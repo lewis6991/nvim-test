@@ -168,12 +168,12 @@ local run_nvim_test = async.void(function(props)
   end
 end)
 
-api.nvim_add_user_command('RunTest', run_nvim_test, {
+api.nvim_create_user_command('RunTest', run_nvim_test, {
   force=true,
   nargs='*' -- shouldn't need this. Must be a bug.
 })
 
-api.nvim_add_user_command('RunTestClear', function()
+api.nvim_create_user_command('RunTestClear', function()
   api.nvim_buf_clear_namespace(0, ns, 0, -1)
   vim.cmd'redraw'
 end, {
