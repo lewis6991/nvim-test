@@ -22,3 +22,48 @@ OPTIONS:
 
 <!-- links -->
 [Busted]: https://lunarmodules.github.io/busted
+
+## Example
+
+Create a `Makefile` with the contents:
+
+```make
+nvim-test:
+	git clone https://github.com/lewis6991/nvim-test
+	nvim-test/bin/nvim-test --init
+
+.PHONY: test
+test: nvim-test
+	nvim-test/bin/nvim-test test \
+		--lpath=$(PWD)/lua/?.lua
+```
+
+
+Add a test file `test/mytest_spec.lua` with the format:
+
+```lua
+local helpers = require('nvim-test.helpers')
+local exec_lua = helpers.exec_lua
+local eq = helpers.eq
+
+describe('my tests', function()
+  before_each(function()
+    helpers.clear()
+
+    -- Make plugin available
+    exec_lua('package.path = ...', package.path)
+  end)
+
+  it('run a test', function()
+    eq(true, exec_lua[[
+        return require('myplugin').foo()
+    ]])
+  end)
+end)
+```
+
+Then to run tests:
+
+```bash
+make test
+```
