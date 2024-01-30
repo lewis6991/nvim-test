@@ -17,7 +17,7 @@ OPTIONS:
   --target_version [NVIM_VERSION] Which version of Nvim to run tests under
                                   (Default 0.9.5)
   --clean                         Redownload test collateral.
-
+  --init                          Initialize nvim-test. Do not run tests.
 ```
 
 <!-- links -->
