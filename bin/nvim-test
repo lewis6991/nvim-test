@@ -5,6 +5,7 @@ set -euo pipefail
 NVIM_TEST_HOME=$(dirname "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)")
 NVIM_RUNNER_VERSION=v0.9.5
 NVIM_TEST_VERSION=v0.9.5
+INIT_ONLY=
 
 DATA=${XDG_DATA_HOME-$HOME/.data}/nvim-test
 mkdir -p "$DATA"
@@ -22,6 +23,7 @@ function help() {
   echo "  --runner_version [NVIM_VERSION] Which version of Nvim to run tests under"
   echo "                                  (Default 0.9.5)"
   echo "  --clean                         Redownload test collateral."
+  echo "  --init                          Initialize nvim-test. Do not run tests."
 }
 
 function parse_args() {
@@ -34,6 +36,9 @@ function parse_args() {
         -h|--help)
           help
           exit
+          ;;
+        --init)
+          INIT_ONLY=1
           ;;
         --clean)
           echo "Cleaning $DATA"
@@ -101,6 +106,10 @@ LUAROCKS="luarocks --lua-version=5.1 --tree $DATA/luarocks"
 if [ ! -f "$DATA/luarocks/bin/busted" ]; then
   echo "Installing busted"
   $LUAROCKS install busted
+fi
+
+if [ $INIT_ONLY ]; then
+  exit
 fi
 
 eval "$($LUAROCKS path)"
