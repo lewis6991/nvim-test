@@ -6,7 +6,7 @@ NVIM_TEST_HOME=$(dirname "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/nu
 NVIM_RUNNER_VERSION=v0.9.5
 NVIM_TEST_VERSION=v0.9.5
 
-DATA=$XDG_DATA_HOME/nvim-test
+DATA=${XDG_DATA_HOME-$HOME/.data}/nvim-test
 mkdir -p "$DATA"
 
 ARGS=()
