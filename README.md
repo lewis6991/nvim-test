@@ -14,7 +14,7 @@ ARGUMENTS:
 OPTIONS:
   --runner_version [NVIM_VERSION] Which version of Nvim to run as the test runner
                                   (Default 0.9.5)
-  --runner_version [NVIM_VERSION] Which version of Nvim to run tests under
+  --target_version [NVIM_VERSION] Which version of Nvim to run tests under
                                   (Default 0.9.5)
   --clean                         Redownload test collateral.
 
