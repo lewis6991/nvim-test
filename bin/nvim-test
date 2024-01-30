@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+NVIM_TEST_HOME=$(dirname "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)")
+NVIM_RUNNER_VERSION=v0.9.5
+NVIM_TEST_VERSION=v0.9.5
+
+DATA=$XDG_DATA_HOME/nvim-test
+mkdir -p "$DATA"
+
+ARGS=()
+
+function help() {
+  echo "Usage: nvim-test [OPTIONS] [--] [BUSTED_ARGS]"
+  echo "ARGUMENTS:"
+  echo "  BUSTED_ARGS                     Arguments passed directly to busted."
+  echo ""
+  echo "OPTIONS:"
+  echo "  --runner_version [NVIM_VERSION] Which version of Nvim to run as the test runner"
+  echo "                                  (Default 0.9.5)"
+  echo "  --runner_version [NVIM_VERSION] Which version of Nvim to run tests under"
+  echo "                                  (Default 0.9.5)"
+  echo "  --clean                         Redownload test collateral."
+}
+
+function parse_args() {
+  local finished=
+  while [[ $# -gt 0 ]]; do
+    if [[ $finished ]]; then
+      ARGS+=("$1") # save positional arg
+    else
+      case $1 in
+        -h|--help)
+          help
+          exit
+          ;;
+        --clean)
+          echo "Cleaning $DATA"
+          rm -rf "$DATA"
+          mkdir -p "$DATA"
+          ;;
+        --runner_version)
+          shift
+          NVIM_RUNNER_VERSION=v$1
+          ;;
+        --target_version)
+          shift
+          NVIM_TEST_VERSION=v$1
+          ;;
+        --)
+          # pass remaining args to busted
+          finished=1
+          ;;
+        *)
+          ARGS+=("$1") # save positional arg
+          ;;
+      esac
+    fi
+    shift
+  done
+}
+
+parse_args "$@"
+
+if [[ $(uname -s) == Darwin ]]; then
+  PLATFORM=macos
+else
+  PLATFORM=linux64
+fi
+
+NVIM_URL=https://github.com/neovim/neovim/releases/download
+
+NVIM_RUNNER="$DATA/nvim-runner-$NVIM_RUNNER_VERSION"
+NVIM_RUNNER_URL="$NVIM_URL/$NVIM_RUNNER_VERSION/nvim-$PLATFORM.tar.gz"
+
+NVIM_TEST="$DATA/nvim-test-$NVIM_TEST_VERSION"
+NVIM_TEST_URL="$NVIM_URL/$NVIM_TEST_VERSION/nvim-$PLATFORM.tar.gz"
+
+function fetch_nvim() {
+  rm -rf "$2"
+  rm -rf nvim-$PLATFORM.tar.gz
+  wget "$1"
+  tar -xf nvim-$PLATFORM.tar.gz
+  rm -rf nvim-$PLATFORM.tar.gz
+  mv nvim-$PLATFORM "$2"
+}
+
+if [ ! -d "$NVIM_TEST" ]; then
+  echo "Download Nvim $NVIM_TEST_VERSION as test target"
+  fetch_nvim "$NVIM_TEST_URL" "$NVIM_TEST"
+fi
+
+if [ ! -d "$NVIM_RUNNER" ]; then
+  echo "Download Nvim $NVIM_RUNNER_VERSION as test runner"
+  fetch_nvim "$NVIM_RUNNER_URL" "$NVIM_RUNNER"
+fi
+
+LUAROCKS="luarocks --lua-version=5.1 --tree $DATA/luarocks"
+
+if [ ! -f "$DATA/luarocks/bin/busted" ]; then
+  echo "Installing busted"
+  $LUAROCKS install busted
+fi
+
+eval "$($LUAROCKS path)"
+
+exec "$NVIM_RUNNER"/bin/nvim -ll \
+  "$NVIM_TEST_HOME/lua/nvim-test/busted/runner.lua" \
+  -v \
+  --helper="$NVIM_TEST_HOME/lua/nvim-test/preload.lua" \
+  --lpath="$NVIM_TEST_HOME/lua/?.lua" \
+  --output nvim-test.busted.output_handler \
+  "${ARGS[@]}"
+
