@@ -105,6 +105,8 @@ fi
 
 eval "$($LUAROCKS path)"
 
+export NVIM_PRG=$NVIM_TEST/bin/nvim
+
 exec "$NVIM_RUNNER"/bin/nvim -ll \
   "$NVIM_TEST_HOME/lua/nvim-test/busted/runner.lua" \
   -v \
