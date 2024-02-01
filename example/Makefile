@@ -16,4 +16,6 @@ nvim-test:
 .PHONY: test
 test: $(NVIM_TEST_HOME)
 	$(NVIM_TEST_HOME)/bin/nvim-test test \
-		--lpath=$(PWD)/lua/?.lua
+		--lpath=$(PWD)/lua/?.lua \
+		--verbose \
+		--coverage

@@ -321,28 +321,44 @@ local function check_close()
   session = nil
 end
 
+local exec_lua = M.exec_lua
+
 --- Starts a new global Nvim session.
 function M.clear()
   check_close()
   local child_stream = ProcessStream.spawn(nvim_cmd)
   session = Session.new(child_stream)
 
-  local status, info = session:request('nvim_get_api_info')
-  assert(status)
+  --- @type integer
+  local channel = M.api.nvim_get_api_info()[1]
 
-  assert(session:request(
-    'nvim_exec_lua',
-    [[
+  exec_lua([[
     local channel = ...
     local orig_error = error
+
+    vim.opt.rtp:append(vim.env.NVIM_TEST_HOME)
 
     function error(...)
       vim.rpcnotify(channel, 'nvim_error_event', debug.traceback(), ...)
       return orig_error(...)
     end
-    ]],
-    { info[1] }
-  ))
+  ]], channel)
+
+  --- @type table?
+  local enable_cov = package.loaded['luacov.runner']
+
+  if enable_cov then
+    exec_lua([[
+      local luacov = require('luacov')
+      table.insert(luacov.configuration.exclude, 'vim/.*')
+
+      vim.api.nvim_create_autocmd('VimLeave', {
+        callback = function()
+          luacov.shutdown()
+        end
+      })
+    ]])
+  end
 end
 
 ---@param ... string
