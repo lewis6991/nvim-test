@@ -4,6 +4,12 @@ Testing framework for Neovim plugins.
 
 Adapted directly from https://github.com/neovim/neovim/tree/master/test
 
+## Requirements
+
+- [Luarocks]
+- [Lua5.1]
+- MacOS or Linux
+
 ## Usage
 
 ```
@@ -67,3 +73,21 @@ Then to run tests:
 ```bash
 make test
 ```
+
+```
+nvim-test/bin/nvim-test test \
+        --lpath=.../nvim-test/example/lua/?.lua
+-------- Global test environment setup.
+-------- Running tests from test/mytest_spec.lua
+RUN       my tests run a test: 1.14 ms OK
+-------- 1 test from test/mytest_spec.lua (11.97 ms total)
+
+-------- Global test environment teardown.
+======== 1 test from 1 test file ran. (12.13 ms total)
+PASSED   1 test.
+```
+
+See [example](./example) for more details.
+
+[Luarocks]: https://luarocks.org/
+[Lua5.1]: https://www.lua.org/versions.html#5.1
