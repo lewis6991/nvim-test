@@ -4,6 +4,8 @@ Testing framework for Neovim plugins.
 
 Adapted directly from https://github.com/neovim/neovim/tree/master/test
 
+- Support integration with LuaCov
+
 ## Requirements
 
 - [Luarocks]
