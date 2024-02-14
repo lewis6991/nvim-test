@@ -151,6 +151,10 @@ local nvim_set = table.concat({
   'noautoindent',
   'startofline',
   'laststatus=1',
+  'undodir=.',
+  'directory=.',
+  'viewdir=.',
+  'backupdir=.',
   'wildoptions-=pum',
   'joinspaces',
   'noshowcmd',
@@ -161,6 +165,7 @@ local nvim_set = table.concat({
 
 local nvim_cmd = {
   os.getenv('NVIM_PRG') or 'nvim',
+  '--clean',
   '-u',
   'NONE',
   '-i',
