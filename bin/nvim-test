@@ -21,7 +21,7 @@ function help() {
   echo "OPTIONS:"
   echo "  --runner_version [NVIM_VERSION] Which version of Nvim to run as the test runner"
   echo "                                  (Default 0.9.5)"
-  echo "  --runner_version [NVIM_VERSION] Which version of Nvim to run tests under"
+  echo "  --target_version [NVIM_VERSION] Which version of Nvim to run tests under"
   echo "                                  (Default 0.9.5)"
   echo "  --clean                         Redownload test collateral."
   echo "  --init                          Initialize nvim-test. Do not run tests."
