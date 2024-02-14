@@ -335,11 +335,30 @@ function M.clear()
   exec_lua([[
     local channel = ...
     local orig_error = error
+    local orig_pcall = pcall
+    local orig_xpcall = xpcall
 
     vim.opt.rtp:append(vim.env.NVIM_TEST_HOME)
+    local protected = false
+
+    function pcall(...)
+      protected = true
+      local ret = { orig_pcall(...) }
+      protected = false
+      return unpack(ret, 1, table.maxn(ret))
+    end
+
+    function xpcall(...)
+      protected = true
+      local ret = { orig_xpcall(...) }
+      protected = false
+      return unpack(ret, 1, table.maxn(ret))
+    end
 
     function error(...)
-      vim.rpcnotify(channel, 'nvim_error_event', debug.traceback(), ...)
+      if not protected then
+        vim.rpcnotify(channel, 'nvim_error_event', debug.traceback(), ...)
+      end
       return orig_error(...)
     end
   ]], channel)
