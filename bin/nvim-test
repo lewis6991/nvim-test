@@ -3,8 +3,8 @@
 set -euo pipefail
 
 NVIM_TEST_HOME=$(dirname "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)")
-NVIM_RUNNER_VERSION=v0.9.5
-NVIM_TEST_VERSION=v0.9.5
+NVIM_RUNNER_VERSION=${NVIM_RUNNER_VERSION:-v0.9.5}
+NVIM_TEST_VERSION=${NVIM_TEST_VERSION:-v0.9.5}
 INIT_ONLY=
 LUACOV_ENABLED=
 
@@ -21,7 +21,7 @@ function help() {
   echo "OPTIONS:"
   echo "  --runner_version [NVIM_VERSION] Which version of Nvim to run as the test runner"
   echo "                                  (Default 0.9.5)"
-  echo "  --target_version [NVIM_VERSION] Which version of Nvim to run tests under"
+  echo "  --target_version [NVIM_VERSION] Which version of Nvim to run tests on"
   echo "                                  (Default 0.9.5)"
   echo "  --clean                         Redownload test collateral."
   echo "  --init                          Initialize nvim-test. Do not run tests."
@@ -74,37 +74,51 @@ function parse_args() {
 
 parse_args "$@"
 
-if [[ $(uname -s) == Darwin ]]; then
-  PLATFORM=macos
-else
-  PLATFORM=linux64
-fi
+function get_nvim_asset() {
+  local version="$1"
+  local platform
+
+  if [[ $(uname -s) == Darwin ]]; then
+    if [[ $version == v0.[789].* ]]; then
+      # prior to 0.10, MacOS builds were universal
+      platform=macos
+    else
+      platform=macos-$(uname -m)
+    fi
+  else
+    platform=linux64
+  fi
+
+  echo "nvim-$platform"
+}
 
 NVIM_URL=https://github.com/neovim/neovim/releases/download
 
 NVIM_RUNNER="$DATA/nvim-runner-$NVIM_RUNNER_VERSION"
-NVIM_RUNNER_URL="$NVIM_URL/$NVIM_RUNNER_VERSION/nvim-$PLATFORM.tar.gz"
-
 NVIM_TEST="$DATA/nvim-test-$NVIM_TEST_VERSION"
-NVIM_TEST_URL="$NVIM_URL/$NVIM_TEST_VERSION/nvim-$PLATFORM.tar.gz"
 
 function fetch_nvim() {
-  rm -rf "$2"
-  rm -rf nvim-$PLATFORM.tar.gz
-  wget "$1"
-  tar -xf nvim-$PLATFORM.tar.gz
-  rm -rf nvim-$PLATFORM.tar.gz
-  mv nvim-$PLATFORM "$2"
+  local version="$1"
+  local dst="$2"
+  local asset; asset="$(get_nvim_asset "$version")"
+  local url="$NVIM_URL/$version/$asset.tar.gz"
+
+  rm -rf "$dst"
+  rm -rf "$asset.tar.gz"
+  wget "$url"
+  tar -xf "$asset.tar.gz"
+  rm -rf "$asset.tar.gz"
+  mv "$asset" "$dst"
 }
 
 if [ ! -d "$NVIM_TEST" ]; then
   echo "Download Nvim $NVIM_TEST_VERSION as test target"
-  fetch_nvim "$NVIM_TEST_URL" "$NVIM_TEST"
+  fetch_nvim "$NVIM_TEST_VERSION" "$NVIM_TEST"
 fi
 
 if [ ! -d "$NVIM_RUNNER" ]; then
   echo "Download Nvim $NVIM_RUNNER_VERSION as test runner"
-  fetch_nvim "$NVIM_RUNNER_URL" "$NVIM_RUNNER"
+  fetch_nvim "$NVIM_RUNNER_VERSION" "$NVIM_RUNNER"
 fi
 
 LUAROCKS="luarocks --lua-version=5.1 --tree $DATA/luarocks"
