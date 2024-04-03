@@ -91,5 +91,16 @@ PASSED   1 test.
 
 See [example](./example) for more details.
 
+
+## Projects Using Nvim-Test
+
+- [gitsigns.nvim]
+- [pckr.nvim]
+- [nvim-treesitter-context]
+
+<!-- links -->
+[gitsigns.nvim]: https://github.com/lewis6991/gitsigns.nvim
+[pckr.nvim]: https://github.com/lewis6991/pckr.nvim
+[nvim-treesitter-context]: https://github.com/nvim-treesitter/nvim-treesitter-context
 [Luarocks]: https://luarocks.org/
 [Lua5.1]: https://www.lua.org/versions.html#5.1
