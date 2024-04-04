@@ -1,5 +1,5 @@
 local assert = require('luassert')
-local luv = vim.loop
+local uv = vim.uv or vim.loop
 local Session = require('nvim-test.client.session')
 local ProcessStream = require('nvim-test.client.uv_stream')
 
@@ -7,7 +7,7 @@ assert:set_parameter('TableFormatLevel', 100)
 
 local M = {}
 
-M.sleep = luv.sleep
+M.sleep = uv.sleep
 
 M.eq = assert.are.same
 M.neq = assert.are_not.same
@@ -22,7 +22,7 @@ end
 assert:register('assertion', 'epicfail', epicfail)
 
 function M.matches(pat, actual)
-  if nil ~= string.match(actual, pat) then
+  if actual:match(pat) then
     return true
   end
   error(string.format('Pattern does not match.\nPattern:\n%s\nActual:\n%s', pat, actual))
@@ -48,6 +48,7 @@ function M.pcall(fn, ...)
     :gsub('([%s<])vim[/\\]([^%s:/\\]+):%d+', '%1\xffvim\xff%2:0')
     :gsub('[^%s<]-[/\\]([^%s:/\\]+):%d+', '.../%1:0')
     :gsub('\xffvim\xff', 'vim/')
+
   -- Scrub numbers in paths/stacktraces:
   --    shared.lua:0: in function 'gsplit'
   --    shared.lua:0: in function <shared.lua:0>'
@@ -77,44 +78,19 @@ end
 --- @generic R
 --- @param fn fun(...): R
 --- @param ... any arguments
---- @return R
-local function pcall_err_withfile(fn, ...)
-  local status, rv = M.pcall(fn, ...)
-  if status == true then
+--- @return string
+function M.pcall_err(fn, ...)
+  local status, err = M.pcall(fn, ...)
+  if status then
     error('expected failure, but got success')
   end
-  return rv
-end
 
-local function pcall_err_withtrace(fn, ...)
-  local errmsg = pcall_err_withfile(fn, ...)
-
-  return errmsg
+  --- @cast err string
+  return (err
     :gsub('^%.%.%./helpers%.lua:0: ', '')
     :gsub('^Error executing lua:- ', '')
     :gsub('^%[string "<nvim>"%]:0: ', '')
-end
-
-function M.pcall_err(...)
-  return M.remove_trace(pcall_err_withtrace(...))
-end
-
-function M.remove_trace(s)
-  return (s:gsub('\n%s*stack traceback:.*', ''))
-end
-
--- Concat list-like tables.
-function M.concat_tables(...)
-  local ret = {}
-  for i = 1, select('#', ...) do
-    local tbl = select(i, ...)
-    if tbl then
-      for _, v in ipairs(tbl) do
-        ret[#ret + 1] = v
-      end
-    end
-  end
-  return ret
+    :gsub('\n%s*stack traceback:.*', ''))
 end
 
 --- @param str string
@@ -298,21 +274,14 @@ function M.feed(...)
   end
 end
 
---- @param ... string
-local function rawfeed(...)
-  for _, v in ipairs({ ... }) do
-    nvim_feed(M.dedent(v))
-  end
-end
-
 local function check_close()
   if not session then
     return
   end
-  local start_time = luv.now()
+  local start_time = uv.now()
   session:close()
-  luv.update_time() -- Update cached value of luv.now() (libuv: uv_now()).
-  local end_time = luv.now()
+  uv.update_time() -- Update cached value of luv.now() (libuv: uv_now()).
+  local end_time = uv.now()
   local delta = end_time - start_time
   if delta > 500 then
     print(
@@ -390,37 +359,22 @@ function M.insert(...)
   nvim_feed('i')
   for _, v in ipairs({ ... }) do
     local escaped = v:gsub('<', '<lt>')
-    rawfeed(escaped)
+    M.feed(escaped)
   end
   nvim_feed('<ESC>')
 end
 
 function M.exc_exec(cmd)
-  M.api.nvim_command(([[
+  M.api.nvim_command(string.format([[
     try
       execute "%s"
     catch
       let g:__exception = v:exception
     endtry
-  ]]):format(cmd:gsub('\n', '\\n'):gsub('[\\"]', '\\%0')))
+  ]], cmd:gsub('\n', '\\n'):gsub('[\\"]', '\\%0')))
   local ret = M.api.nvim_eval('get(g:, "__exception", 0)')
   M.api.nvim_command('unlet! g:__exception')
   return ret
-end
-
---- @param after_each fun(block:fun())
-function M.after_each(after_each)
-  after_each(function()
-    if not session then
-      return
-    end
-    local msg = session:next_message(0)
-    if msg then
-      if msg[1] == 'notification' and msg[2] == 'nvim_error_event' then
-        error(msg[3][2])
-      end
-    end
-  end)
 end
 
 local it_id = 0

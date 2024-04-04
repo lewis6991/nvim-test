@@ -73,13 +73,27 @@
 local helpers = require('nvim-test.helpers')
 local busted = require('busted')
 local deepcopy = vim.deepcopy
-local concat_tables = helpers.concat_tables
 local pesc = vim.pesc
 local run_session = helpers.run_session
 local eq = helpers.eq
 local dedent = helpers.dedent
 local get_session = helpers.get_session
 local create_callindex = helpers.create_callindex
+
+-- Concat list-like tables.
+--- @generic T: any[]
+--- @param ... T
+--- @return T
+local function concat_tables(...)
+  local ret = {} --- @type any[]
+  for i = 1, select('#', ...) do
+    local tbl = select(i, ...) --- @type any[]
+    for _, v in ipairs(tbl or {}) do
+      ret[#ret + 1] = v
+    end
+  end
+  return ret
+end
 
 --- @generic T
 --- @param orig T
