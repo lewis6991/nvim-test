@@ -53,11 +53,11 @@ function parse_args() {
           ;;
         --runner_version)
           shift
-          NVIM_RUNNER_VERSION=v$1
+          NVIM_RUNNER_VERSION=$1
           ;;
         --target_version)
           shift
-          NVIM_TEST_VERSION=v$1
+          NVIM_TEST_VERSION=$1
           ;;
         --)
           # pass remaining args to busted
