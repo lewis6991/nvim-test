@@ -1,5 +1,4 @@
-local uv = vim.loop
-local MsgpackRpcStream = require('nvim-test.client.msgpack_rpc_stream')
+local uv = vim.uv or vim.loop
 
 --- @class test.Session
 --- @field private _msgpack_rpc_stream test.MsgpackRpcStream
@@ -7,11 +6,9 @@ local MsgpackRpcStream = require('nvim-test.client.msgpack_rpc_stream')
 --- @field private _prepare uv.uv_prepare_t
 --- @field private _timer uv.uv_timer_t
 --- @field private _is_running boolean
+--- @field private _log_cb? fun(type: string, method: string, args: any[])
 local M = {}
 M.__index = M
-
--- luajit pcall is already coroutine safe
-M.safe_pcall = pcall
 
 local function resume(co, ...)
   local status, result = coroutine.resume(co, ...)
@@ -37,7 +34,7 @@ local function coroutine_exec(func, ...)
   end
 
   resume(coroutine.create(function()
-    local status, result, flag = M.safe_pcall(func, unpack(args))
+    local status, result, flag = pcall(func, unpack(args))
     if on_complete then
       coroutine.yield(function()
         -- run the completion callback on the main thread
@@ -47,12 +44,16 @@ local function coroutine_exec(func, ...)
   end))
 end
 
-function M.new(stream)
+---@param stream test.MsgpackRpcStream
+---@param log_cb? fun(type: string, method: string, args: any[])
+---@return test.Session
+function M.new(stream, log_cb)
   return setmetatable({
-    _msgpack_rpc_stream = MsgpackRpcStream.new(stream),
+    _msgpack_rpc_stream = stream,
     _pending_messages = {},
     _prepare = uv.new_prepare(),
     _timer = uv.new_timer(),
+    _log_cb = log_cb,
     _is_running = false,
   }, M)
 end
@@ -206,7 +207,22 @@ function M:_run(request_cb, notification_cb, timeout)
       self._prepare:stop()
     end)
   end
-  self._msgpack_rpc_stream:read_start(request_cb, notification_cb, function()
+
+  local request_cb_logged = function(...)
+    if self._log_cb then
+      self._log_cb(...)
+    end
+    return request_cb(...)
+  end
+
+  local notification_cb_logged = function(...)
+    if self._log_cb then
+      self._log_cb(...)
+    end
+    return notification_cb(...)
+  end
+
+  self._msgpack_rpc_stream:read_start(request_cb_logged, notification_cb_logged, function()
     uv.stop()
     self.eof_err = { 1, 'EOF was received from Nvim. Likely the Nvim process crashed.' }
   end)

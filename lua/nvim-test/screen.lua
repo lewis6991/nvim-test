@@ -398,7 +398,7 @@ end
 --- @field mouse_enabled? boolean
 ---
 --- @field win_viewport? table<integer,table<string,integer>>
---- @field float_pos? {[1]:integer,[2]:integer}
+--- @field float_pos? [integer,integer]
 --- @field hl_groups? table<string,integer>
 ---
 --- The following keys should be used to expect the state of various ext_
@@ -431,6 +431,7 @@ end
 ---
 --- @param expected string|function|test.function.ui.screen.Expect
 --- @param attr_ids? table<integer,table<string,any>>
+--- @param ... any
 function M:expect(expected, attr_ids, ...)
   --- @type string, fun()
   local grid, condition
@@ -818,6 +819,7 @@ end
 
 --- @private
 --- @param updates {[1]:string, [integer]:any[]}[]
+--- @return boolean
 function M:_redraw(updates)
   local did_flush = false
   for k, update in ipairs(updates) do
@@ -1685,7 +1687,7 @@ function M:_insert_hl_id(attr_state, hl_id)
 end
 
 function M:linegrid_check_attrs(attrs)
-  local id_to_index = {}
+  local id_to_index = {} --- @type table<integer,string>
   for i, def_attr in pairs(self._attr_table) do
     local iinfo = self._hl_info[i]
     local matchinfo = {}

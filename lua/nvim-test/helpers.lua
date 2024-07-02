@@ -2,6 +2,7 @@ local assert = require('luassert')
 local uv = vim.uv or vim.loop
 local Session = require('nvim-test.client.session')
 local ProcessStream = require('nvim-test.client.uv_stream')
+local MsgpackRpcStream = require('nvim-test.client.msgpack_rpc_stream')
 
 assert:set_parameter('TableFormatLevel', 100)
 
@@ -164,7 +165,7 @@ end
 --- @param ... any
 --- @return string
 local function call_and_stop_on_error(lsession, ...)
-  local status, result = Session.safe_pcall(...)
+  local status, result = pcall(...)
   if not status then
     lsession:stop()
     last_error = result
@@ -300,14 +301,26 @@ local exec_lua = M.exec_lua
 --- Starts a new global Nvim session.
 function M.clear()
   check_close()
-  local child_stream = ProcessStream.spawn(nvim_cmd)
-  session = Session.new(child_stream)
+  local proc_stream = ProcessStream.spawn(nvim_cmd)
+  local msgpack_stream = MsgpackRpcStream.new(proc_stream)
+
+  local log_cb --- @type function?
+  -- if M.options.verbose then
+  --   log_cb = function(method, args)
+  --     if method == 'nvim_print_event' or method == 'nvim_error_event' then
+  --       print(method, ':', vim.inspect(args))
+  --     end
+  --   end
+  -- end
+
+  session = Session.new(msgpack_stream, log_cb)
 
   --- @type integer
   local channel = M.api.nvim_get_api_info()[1]
 
   exec_lua([[
     local channel = ...
+    local orig_print = print
     local orig_error = error
     local orig_pcall = pcall
     local orig_xpcall = xpcall
@@ -334,6 +347,11 @@ function M.clear()
         vim.rpcnotify(channel, 'nvim_error_event', debug.traceback(), ...)
       end
       return orig_error(...)
+    end
+
+    function print(...)
+      -- vim.rpcnotify(channel, 'nvim_print_event', ...)
+      return orig_print(...)
     end
   ]], channel)
 

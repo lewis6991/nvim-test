@@ -85,34 +85,34 @@ return function(options)
   local errorCount = 0
 
   local pendingDescription = function(pending)
-    local string = ''
+    local s = ''
 
     if type(pending.message) == 'string' then
-      string = string .. pending.message .. '\n'
+      s = s .. pending.message .. '\n'
     elseif pending.message ~= nil then
-      string = string .. pretty.write(pending.message) .. '\n'
+      s = s .. pretty.write(pending.message) .. '\n'
     end
 
-    return string
+    return s
   end
 
   local failureDescription = function(failure)
-    local string = failure.randomseed and ('Random seed: ' .. failure.randomseed .. '\n') or ''
+    local s = failure.randomseed and ('Random seed: ' .. failure.randomseed .. '\n') or ''
     if type(failure.message) == 'string' then
-      string = string .. failure.message
+      s = s .. failure.message
     elseif failure.message == nil then
-      string = string .. 'Nil error'
+      s = s .. 'Nil error'
     else
-      string = string .. pretty.write(failure.message)
+      s = s .. pretty.write(failure.message)
     end
 
-    string = string .. '\n'
+    s = s .. '\n'
 
     if options.verbose and failure.trace and failure.trace.traceback then
-      string = string .. failure.trace.traceback .. '\n'
+      s = s .. failure.trace.traceback .. '\n'
     end
 
-    return string
+    return s
   end
 
   local getFileLine = function(element)
@@ -127,23 +127,23 @@ return function(options)
   end
 
   local getTestList = function(status, count, list, getDescription)
-    local string = ''
+    local s = ''
     local header = summaryStrings[status].header
     if count > 0 and header then
       local tests = (count == 1 and 'test' or 'tests')
       local errors = (count == 1 and 'error' or 'errors')
-      string = header:format(count, status == 'error' and errors or tests)
+      s = header:format(count, status == 'error' and errors or tests)
 
       local testString = summaryStrings[status].test
       if testString then
         for _, t in ipairs(list) do
           local fullname = getFileLine(t.element) .. colors.bright(t.name)
-          string = string .. testString:format(fullname)
-          string = string .. getDescription(t)
+          s = s .. testString:format(fullname)
+          s = s .. getDescription(t)
         end
       end
     end
-    return string
+    return s
   end
 
   local getSummary = function(status, count)
@@ -249,26 +249,26 @@ return function(options)
   end
 
   handler.testEnd = function(element, _parent, status, _debug)
-    local string --- @type string
+    local s --- @type string
 
     fileTestCount = fileTestCount + 1
     testCount = testCount + 1
     if status == 'success' then
       successCount = successCount + 1
-      string = successString
+      s = successString
     elseif status == 'pending' then
       skippedCount = skippedCount + 1
-      string = skippedString
+      s = skippedString
     elseif status == 'failure' then
       failureCount = failureCount + 1
-      string = failureString .. failureDescription(handler.failures[#handler.failures])
+      s = failureString .. failureDescription(handler.failures[#handler.failures])
     elseif status == 'error' then
       errorCount = errorCount + 1
-      string = errorString .. failureDescription(handler.errors[#handler.errors])
+      s = errorString .. failureDescription(handler.errors[#handler.errors])
     else
-      string = 'unexpected test status! (' .. status .. ')'
+      s = 'unexpected test status! (' .. status .. ')'
     end
-    write_status(element, string)
+    write_status(element, s)
 
     return nil, true
   end
