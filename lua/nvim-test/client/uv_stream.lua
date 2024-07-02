@@ -1,30 +1,29 @@
-local uv = vim.loop
+local uv = vim.uv or vim.loop
 
---- @class ProcessStream
---- @field _proc uv.uv_process_t
---- @field _pid integer
---- @field _child_stdin uv.uv_pipe_t
---- @field _child_stdout uv.uv_pipe_t
---- @field _exiting boolean
+--- @class test.ProcessStream
+--- @field private _proc uv.uv_process_t
+--- @field private _pid integer
+--- @field private _stdin uv.uv_pipe_t
+--- @field private _stdout uv.uv_pipe_t
+--- @field private _closed true?
 --- @field signal integer
 --- @field status integer
-local ProcessStream = {}
+local M = {}
 
 --- @param argv string[]
---- @return ProcessStream
-function ProcessStream.spawn(argv)
-  --- @type ProcessStream
+--- @return test.ProcessStream
+function M.spawn(argv)
+  --- @type test.ProcessStream
   local self = setmetatable({
-    _child_stdin = uv.new_pipe(false),
-    _child_stdout = uv.new_pipe(false),
-    _exiting = false,
-  }, { __index = ProcessStream })
+    _stdin = uv.new_pipe(false),
+    _stdout = uv.new_pipe(false),
+  }, { __index = M })
 
   local prog, args = argv[1], vim.list_slice(argv, 2)
 
   --- @diagnostic disable-next-line:missing-fields
   self._proc, self._pid = uv.spawn(prog, {
-    stdio = { self._child_stdin, self._child_stdout, 2 },
+    stdio = { self._stdin, self._stdout, 2 },
     args = args,
   }, function(status, signal)
     self.status = status
@@ -39,12 +38,12 @@ function ProcessStream.spawn(argv)
   return self
 end
 
-function ProcessStream:write(data)
-  self._child_stdin:write(data)
+function M:write(data)
+  self._stdin:write(data)
 end
 
-function ProcessStream:read_start(cb)
-  self._child_stdout:read_start(function(err, chunk)
+function M:read_start(cb)
+  self._stdout:read_start(function(err, chunk)
     if err then
       error(err)
     end
@@ -52,21 +51,21 @@ function ProcessStream:read_start(cb)
   end)
 end
 
-function ProcessStream:read_stop()
-  self._child_stdout:read_stop()
+function M:read_stop()
+  self._stdout:read_stop()
 end
 
 --- @param signal string
 --- @return integer?
 --- @return integer?
-function ProcessStream:close(signal)
+function M:close(signal)
   if self._closed then
     return
   end
   self._closed = true
   self:read_stop()
-  self._child_stdin:close()
-  self._child_stdout:close()
+  self._stdin:close()
+  self._stdout:close()
   if type(signal) == 'string' then
     self._proc:kill('sig' .. signal)
   end
@@ -76,4 +75,4 @@ function ProcessStream:close(signal)
   return self.status, self.signal
 end
 
-return ProcessStream
+return M

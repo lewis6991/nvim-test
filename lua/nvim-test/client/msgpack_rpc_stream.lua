@@ -1,5 +1,10 @@
---- @class vim.mpack.session
---- @field receive function
+--- @alias test.MessageType 'request'|'notification'|'response'
+
+--- @class vim.mpack.Session
+--- @field receive fun(self, data: string, pos: integer): type: test.MessageType, id_or_cb: integer|function, method_or_error: string, args_or_result: any[], pos: integer
+--- @field request fun(self, ...)
+--- @field notify fun(self, ...)
+--- @field reply fun(self, id: integer)
 
 --- @class vim.mpack.Packer
 
@@ -9,42 +14,19 @@
 --- @field encode fun(obj: any): string
 --- @field decode fun(obj: string): any
 --- @field Packer fun(opts): vim.mpack.Packer
---- @field Session fun(opts): vim.mpack.session
+--- @field Session fun(opts): vim.mpack.Session
 --- @field Unpacker fun(opts): vim.mpack.Unacker
 --- @field NIL userdata vim.NIL
 local mpack = vim.mpack
 
-local Response = {}
-Response.__index = Response
-
-function Response.new(msgpack_rpc_stream, request_id)
-  return setmetatable({
-    _msgpack_rpc_stream = msgpack_rpc_stream,
-    _request_id = request_id,
-  }, Response)
-end
-
-function Response:send(value, is_error)
-  --- @type string[]
-  local data = { self._msgpack_rpc_stream._session:reply(self._request_id) }
-  if is_error then
-    data[#data + 1] = self._msgpack_rpc_stream._pack(value)
-    data[#data + 1] = self._msgpack_rpc_stream._pack(mpack.NIL)
-  else
-    data[#data + 1] = self._msgpack_rpc_stream._pack(mpack.NIL)
-    data[#data + 1] = self._msgpack_rpc_stream._pack(value)
-  end
-  self._msgpack_rpc_stream._stream:write(table.concat(data))
-end
-
 --- @class test.MsgpackRpcStream
---- @field private _stream ProcessStream
---- @field private _session unknown
---- @field private _pack unknown
-local MsgpackRpcStream = {}
-MsgpackRpcStream.__index = MsgpackRpcStream
+--- @field package _stream test.ProcessStream
+--- @field package _session vim.mpack.Session
+--- @field package _pack vim.mpack.Packer
+local M = {}
+M.__index = M
 
-function MsgpackRpcStream.new(stream)
+function M.new(stream)
   return setmetatable({
     _stream = stream,
     _pack = mpack.Packer(),
@@ -66,10 +48,13 @@ function MsgpackRpcStream.new(stream)
         },
       }),
     }),
-  }, MsgpackRpcStream)
+  }, M)
 end
 
-function MsgpackRpcStream:write(method, args, response_cb)
+---@param method string
+---@param args any[]
+---@param response_cb? function
+function M:write(method, args, response_cb)
   local data --- @type string[]
   if response_cb then
     assert(type(response_cb) == 'function')
@@ -84,45 +69,62 @@ function MsgpackRpcStream:write(method, args, response_cb)
   self._stream:write(table.concat(data))
 end
 
-function MsgpackRpcStream:read_start(request_cb, notification_cb, eof_cb)
+--- @private
+--- @param id integer
+--- @param value any
+--- @param is_error boolean
+function M:_respond(id, value, is_error)
+  --- @type string[]
+  local data = { self._session:reply(id) }
+  if is_error then
+    data[#data + 1] = self._pack(value)
+    data[#data + 1] = self._pack(mpack.NIL)
+  else
+    data[#data + 1] = self._pack(mpack.NIL)
+    data[#data + 1] = self._pack(value)
+  end
+  self._stream:write(table.concat(data))
+end
+
+---@param request_cb fun(method: string, args: any[], resp: fun(value: any, is_error: boolean))
+---@param notification_cb fun(method: string, args: any[])
+---@param eof_cb any
+function M:read_start(request_cb, notification_cb, eof_cb)
   self._stream:read_start(function(data)
     if not data then
       return eof_cb()
     end
 
-    local type --- @type 'request'|'notification'|'response'
-    local id_or_cb --- @type integer|function
-    local method_or_error --- @type string?
-    local args_or_result --- @type any
-    local pos = 1
-    local len = #data
+    local pos, len = 1, #data
 
     while pos <= len do
-      type, id_or_cb, method_or_error, args_or_result, pos = self._session:receive(data, pos)
-      if type == 'request' or type == 'notification' then
-        if type == 'request' then
-          request_cb(method_or_error, args_or_result, Response.new(self, id_or_cb))
-        else
-          notification_cb(method_or_error, args_or_result)
-        end
+      local type, id_or_cb, method_or_error, args_or_result, pos0 = self._session:receive(data, pos)
+      pos = pos0
+
+      if type == 'request' then
+        assert(type(id_or_cb) == 'number')
+        request_cb(method_or_error, args_or_result, function(value, is_error)
+          self:_respond(id_or_cb, value, is_error)
+        end)
+      elseif type == 'notification' then
+        notification_cb(method_or_error, args_or_result)
       elseif type == 'response' then
         if method_or_error == mpack.NIL then
-          method_or_error = nil
+          id_or_cb(nil, args_or_result)
         else
-          args_or_result = nil
+          id_or_cb(method_or_error)
         end
-        id_or_cb(method_or_error, args_or_result)
       end
     end
   end)
 end
 
-function MsgpackRpcStream:read_stop()
+function M:read_stop()
   self._stream:read_stop()
 end
 
-function MsgpackRpcStream:close(signal)
+function M:close(signal)
   self._stream:close(signal)
 end
 
-return MsgpackRpcStream
+return M

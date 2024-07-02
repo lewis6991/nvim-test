@@ -2,16 +2,16 @@ local uv = vim.loop
 local MsgpackRpcStream = require('nvim-test.client.msgpack_rpc_stream')
 
 --- @class test.Session
---- @field private _msgpack_rpc_stream MsgpackRpcStream
+--- @field private _msgpack_rpc_stream test.MsgpackRpcStream
 --- @field private _pending_messages string[]
 --- @field private _prepare uv.uv_prepare_t
 --- @field private _timer uv.uv_timer_t
 --- @field private _is_running boolean
-local Session = {}
-Session.__index = Session
+local M = {}
+M.__index = M
 
 -- luajit pcall is already coroutine safe
-Session.safe_pcall = pcall
+M.safe_pcall = pcall
 
 local function resume(co, ...)
   local status, result = coroutine.resume(co, ...)
@@ -37,7 +37,7 @@ local function coroutine_exec(func, ...)
   end
 
   resume(coroutine.create(function()
-    local status, result, flag = Session.safe_pcall(func, unpack(args))
+    local status, result, flag = M.safe_pcall(func, unpack(args))
     if on_complete then
       coroutine.yield(function()
         -- run the completion callback on the main thread
@@ -47,19 +47,19 @@ local function coroutine_exec(func, ...)
   end))
 end
 
-function Session.new(stream)
+function M.new(stream)
   return setmetatable({
     _msgpack_rpc_stream = MsgpackRpcStream.new(stream),
     _pending_messages = {},
     _prepare = uv.new_prepare(),
     _timer = uv.new_timer(),
     _is_running = false,
-  }, Session)
+  }, M)
 end
 
 --- @param timeout integer
 --- @return string
-function Session:next_message(timeout)
+function M:next_message(timeout)
   if self._is_running then
     error('Event loop already running')
   end
@@ -82,11 +82,11 @@ function Session:next_message(timeout)
   return table.remove(self._pending_messages, 1)
 end
 
-function Session:notify(method, ...)
+function M:notify(method, ...)
   self._msgpack_rpc_stream:write(method, { ... })
 end
 
-function Session:request(method, ...)
+function M:request(method, ...)
   local args = { ... }
   local err, result
   if self._is_running then
@@ -106,7 +106,7 @@ end
 ---@param notification_cb fun()?
 ---@param setup_cb fun()?
 ---@param timeout integer?
-function Session:run(request_cb, notification_cb, setup_cb, timeout)
+function M:run(request_cb, notification_cb, setup_cb, timeout)
   local function on_request(method, args, response)
     coroutine_exec(request_cb, method, args, function(status, result, flag)
       if status then
@@ -140,11 +140,11 @@ function Session:run(request_cb, notification_cb, setup_cb, timeout)
   self._is_running = false
 end
 
-function Session:stop()
+function M:stop()
   uv.stop()
 end
 
-function Session:close(signal)
+function M:close(signal)
   if not self._timer:is_closing() then
     self._timer:close()
   end
@@ -154,10 +154,11 @@ function Session:close(signal)
   self._msgpack_rpc_stream:close(signal)
 end
 
+--- @private
 --- @param method string
 --- @param args any[]
 --- @return any
-function Session:_yielding_request(method, args)
+function M:_yielding_request(method, args)
   --- @param co thread
   return coroutine.yield(function(co)
     self._msgpack_rpc_stream:write(method, args, function(err, result)
@@ -166,8 +167,12 @@ function Session:_yielding_request(method, args)
   end)
 end
 
+--- @private
 --- @param method string
-function Session:_blocking_request(method, args)
+--- @param args any[]
+--- @return [integer, string]?, any?
+function M:_blocking_request(method, args)
+  --- @type [integer, string]?, any?
   local err, result
 
   local function on_request(method_, args_, response)
@@ -188,10 +193,11 @@ function Session:_blocking_request(method, args)
   return (err or self.eof_err), result
 end
 
+--- @private
 --- @param request_cb function
 --- @param notification_cb function
 --- @param timeout? integer
-function Session:_run(request_cb, notification_cb, timeout)
+function M:_run(request_cb, notification_cb, timeout)
   if type(timeout) == 'number' then
     self._prepare:start(function()
       self._timer:start(timeout, 0, function()
@@ -210,4 +216,4 @@ function Session:_run(request_cb, notification_cb, timeout)
   self._msgpack_rpc_stream:read_stop()
 end
 
-return Session
+return M

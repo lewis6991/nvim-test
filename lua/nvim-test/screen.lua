@@ -138,8 +138,8 @@ end
 --- @field private _grid_win_extmarks table<integer,table>
 --- @field private _attr_table table<integer,table>
 --- @field private _hl_info table<integer,table>
-local Screen = {}
-Screen.__index = Screen
+local M = {}
+M.__index = M
 
 local default_timeout_factor = 1
 if os.getenv('VALGRIND') then
@@ -152,7 +152,7 @@ end
 
 local default_screen_timeout = default_timeout_factor * 3500
 
-function Screen._init_colors()
+function M._init_colors()
   local session = get_session()
   local status, rv = session:request('nvim_get_color_map')
   if not status then
@@ -165,16 +165,16 @@ function Screen._init_colors()
     -- this is just a helper to get any canonical name of a color
     colornames[rgb] = name
   end
-  Screen.colors = colors
-  Screen.colornames = colornames
+  M.colors = colors
+  M.colornames = colornames
 end
 
 --- @param width? integer
 --- @param height? integer
 --- @return test.screen
-function Screen.new(width, height)
-  if not Screen.colors then
-    Screen._init_colors()
+function M.new(width, height)
+  if not M.colors then
+    M._init_colors()
   end
 
   local self = setmetatable({
@@ -221,7 +221,7 @@ function Screen.new(width, height)
       col = 1,
     },
     _busy = false,
-  }, Screen)
+  }, M)
   local function ui(method, ...)
     local status, rv = self._session:request('nvim_ui_' .. method, ...)
     if not status then
@@ -232,15 +232,15 @@ function Screen.new(width, height)
   return self
 end
 
-function Screen:set_default_attr_ids(attr_ids)
+function M:set_default_attr_ids(attr_ids)
   self._default_attr_ids = attr_ids
 end
 
-function Screen:get_default_attr_ids()
+function M:get_default_attr_ids()
   return deepcopy(self._default_attr_ids)
 end
 
-function Screen:set_rgb_cterm(val)
+function M:set_rgb_cterm(val)
   self._rgb_cterm = val
 end
 
@@ -255,7 +255,7 @@ end
 
 --- @param options? test.screen.Opts
 --- @param session? test.Session
-function Screen:attach(options, session)
+function M:attach(options, session)
   session = session or get_session()
   options = options or {}
 
@@ -278,22 +278,22 @@ function Screen:attach(options, session)
   end
 end
 
-function Screen:detach()
+function M:detach()
   self.uimeths.detach()
   self._session = nil
 end
 
-function Screen:try_resize(columns, rows)
+function M:try_resize(columns, rows)
   self._width = columns
   self._height = rows
   self.uimeths.try_resize(columns, rows)
 end
 
-function Screen:try_resize_grid(grid, columns, rows)
+function M:try_resize_grid(grid, columns, rows)
   self.uimeths.try_resize_grid(grid, columns, rows)
 end
 
-function Screen:set_option(option, value)
+function M:set_option(option, value)
   self.uimeths.set_option(option, value)
   --- @diagnostic disable-next-line:no-unknown
   self._options[option] = value
@@ -431,7 +431,7 @@ end
 ---
 --- @param expected string|function|test.function.ui.screen.Expect
 --- @param attr_ids? table<integer,table<string,any>>
-function Screen:expect(expected, attr_ids, ...)
+function M:expect(expected, attr_ids, ...)
   --- @type string, fun()
   local grid, condition
 
@@ -649,7 +649,7 @@ screen:redraw_debug() to show all intermediate screen states.]]
   end, expected)
 end
 
-function Screen:expect_unchanged(intermediate, waittime_ms, ignore_attrs)
+function M:expect_unchanged(intermediate, waittime_ms, ignore_attrs)
   waittime_ms = waittime_ms and waittime_ms or 100
   -- Collect the current screen state.
   local kwargs = self:get_snapshot(nil, ignore_attrs)
@@ -668,7 +668,7 @@ end
 --- @private
 --- @param check fun(): string
 --- @param flags table<string,any>
-function Screen:_wait(check, flags)
+function M:_wait(check, flags)
   local err, checked = false, false
   local success_seen = false
   local failure_after_success = false
@@ -808,7 +808,7 @@ between asynchronous (feed(), nvim_input()) and synchronous API calls.
   end
 end
 
-function Screen:sleep(ms, request_cb)
+function M:sleep(ms, request_cb)
   local function notification_cb(method, args)
     assert(method == 'redraw')
     self:_redraw(args)
@@ -818,7 +818,7 @@ end
 
 --- @private
 --- @param updates {[1]:string, [integer]:any[]}[]
-function Screen:_redraw(updates)
+function M:_redraw(updates)
   local did_flush = false
   for k, update in ipairs(updates) do
     -- print('--', inspect(update))
@@ -847,7 +847,7 @@ function Screen:_redraw(updates)
   return did_flush
 end
 
-function Screen:_handle_resize(width, height)
+function M:_handle_resize(width, height)
   self:_handle_grid_resize(1, width, height)
   self._scroll_region = {
     top = 1,
@@ -866,7 +866,7 @@ local function min(x, y)
   end
 end
 
-function Screen:_handle_grid_resize(grid, width, height)
+function M:_handle_grid_resize(grid, width, height)
   local rows = {}
   for _ = 1, height do
     local cols = {}
@@ -895,16 +895,16 @@ function Screen:_handle_grid_resize(grid, width, height)
   }
 end
 
-function Screen:_handle_msg_set_pos(grid, row, scrolled, char)
+function M:_handle_msg_set_pos(grid, row, scrolled, char)
   self.msg_grid = grid
   self.msg_grid_pos = row
   self.msg_scrolled = scrolled
   self.msg_sep_char = char
 end
 
-function Screen:_handle_flush() end
+function M:_handle_flush() end
 
-function Screen:_reset()
+function M:_reset()
   -- TODO: generalize to multigrid later
   self:_handle_grid_clear(1)
 
@@ -919,7 +919,7 @@ end
 
 --- @param cursor_style_enabled boolean
 --- @param mode_info table[]
-function Screen:_handle_mode_info_set(cursor_style_enabled, mode_info)
+function M:_handle_mode_info_set(cursor_style_enabled, mode_info)
   self._cursor_style_enabled = cursor_style_enabled
   for _, item in pairs(mode_info) do
     -- attr IDs are not stable, but their value should be
@@ -935,7 +935,7 @@ function Screen:_handle_mode_info_set(cursor_style_enabled, mode_info)
   self._mode_info = mode_info
 end
 
-function Screen:_handle_clear()
+function M:_handle_clear()
   -- the first implemented UI protocol clients (python-gui and builitin TUI)
   -- allowed the cleared region to be restricted by setting the scroll region.
   -- this was never used by nvim tough, and not documented and implemented by
@@ -951,11 +951,11 @@ function Screen:_handle_clear()
   self:_handle_grid_clear(1)
 end
 
-function Screen:_handle_grid_clear(grid)
+function M:_handle_grid_clear(grid)
   self:_clear_block(self._grids[grid], 1, self._grids[grid].height, 1, self._grids[grid].width)
 end
 
-function Screen:_handle_grid_destroy(grid)
+function M:_handle_grid_destroy(grid)
   self._grids[grid] = nil
   if self._options.ext_multigrid then
     self.win_position[grid] = nil
@@ -963,24 +963,24 @@ function Screen:_handle_grid_destroy(grid)
   end
 end
 
-function Screen:_handle_eol_clear()
+function M:_handle_eol_clear()
   local row, col = self._cursor.row, self._cursor.col
   self:_clear_block(self._grid, row, row, col, self._grid.width)
 end
 
-function Screen:_handle_cursor_goto(row, col)
+function M:_handle_cursor_goto(row, col)
   self._cursor.row = row + 1
   self._cursor.col = col + 1
 end
 
-function Screen:_handle_grid_cursor_goto(grid, row, col)
+function M:_handle_grid_cursor_goto(grid, row, col)
   self._cursor.grid = grid
   assert(row >= 0 and col >= 0)
   self._cursor.row = row + 1
   self._cursor.col = col + 1
 end
 
-function Screen:_handle_win_pos(grid, win, startrow, startcol, width, height)
+function M:_handle_win_pos(grid, win, startrow, startcol, width, height)
   self.win_position[grid] = {
     win = win,
     startrow = startrow,
@@ -991,7 +991,7 @@ function Screen:_handle_win_pos(grid, win, startrow, startcol, width, height)
   self.float_pos[grid] = nil
 end
 
-function Screen:_handle_win_viewport(
+function M:_handle_win_viewport(
   grid,
   win,
   topline,
@@ -1015,61 +1015,61 @@ function Screen:_handle_win_viewport(
   }
 end
 
-function Screen:_handle_win_float_pos(grid, ...)
+function M:_handle_win_float_pos(grid, ...)
   self.win_position[grid] = nil
   self.float_pos[grid] = { ... }
 end
 
-function Screen:_handle_win_external_pos(grid)
+function M:_handle_win_external_pos(grid)
   self.win_position[grid] = nil
   self.float_pos[grid] = { external = true }
 end
 
-function Screen:_handle_win_hide(grid)
+function M:_handle_win_hide(grid)
   self.win_position[grid] = nil
   self.float_pos[grid] = nil
 end
 
-function Screen:_handle_win_close(grid)
+function M:_handle_win_close(grid)
   self.float_pos[grid] = nil
 end
 
-function Screen:_handle_win_extmark(grid, ...)
+function M:_handle_win_extmark(grid, ...)
   if self._grid_win_extmarks[grid] == nil then
     self._grid_win_extmarks[grid] = {}
   end
   table.insert(self._grid_win_extmarks[grid], { ... })
 end
 
-function Screen:_handle_busy_start()
+function M:_handle_busy_start()
   self._busy = true
 end
 
-function Screen:_handle_busy_stop()
+function M:_handle_busy_stop()
   self._busy = false
 end
 
-function Screen:_handle_mouse_on()
+function M:_handle_mouse_on()
   self.mouse_enabled = true
 end
 
-function Screen:_handle_mouse_off()
+function M:_handle_mouse_off()
   self.mouse_enabled = false
 end
 
-function Screen:_handle_mode_change(mode, idx)
+function M:_handle_mode_change(mode, idx)
   assert(mode == self._mode_info[idx + 1].name)
   self.mode = mode
 end
 
-function Screen:_handle_set_scroll_region(top, bot, left, right)
+function M:_handle_set_scroll_region(top, bot, left, right)
   self._scroll_region.top = top + 1
   self._scroll_region.bot = bot + 1
   self._scroll_region.left = left + 1
   self._scroll_region.right = right + 1
 end
 
-function Screen:_handle_scroll(count)
+function M:_handle_scroll(count)
   local top = self._scroll_region.top
   local bot = self._scroll_region.bot
   local left = self._scroll_region.left
@@ -1077,7 +1077,7 @@ function Screen:_handle_scroll(count)
   self:_handle_grid_scroll(1, top - 1, bot, left - 1, right, count, 0)
 end
 
-function Screen:_handle_grid_scroll(g, top, bot, left, right, rows, cols)
+function M:_handle_grid_scroll(g, top, bot, left, right, rows, cols)
   top = top + 1
   left = left + 1
   assert(cols == 0)
@@ -1111,7 +1111,7 @@ function Screen:_handle_grid_scroll(g, top, bot, left, right, rows, cols)
   end
 end
 
-function Screen:_handle_hl_attr_define(id, rgb_attrs, cterm_attrs, info)
+function M:_handle_hl_attr_define(id, rgb_attrs, cterm_attrs, info)
   self._attr_table[id] = { rgb_attrs, cterm_attrs }
   self._hl_info[id] = info
   self._new_attrs = true
@@ -1119,11 +1119,11 @@ end
 
 --- @param name string
 --- @param id integer
-function Screen:_handle_hl_group_set(name, id)
+function M:_handle_hl_group_set(name, id)
   self.hl_groups[name] = id
 end
 
-function Screen:get_hl(val)
+function M:get_hl(val)
   if self._options.ext_newgrid then
     return self._attr_table[val][1]
   else
@@ -1131,11 +1131,11 @@ function Screen:get_hl(val)
   end
 end
 
-function Screen:_handle_highlight_set(attrs)
+function M:_handle_highlight_set(attrs)
   self._attrs = attrs
 end
 
-function Screen:_handle_put(str)
+function M:_handle_put(str)
   assert(not self._options.ext_linegrid)
   local cell = self._grid.rows[self._cursor.row][self._cursor.col]
   cell.text = str
@@ -1148,7 +1148,7 @@ end
 --- @param row integer
 --- @param col integer
 --- @param items integer[][]
-function Screen:_handle_grid_line(grid, row, col, items)
+function M:_handle_grid_line(grid, row, col, items)
   assert(self._options.ext_linegrid)
   local line = self._grids[grid].rows[row + 1]
   local colpos = col + 1
@@ -1167,15 +1167,15 @@ function Screen:_handle_grid_line(grid, row, col, items)
   end
 end
 
-function Screen:_handle_bell()
+function M:_handle_bell()
   self.bell = true
 end
 
-function Screen:_handle_visual_bell()
+function M:_handle_visual_bell()
   self.visual_bell = true
 end
 
-function Screen:_handle_default_colors_set(rgb_fg, rgb_bg, rgb_sp, cterm_fg, cterm_bg)
+function M:_handle_default_colors_set(rgb_fg, rgb_bg, rgb_sp, cterm_fg, cterm_bg)
   self.default_colors = {
     rgb_fg = rgb_fg,
     rgb_bg = rgb_bg,
@@ -1185,55 +1185,55 @@ function Screen:_handle_default_colors_set(rgb_fg, rgb_bg, rgb_sp, cterm_fg, cte
   }
 end
 
-function Screen:_handle_update_fg(fg)
+function M:_handle_update_fg(fg)
   self._fg = fg
 end
 
-function Screen:_handle_update_bg(bg)
+function M:_handle_update_bg(bg)
   self._bg = bg
 end
 
-function Screen:_handle_update_sp(sp)
+function M:_handle_update_sp(sp)
   self._sp = sp
 end
 
-function Screen:_handle_suspend()
+function M:_handle_suspend()
   self.suspended = true
 end
 
-function Screen:_handle_update_menu()
+function M:_handle_update_menu()
   self.update_menu = true
 end
 
-function Screen:_handle_set_title(title)
+function M:_handle_set_title(title)
   self.title = title
 end
 
-function Screen:_handle_set_icon(icon)
+function M:_handle_set_icon(icon)
   self.icon = icon
 end
 
-function Screen:_handle_option_set(name, value)
+function M:_handle_option_set(name, value)
   self.options[name] = value
 end
 
-function Screen:_handle_chdir(path)
+function M:_handle_chdir(path)
   self.pwd = vim.fs.normalize(path, { expand_env = false })
 end
 
-function Screen:_handle_popupmenu_show(items, selected, row, col, grid)
+function M:_handle_popupmenu_show(items, selected, row, col, grid)
   self.popupmenu = { items = items, pos = selected, anchor = { grid, row, col } }
 end
 
-function Screen:_handle_popupmenu_select(selected)
+function M:_handle_popupmenu_select(selected)
   self.popupmenu.pos = selected
 end
 
-function Screen:_handle_popupmenu_hide()
+function M:_handle_popupmenu_hide()
   self.popupmenu = nil
 end
 
-function Screen:_handle_cmdline_show(content, pos, firstc, prompt, indent, level)
+function M:_handle_cmdline_show(content, pos, firstc, prompt, indent, level)
   if firstc == '' then
     firstc = nil
   end
@@ -1260,44 +1260,44 @@ function Screen:_handle_cmdline_show(content, pos, firstc, prompt, indent, level
   }
 end
 
-function Screen:_handle_cmdline_hide(level)
+function M:_handle_cmdline_hide(level)
   self.cmdline[level] = nil
 end
 
-function Screen:_handle_cmdline_special_char(char, shift, level)
+function M:_handle_cmdline_special_char(char, shift, level)
   -- cleared by next cmdline_show on the same level
   self.cmdline[level].special = { char, shift }
 end
 
-function Screen:_handle_cmdline_pos(pos, level)
+function M:_handle_cmdline_pos(pos, level)
   self.cmdline[level].pos = pos
 end
 
-function Screen:_handle_cmdline_block_show(block)
+function M:_handle_cmdline_block_show(block)
   self.cmdline_block = block
 end
 
-function Screen:_handle_cmdline_block_append(item)
+function M:_handle_cmdline_block_append(item)
   self.cmdline_block[#self.cmdline_block + 1] = item
 end
 
-function Screen:_handle_cmdline_block_hide()
+function M:_handle_cmdline_block_hide()
   self.cmdline_block = {}
 end
 
-function Screen:_handle_wildmenu_show(items)
+function M:_handle_wildmenu_show(items)
   self.wildmenu_items = items
 end
 
-function Screen:_handle_wildmenu_select(pos)
+function M:_handle_wildmenu_select(pos)
   self.wildmenu_pos = pos
 end
 
-function Screen:_handle_wildmenu_hide()
+function M:_handle_wildmenu_hide()
   self.wildmenu_items, self.wildmenu_pos = nil, nil
 end
 
-function Screen:_handle_msg_show(kind, chunks, replace_last)
+function M:_handle_msg_show(kind, chunks, replace_last)
   local pos = #self.messages
   if not replace_last or pos == 0 then
     pos = pos + 1
@@ -1305,37 +1305,37 @@ function Screen:_handle_msg_show(kind, chunks, replace_last)
   self.messages[pos] = { kind = kind, content = chunks }
 end
 
-function Screen:_handle_msg_clear()
+function M:_handle_msg_clear()
   self.messages = {}
 end
 
-function Screen:_handle_msg_showcmd(msg)
+function M:_handle_msg_showcmd(msg)
   self.showcmd = msg
 end
 
-function Screen:_handle_msg_showmode(msg)
+function M:_handle_msg_showmode(msg)
   self.showmode = msg
 end
 
-function Screen:_handle_msg_ruler(msg)
+function M:_handle_msg_ruler(msg)
   self.ruler = msg
 end
 
-function Screen:_handle_msg_history_show(entries)
+function M:_handle_msg_history_show(entries)
   self.msg_history = entries
 end
 
-function Screen:_handle_msg_history_clear()
+function M:_handle_msg_history_clear()
   self.msg_history = {}
 end
 
-function Screen:_clear_block(grid, top, bot, left, right)
+function M:_clear_block(grid, top, bot, left, right)
   for i = top, bot do
     self:_clear_row_section(grid, i, left, right)
   end
 end
 
-function Screen:_clear_row_section(grid, rownum, startcol, stopcol, invalid)
+function M:_clear_row_section(grid, rownum, startcol, stopcol, invalid)
   local row = grid.rows[rownum]
   for i = startcol, stopcol do
     row[i].text = (invalid and '�' or ' ')
@@ -1344,7 +1344,7 @@ function Screen:_clear_row_section(grid, rownum, startcol, stopcol, invalid)
   end
 end
 
-function Screen:_row_repr(gridnr, rownr, attr_state, cursor)
+function M:_row_repr(gridnr, rownr, attr_state, cursor)
   local rv = {}
   local current_attr_id
   local i = 1
@@ -1401,7 +1401,7 @@ function Screen:_row_repr(gridnr, rownr, attr_state, cursor)
   return table.concat(rv, '') --:gsub('%s+$', '')
 end
 
-function Screen:_extstate_repr(attr_state)
+function M:_extstate_repr(attr_state)
   local cmdline = {}
   for i, entry in pairs(self.cmdline) do
     entry = shallowcopy(entry)
@@ -1442,7 +1442,7 @@ function Screen:_extstate_repr(attr_state)
   }
 end
 
-function Screen:_chunks_repr(chunks, attr_state)
+function M:_chunks_repr(chunks, attr_state)
   local repr_chunks = {}
   for i, chunk in ipairs(chunks) do
     local hl, text = unpack(chunk)
@@ -1463,12 +1463,12 @@ end
 -- Use snapshot_util({},true) to generate a text-only (no attributes) test.
 --
 -- @see Screen:redraw_debug()
-function Screen:snapshot_util(attrs, ignore, request_cb)
+function M:snapshot_util(attrs, ignore, request_cb)
   self:sleep(250, request_cb)
   self:print_snapshot(attrs, ignore)
 end
 
-function Screen:redraw_debug(attrs, ignore, timeout)
+function M:redraw_debug(attrs, ignore, timeout)
   self:print_snapshot(attrs, ignore)
   local function notification_cb(method, args)
     assert(method == 'redraw')
@@ -1492,7 +1492,7 @@ end
 --- @param attr_state any
 --- @param preview? boolean
 --- @return string[]
-function Screen:render(headers, attr_state, preview)
+function M:render(headers, attr_state, preview)
   headers = headers and (self._options.ext_multigrid or self._options._debug_float)
   local rv = {}
   for igrid, grid in pairs(self._grids) do
@@ -1523,7 +1523,7 @@ end
 
 -- Returns the current screen state in the form of a screen:expect()
 -- keyword-args map.
-function Screen:get_snapshot(attrs, ignore)
+function M:get_snapshot(attrs, ignore)
   attrs = attrs or self._default_attr_ids
   if ignore == nil then
     ignore = self._default_attr_ignore
@@ -1617,7 +1617,7 @@ local function fmt_ext_state(name, state)
   end
 end
 
-function Screen:print_snapshot(attrs, ignore)
+function M:print_snapshot(attrs, ignore)
   local kwargs, ext_state, attr_state = self:get_snapshot(attrs, ignore)
   local attrstr = ''
   if attr_state.modified then
@@ -1647,7 +1647,7 @@ function Screen:print_snapshot(attrs, ignore)
   io.stdout:flush()
 end
 
-function Screen:_insert_hl_id(attr_state, hl_id)
+function M:_insert_hl_id(attr_state, hl_id)
   if attr_state.id_to_index[hl_id] ~= nil then
     return attr_state.id_to_index[hl_id]
   end
@@ -1684,7 +1684,7 @@ function Screen:_insert_hl_id(attr_state, hl_id)
   return #attr_state.ids
 end
 
-function Screen:linegrid_check_attrs(attrs)
+function M:linegrid_check_attrs(attrs)
   local id_to_index = {}
   for i, def_attr in pairs(self._attr_table) do
     local iinfo = self._hl_info[i]
@@ -1739,7 +1739,7 @@ function Screen:linegrid_check_attrs(attrs)
   return id_to_index
 end
 
-function Screen:_pprint_hlitem(item)
+function M:_pprint_hlitem(item)
   -- print(inspect(item))
   local multi = self._rgb_cterm or self._options.ext_hlstate
   local cterm = (not self._rgb_cterm and not self._options.rgb)
@@ -1759,7 +1759,7 @@ function Screen:_pprint_hlitem(item)
   return (multi and '{' or '') .. attrdict .. attrdict2 .. descdict .. (multi and '}' or '')
 end
 
-function Screen:_pprint_hlinfo(states)
+function M:_pprint_hlinfo(states)
   if #states == 1 then
     local items = {}
     for f, v in pairs(states[1]) do
@@ -1775,13 +1775,13 @@ function Screen:_pprint_hlinfo(states)
   end
 end
 
-function Screen:_pprint_attrs(attrs, cterm)
+function M:_pprint_attrs(attrs, cterm)
   local items = {}
   for f, v in pairs(attrs) do
     local desc = tostring(v)
     if f == 'foreground' or f == 'background' or f == 'special' then
-      if Screen.colornames[v] ~= nil then
-        desc = 'Screen.colors.' .. Screen.colornames[v]
+      if M.colornames[v] ~= nil then
+        desc = 'Screen.colors.' .. M.colornames[v]
       elseif cterm then
         desc = tostring(v)
       else
@@ -1793,7 +1793,7 @@ function Screen:_pprint_attrs(attrs, cterm)
   return table.concat(items, ', ')
 end
 
-function Screen:_get_attr_id(attr_state, attrs, hl_id)
+function M:_get_attr_id(attr_state, attrs, hl_id)
   if not attr_state.ids then
     return
   end
@@ -1831,7 +1831,7 @@ function Screen:_get_attr_id(attr_state, attrs, hl_id)
   end
 end
 
-function Screen:_equal_attr_def(a, b)
+function M:_equal_attr_def(a, b)
   if self._rgb_cterm then
     return self:_equal_attrs(a[1], b[1]) and self:_equal_attrs(a[2], b[2])
   elseif self._options.rgb then
@@ -1841,7 +1841,7 @@ function Screen:_equal_attr_def(a, b)
   end
 end
 
-function Screen:_equal_attrs(a, b)
+function M:_equal_attrs(a, b)
   return a.bold == b.bold
     and a.standout == b.standout
     and a.underline == b.underline
@@ -1860,11 +1860,11 @@ function Screen:_equal_attrs(a, b)
     and a.bg_indexed == b.bg_indexed
 end
 
-function Screen:_equal_info(a, b)
+function M:_equal_info(a, b)
   return a.kind == b.kind and a.hi_name == b.hi_name and a.ui_name == b.ui_name
 end
 
-function Screen:_attr_index(attrs, attr)
+function M:_attr_index(attrs, attr)
   if not attrs then
     return nil
   end
@@ -1876,4 +1876,4 @@ function Screen:_attr_index(attrs, attr)
   return nil
 end
 
-return Screen
+return M
