@@ -74,34 +74,53 @@ function parse_args() {
 
 parse_args "$@"
 
-function get_nvim_asset() {
-  local version="$1"
-  local platform
-
-  if [[ $(uname -s) == Darwin ]]; then
-    if [[ $version == v0.[789].* ]]; then
-      # prior to 0.10, MacOS builds were universal
-      platform=macos
-    else
-      platform=macos-$(uname -m)
-    fi
-  else
-    platform=linux64
-  fi
-
-  echo "nvim-$platform"
+function version {
+  echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'
 }
 
+function version_cmp {
+  [[ $(version "$1") -ge $(version "$2") ]]
+}
+
+function get_platform() {
+  local ver=$1
+  if [[ $(uname -s) == Darwin ]]; then
+    if version_cmp "$ver" 0.10; then
+      echo "macos-$(uname -m)"
+    else
+      # prior to 0.10, MacOS builds were universal
+      echo "macos"
+    fi
+  else
+    echo "linux64"
+  fi
+}
+
+
 NVIM_URL=https://github.com/neovim/neovim/releases/download
+NVIM_RELEASES_URL=https://github.com/neovim/neovim-releases/releases/download
 
 NVIM_RUNNER="$DATA/nvim-runner-$NVIM_RUNNER_VERSION"
 NVIM_TEST="$DATA/nvim-test-$NVIM_TEST_VERSION"
 
+function use_nvim_releases() {
+  local ver=$1
+  local platform=$2
+  [[ $platform == linux64 ]] && version_cmp "$ver" 0.10
+}
+
 function fetch_nvim() {
-  local version="$1"
-  local dst="$2"
-  local asset; asset="$(get_nvim_asset "$version")"
-  local url="$NVIM_URL/$version/$asset.tar.gz"
+  local ver=$1
+  local dst=$2
+  local platform; platform=$(get_platform "$ver")
+  local asset; asset="nvim-$platform"
+
+  local url
+  if use_nvim_releases "$ver" "$platform"; then
+    url="$NVIM_RELEASES_URL/$ver/$asset.tar.gz"
+  else
+    url="$NVIM_URL/$ver/$asset.tar.gz"
+  fi
 
   rm -rf "$dst"
   rm -rf "$asset.tar.gz"
