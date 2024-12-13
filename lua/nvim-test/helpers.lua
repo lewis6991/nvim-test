@@ -140,19 +140,6 @@ local nvim_set = table.concat({
   'redrawdebug=invalid',
 }, ' ')
 
-local nvim_cmd = {
-  os.getenv('NVIM_PRG') or 'nvim',
-  '--clean',
-  '-u',
-  'NONE',
-  '-i',
-  'NONE',
-  '--cmd',
-  nvim_set,
-  '--embed',
-  '--headless',
-}
-
 local session --- @type test.Session?
 local loop_running = false
 local last_error --- @type string?
@@ -299,8 +286,23 @@ end
 local exec_lua = M.exec_lua
 
 --- Starts a new global Nvim session.
-function M.clear()
+--- @param init_lua_path? string
+function M.clear(init_lua_path)
   check_close()
+
+  local nvim_cmd = {
+    os.getenv('NVIM_PRG') or 'nvim',
+    '--clean',
+    '-u',
+    init_lua_path or 'NONE',
+    '-i',
+    'NONE',
+    '--cmd',
+    nvim_set,
+    '--embed',
+    '--headless',
+  }
+
   local proc_stream = ProcessStream.spawn(nvim_cmd)
   local msgpack_stream = MsgpackRpcStream.new(proc_stream)
 
