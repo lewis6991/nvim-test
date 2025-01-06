@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/lewis6991/nvim-test/compare/v1.0.0...v1.0.1) (2025-01-06)
+
+
+### Bug Fixes
+
+* support nightly again ([281cb34](https://github.com/lewis6991/nvim-test/commit/281cb343bc39433db58b9faee40d06390b5e18d5))
+
 ## 1.0.0 (2024-12-13)
 
 
