@@ -85,7 +85,7 @@ function version_cmp {
 function get_platform() {
   local ver=$1
   if [[ $(uname -s) == Darwin ]]; then
-    if version_cmp "$ver" 0.10; then
+    if [[ $ver == 'nightly' ]] || version_cmp "$ver" 0.10; then
       echo "macos-$(uname -m)"
     else
       # prior to 0.10, MacOS builds were universal
