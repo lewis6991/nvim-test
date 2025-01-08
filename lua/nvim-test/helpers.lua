@@ -232,8 +232,28 @@ M.fn = vim.fn
     return M.api.nvim_call_function(name, { ... })
   end)
 
+--- @param t table
+--- @param i? integer
+--- @return any ...
+local function unpack_max(t, i)
+  return unpack(t, i or 1, table.maxn(t))
+end
+
+--- @param code function|string
+--- @param ... any
+--- @return any ...
 function M.exec_lua(code, ...)
-  return M.api.nvim_exec_lua(code, { ... })
+  if type(code) == 'string' then
+    return M.api.nvim_exec_lua(code, { ... })
+  else
+    return unpack_max(M.api.nvim_exec_lua(
+      [[
+      local f = select(1, ...)
+      return { loadstring(f)(select(2, ...)) }
+      ]],
+      { string.dump(code), ... }
+    ))
+  end
 end
 
 -- Checks that the Nvim session did not terminate.
@@ -307,61 +327,42 @@ function M.clear(init_lua_path)
   local msgpack_stream = MsgpackRpcStream.new(proc_stream)
 
   local log_cb --- @type function?
-  -- if M.options.verbose then
-  --   log_cb = function(method, args)
-  --     if method == 'nvim_print_event' or method == 'nvim_error_event' then
-  --       print(method, ':', vim.inspect(args))
-  --     end
-  --   end
-  -- end
+  if M.options.verbose then
+    --- @param method string
+    --- @param args any[]
+    log_cb = function(method, args)
+      if method == 'nvim_error_event' then
+        print(('%s: %s'):format(method, args[1]))
+      elseif method == 'nvim_print_event' then
+        local msg = {} --- @type string[]
+        for _, v in ipairs(args) do
+          table.insert(msg, tostring(v))
+        end
+        print(('%s: %s'):format(method, table.concat(msg, ' ')))
+      end
+    end
+  end
 
   session = Session.new(msgpack_stream, log_cb)
 
   --- @type integer
   local channel = M.api.nvim_get_api_info()[1]
 
-  exec_lua([[
-    local channel = ...
-    local orig_print = print
-    local orig_error = error
-    local orig_pcall = pcall
-    local orig_xpcall = xpcall
-
+  exec_lua(function(chan)
     vim.opt.rtp:append(vim.env.NVIM_TEST_HOME)
-    local protected = false
 
-    function pcall(...)
-      protected = true
-      local ret = { orig_pcall(...) }
-      protected = false
-      return unpack(ret, 1, table.maxn(ret))
-    end
-
-    function xpcall(...)
-      protected = true
-      local ret = { orig_xpcall(...) }
-      protected = false
-      return unpack(ret, 1, table.maxn(ret))
-    end
-
-    function error(...)
-      if not protected then
-        vim.rpcnotify(channel, 'nvim_error_event', debug.traceback(), ...)
-      end
-      return orig_error(...)
-    end
-
-    function print(...)
-      -- vim.rpcnotify(channel, 'nvim_print_event', ...)
+    local orig_print = _G.print
+    function _G.print(...)
+      vim.rpcnotify(chan, 'nvim_print_event', ...)
       return orig_print(...)
     end
-  ]], channel)
+  end, channel)
 
   --- @type table?
   local enable_cov = package.loaded['luacov.runner']
 
   if enable_cov then
-    exec_lua([[
+    exec_lua(function()
       local luacov = require('luacov')
       table.insert(luacov.configuration.exclude, 'vim/.*')
 
@@ -370,7 +371,7 @@ function M.clear(init_lua_path)
           luacov.shutdown()
         end
       })
-    ]])
+    end)
   end
 end
 

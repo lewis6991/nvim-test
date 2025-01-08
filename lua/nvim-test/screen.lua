@@ -709,10 +709,9 @@ function M:_wait(check, flags)
   local did_minimal_timeout = false
 
   local function notification_cb(method, args)
-    assert(
-      method == 'redraw',
-      string.format('notification_cb: unexpected method (%s, args=%s)', method, inspect(args))
-    )
+    if method ~= 'redraw' then
+      return
+    end
     did_flush = self:_redraw(args)
     if not did_flush then
       return
