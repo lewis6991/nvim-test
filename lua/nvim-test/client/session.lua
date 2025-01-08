@@ -10,38 +10,26 @@ local uv = vim.uv or vim.loop
 local M = {}
 M.__index = M
 
-local function resume(co, ...)
-  local status, result = coroutine.resume(co, ...)
+--- @param func function
+--- @param callback? fun(...: any)
+local function coroutine_exec(func, callback)
+  local co = coroutine.create(func)
 
-  if coroutine.status(co) == 'dead' then
-    if not status then
-      error(result)
+  local function step(...)
+    local result = { coroutine.resume(co, ...) }
+    local status = table.remove(result, 1)
+
+    if coroutine.status(co) == 'dead' then
+      if callback then
+        callback(status, unpack(result, 1, table.maxn(result)))
+      end
+      return
     end
-    return
+
+    result(step)
   end
 
-  assert(coroutine.status(co) == 'suspended')
-  result(co)
-end
-
-local function coroutine_exec(func, ...)
-  local args = { ... }
-  local on_complete --- @type function?
-
-  if #args > 0 and type(args[#args]) == 'function' then
-    -- completion callback
-    on_complete = table.remove(args)
-  end
-
-  resume(coroutine.create(function()
-    local status, result, flag = pcall(func, unpack(args))
-    if on_complete then
-      coroutine.yield(function()
-        -- run the completion callback on the main thread
-        on_complete(status, result, flag)
-      end)
-    end
-  end))
+  step()
 end
 
 ---@param stream test.MsgpackRpcStream
@@ -103,13 +91,19 @@ function M:request(method, ...)
   return true, result
 end
 
----@param request_cb fun()?
----@param notification_cb fun()?
+---@param request_cb fun(method: string, args: any[])?
+---@param notification_cb fun(method: string, args: any[])?
 ---@param setup_cb fun()?
 ---@param timeout integer?
 function M:run(request_cb, notification_cb, setup_cb, timeout)
   local function on_request(method, args, response)
-    coroutine_exec(request_cb, method, args, function(status, result, flag)
+    if not request_cb then
+      return
+    end
+
+    coroutine_exec(function()
+      return request_cb(method, args)
+    end, function(status, result, flag)
       if status then
         response:send(result, flag)
       else
@@ -119,7 +113,13 @@ function M:run(request_cb, notification_cb, setup_cb, timeout)
   end
 
   local function on_notification(method, args)
-    coroutine_exec(notification_cb, method, args)
+    if not notification_cb then
+      return
+    end
+
+    coroutine_exec(function()
+      return notification_cb(method, args)
+    end)
   end
 
   self._is_running = true
@@ -158,13 +158,12 @@ end
 --- @private
 --- @param method string
 --- @param args any[]
---- @return any
+--- @return any err
+--- @return any result
 function M:_yielding_request(method, args)
-  --- @param co thread
-  return coroutine.yield(function(co)
-    self._msgpack_rpc_stream:write(method, args, function(err, result)
-      resume(co, err, result)
-    end)
+  --- @param callback fun(err: any, result: any)
+  return coroutine.yield(function(callback)
+    self._msgpack_rpc_stream:write(method, args, callback)
   end)
 end
 
@@ -208,14 +207,14 @@ function M:_run(request_cb, notification_cb, timeout)
     end)
   end
 
-  local request_cb_logged = function(...)
+  local function request_cb_logged(...)
     if self._log_cb then
       self._log_cb(...)
     end
     return request_cb(...)
   end
 
-  local notification_cb_logged = function(...)
+  local function notification_cb_logged(...)
     if self._log_cb then
       self._log_cb(...)
     end
