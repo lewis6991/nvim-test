@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0](https://github.com/lewis6991/nvim-test/compare/v1.0.1...v1.1.0) (2025-01-28)
+
+
+### Features
+
+* allow passing functions to exec_lua ([0de46ad](https://github.com/lewis6991/nvim-test/commit/0de46ad0425007c4845669419db5023f18c1d9d5))
+
+
+### Bug Fixes
+
+* fix nightly linux release name ([dfecc4a](https://github.com/lewis6991/nvim-test/commit/dfecc4a8b1f656024ff0892a5f217c2b97bb7530))
+
 ## [1.0.1](https://github.com/lewis6991/nvim-test/compare/v1.0.0...v1.0.1) (2025-01-06)
 
 
