@@ -92,7 +92,7 @@ function get_platform() {
       echo "macos"
     fi
   else
-    if [[ $ver == 'nightly' ]] || version_cmp "$ver" 0.11; then
+    if [[ $ver == 'nightly' ]] || version_cmp "$ver" 0.10.4; then
       echo "linux-$(uname -m)"
     else
       echo "linux64"
