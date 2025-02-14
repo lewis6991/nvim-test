@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/lewis6991/nvim-test/compare/v1.1.0...v1.1.1) (2025-02-14)
+
+
+### Bug Fixes
+
+* support nvim v0.10.4 ([ba9f57a](https://github.com/lewis6991/nvim-test/commit/ba9f57acf2c7a342fc19003c820bba46b96d9278))
+
 ## [1.1.0](https://github.com/lewis6991/nvim-test/compare/v1.0.1...v1.1.0) (2025-01-28)
 
 
