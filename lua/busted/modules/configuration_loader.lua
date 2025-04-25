@@ -1,5 +1,3 @@
-local tablex = require('pl.tablex')
-
 return function()
   -- Function to load the .busted configuration file if available
   local loadBustedConfigurationFile = function(configFile, config, defaults)
@@ -14,19 +12,19 @@ return function()
       local runConfig = configFile[run]
 
       if type(runConfig) == 'table' then
-        config = tablex.merge(runConfig, config, true)
+        config = vim.tbl_deep_extend('force', runConfig, config)
       else
         return nil, 'Task `' .. run .. '` not found, or not a table.'
       end
     elseif type(configFile.default) == 'table' then
-      config = tablex.merge(configFile.default, config, true)
+      config = vim.tbl_deep_extend('force', configFile.default, config)
     end
 
     if type(configFile._all) == 'table' then
-      config = tablex.merge(configFile._all, config, true)
+      config = vim.tbl_deep_extend('force', configFile._all, config)
     end
 
-    config = tablex.merge(defaults, config, true)
+    config = vim.tbl_deep_extend('force', defaults, config)
 
     return config
   end

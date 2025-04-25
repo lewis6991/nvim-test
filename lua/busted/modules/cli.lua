@@ -317,7 +317,7 @@ return function(options)
         end
       end
     else
-      cliArgs = tablex.merge(cliArgs, cliArgsParsed, true)
+      cliArgs = vim.tbl_deep_extend('force', cliArgs, cliArgsParsed)
     end
 
     -- Switch lua, we should rebuild this feature once luarocks changes how it

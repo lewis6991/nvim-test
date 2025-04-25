@@ -20,7 +20,7 @@ return function(busted, loaders)
       local getfiles = options.recursive and dir.getallfiles or dir.getfiles
       fileList = getfiles(rootFile)
 
-      fileList = tablex.filter(fileList, function(filename)
+      fileList = vim.tbl_filter(function(filename)
         local basename = vim.fs.basename(filename)
         for _, patt in ipairs(options.excludes) do
           if patt ~= '' and basename:find(patt) then
@@ -33,15 +33,15 @@ return function(busted, loaders)
           end
         end
         return #patterns == 0
-      end)
+      end, fileList)
 
-      fileList = tablex.filter(fileList, function(filename)
+      fileList = vim.tbl_filter(function(filename)
         if path.is_windows then
           return not filename:find('%\\%.%w+.%w+', #rootFile)
         else
           return not filename:find('/%.%w+.%w+', #rootFile)
         end
-      end)
+      end, fileList)
     else
       busted.publish({ 'error' }, {}, nil, s('output.file_not_found'):format(rootFile), {})
       fileList = {}

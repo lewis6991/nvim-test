@@ -99,7 +99,7 @@ return function(options)
 
   -- Load and execute commands given on the command-line
   if cliArgs.e then
-    for k, v in ipairs(cliArgs.e) do
+    for _, v in ipairs(cliArgs.e) do
       loadstring(v)()
     end
   end

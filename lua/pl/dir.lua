@@ -20,10 +20,6 @@ local sep = path.sep
 
 local M = {}
 
-local function makelist(l)
-  return setmetatable(l, require('pl.List'))
-end
-
 local function assert_dir(n, val)
   assert_arg(n, val, 'string', path.isdir, 'not a directory', 4)
 end
@@ -47,7 +43,7 @@ local function _listfiles(dirname, filemode, match)
       end
     end
   end
-  return makelist(res)
+  return res
 end
 
 --- return a list of all files in a directory which match a shell pattern.
@@ -321,7 +317,7 @@ function M.getallfiles(start_path, shell_pattern)
     end
   end
 
-  return makelist(files)
+  return files
 end
 
 return M
