@@ -14,15 +14,22 @@ function types.is_callable(obj)
   return type(obj) == 'function' or getmetatable(obj) and getmetatable(obj).__call and true
 end
 
---- is the object of the specified type?.
--- If the type is a string, then use type, otherwise compare with metatable.
---
--- NOTE: this function is imported from `utils.is_type`.
+--- is the object of the specified type?
+-- If the type is a string, then use type, otherwise compare with metatable
 -- @param obj An object to check
--- @param tp The expected type
--- @function is_type
--- @see utils.is_type
-types.is_type = utils.is_type
+-- @param tp String of what type it should be
+-- @return boolean
+-- @usage utils.is_type("hello world", "string")   --> true
+-- -- or check metatable
+-- local my_mt = {}
+-- local my_obj = setmetatable(my_obj, my_mt)
+-- utils.is_type(my_obj, my_mt)  --> true
+function types.is_type(obj, tp)
+  if type(tp) == 'string' then
+    return type(obj) == tp
+  end
+  return tp == getmetatable(obj)
+end
 
 local fileMT = getmetatable(io.stdout)
 

@@ -5,16 +5,7 @@
 -- `pl.compat` are also available in this module.
 --
 -- @module pl.utils
-local format = string.format
 local compat = require('pl.compat')
-local stdout = io.stdout
-local append = table.insert
-local concat = table.concat
-local _unpack = table.unpack -- always injected by 'compat'
-local find = string.find
-local sub = string.sub
-local next = next
-local floor = math.floor
 
 local is_windows = compat.is_windows
 local err_mode = 'default'
@@ -54,7 +45,6 @@ M.stdmt = {
 -- @return a table with field `n` set to the length
 -- @function utils.pack
 -- @see compat.pack
--- @see utils.npairs
 -- @see utils.unpack
 M.pack = table.pack -- added here to be symmetrical with unpack
 
@@ -69,14 +59,13 @@ M.pack = table.pack -- added here to be symmetrical with unpack
 -- @function utils.unpack
 -- @see compat.unpack
 -- @see utils.pack
--- @see utils.npairs
 -- @usage
 -- local t = table.pack(nil, nil, nil, 4)
 -- local a, b, c, d = table.unpack(t)   -- this `unpack` is NOT nil-safe, so d == nil
 --
 -- local a, b, c, d = utils.unpack(t)   -- this is nil-safe, so d == 4
 function M.unpack(t, i, j)
-  return _unpack(t, i or 1, j or t.n or #t)
+  return table.unpack(t, i or 1, j or t.n or #t)
 end
 
 --- print an arbitrary number of arguments using a format.
@@ -85,7 +74,7 @@ end
 -- @param ... Extra arguments for format
 function M.printf(fmt, ...)
   M.assert_string(1, fmt)
-  M.fprintf(stdout, fmt, ...)
+  M.fprintf(io.stdout, fmt, ...)
 end
 
 --- write an arbitrary number of arguments to a file using a format.
@@ -94,7 +83,7 @@ end
 -- @param ... Extra arguments for format
 function M.fprintf(f, fmt, ...)
   M.assert_string(2, fmt)
-  f:write(format(fmt, ...))
+  f:write(fmt:format(...))
 end
 
 do
@@ -139,18 +128,6 @@ do
   end
 end
 
---- return either of two values, depending on a condition.
--- @param cond A condition
--- @param value1 Value returned if cond is truthy
--- @param value2 Value returned if cond is falsy
-function M.choose(cond, value1, value2)
-  if cond then
-    return value1
-  else
-    return value2
-  end
-end
-
 --- convert an array of values to strings.
 -- @param t a list-like table
 -- @param[opt] temp (table) buffer to use, otherwise allocate
@@ -162,24 +139,6 @@ function M.array_tostring(t, temp, tostr)
     temp[i] = tostr(t[i], i)
   end
   return temp
-end
-
---- is the object of the specified type?
--- If the type is a string, then use type, otherwise compare with metatable
--- @param obj An object to check
--- @param tp String of what type it should be
--- @return boolean
--- @usage utils.is_type("hello world", "string")   --> true
--- -- or check metatable
--- local my_mt = {}
--- local my_obj = setmetatable(my_obj, my_mt)
--- utils.is_type(my_obj, my_mt)  --> true
-function M.is_type(obj, tp)
-  if type(tp) == 'string' then
-    return type(obj) == tp
-  end
-  local mt = getmetatable(obj)
-  return tp == mt
 end
 
 --- an iterator with indices, similar to `ipairs`, but with a range.
@@ -196,12 +155,12 @@ end
 -- @usage
 -- local t = utils.pack(nil, 123, nil)  -- adds an `n` field when packing
 --
--- for i, v in utils.npairs(t, 2) do  -- start at index 2
+-- for i, v in npairs(t, 2) do  -- start at index 2
 --   t[i] = tostring(t[i])
 -- end
 --
 -- -- t = { n = 3, [2] = "123", [3] = "nil" }
-function M.npairs(t, i_start, i_end, step)
+local function npairs(t, i_start, i_end, step)
   step = step or 1
   if step == 0 then
     error('iterator step-size cannot be 0', 2)
@@ -258,7 +217,7 @@ function M.kpairs(t)
     local value
     while true do
       index, value = next(t, index)
-      if type(index) ~= 'number' or floor(index) ~= index then
+      if type(index) ~= 'number' or math.floor(index) ~= index then
         break
       end
     end
@@ -360,7 +319,7 @@ function M.enum(...)
   if type(first) ~= 'table' then
     -- vararg with strings
     lst = M.pack(...)
-    for i, value in M.npairs(lst) do
+    for i, value in npairs(lst) do
       M.assert_arg(i, value, 'string')
       enum[value] = value
     end
@@ -393,7 +352,7 @@ function M.enum(...)
     error('expected at least 1 entry', 2)
   end
 
-  local valid = "(expected one of: '" .. concat(lst, "', '") .. "')"
+  local valid = "(expected one of: '" .. table.concat(lst, "', '") .. "')"
   setmetatable(enum, {
     __index = function(self, key)
       error(("'%s' is not a valid value %s"):format(tostring(key), valid), 2)
@@ -414,6 +373,57 @@ function M.enum(...)
 
   return enum
 end
+
+local function _string_lambda(f)
+  if f:find('^|') or f:find('_') then
+    local args, body = f:match('|([^|]*)|(.+)')
+    if f:find('_') then
+      args = '_'
+      body = f
+    else
+      if not args then
+        return raise('bad string lambda')
+      end
+    end
+    local fstr = 'return function(' .. args .. ') return ' .. body .. ' end'
+    local fn, err = M.load(fstr)
+    if not fn then
+      return raise(err)
+    end
+    fn = fn()
+    return fn
+  else
+    return raise('not a string lambda')
+  end
+end
+
+--- 'memoize' a function (cache returned value for next call).
+-- This is useful if you have a function which is relatively expensive,
+-- but you don't know in advance what values will be required, so
+-- building a table upfront is wasteful/impossible.
+-- @param func a function that takes exactly one argument (which later serves as the cache key) and returns a single value
+-- @return a function taking one argument and returning a single value either from the cache or by running the original input function
+local function memoize(func)
+  local cache = {}
+  return function(k)
+    local res = cache[k]
+    if res == nil then
+      res = func(k)
+      cache[k] = res
+    end
+    return res
+  end
+end
+
+--- an anonymous function as a string. This string is either of the form
+-- '|args| expression' or is a function of one argument, '_'
+-- @param lf function as a string
+-- @return a function
+-- @function utils.string_lambda
+-- @usage
+-- string_lambda '|x|x+1' (2) == 3
+-- string_lambda '_+1' (2) == 3
+local string_lambda = memoize(_string_lambda)
 
 --- process a function argument.
 -- This is used throughout Penlight and defines what is meant by a function:
@@ -440,7 +450,7 @@ function M.function_arg(idx, f, msg)
     if fn then
       return fn
     end
-    local fn, err = M.string_lambda(f)
+    local fn, err = string_lambda(f)
     if not fn then
       error(err .. ': ' .. f)
     end
@@ -589,7 +599,7 @@ function M.readlines(filename)
   end
   local res = {}
   for line in f:lines() do
-    append(res, line)
+    table.insert(res, line)
   end
   f:close()
   return res
@@ -645,7 +655,7 @@ function M.quote_arg(argument)
       r[i] = M.quote_arg(arg)
     end
 
-    return concat(r, ' ')
+    return table.concat(r, ' ')
   end
   -- only a single argument
   if is_windows then
@@ -721,11 +731,11 @@ function M.split(s, re, plain, n)
     return { s }
   end
   while true do
-    local i2, i3 = find(s, re, i1, plain)
+    local i2, i3 = s:find(re, i1, plain)
     if not i2 then
-      local last = sub(s, i1)
+      local last = s:sub(i1)
       if last ~= '' then
-        append(ls, last)
+        table.insert(ls, last)
       end
       if #ls == 1 and ls[1] == '' then
         return {}
@@ -733,9 +743,9 @@ function M.split(s, re, plain, n)
         return ls
       end
     end
-    append(ls, sub(s, i1, i2 - 1))
+    table.insert(ls, s:sub(i1, i2 - 1))
     if n and #ls == n then
-      ls[#ls] = sub(s, i1)
+      ls[#ls] = s:sub(i1)
       return ls
     end
     i1 = i3 + 1
@@ -755,29 +765,12 @@ end
 -- assert(next == "jane=doe")
 -- @see split
 function M.splitv(s, re, plain, n)
-  return _unpack(M.split(s, re, plain, n))
+  return table.unpack(M.split(s, re, plain, n))
 end
 
 --- Functional
 -- @section functional
 
---- 'memoize' a function (cache returned value for next call).
--- This is useful if you have a function which is relatively expensive,
--- but you don't know in advance what values will be required, so
--- building a table upfront is wasteful/impossible.
--- @param func a function that takes exactly one argument (which later serves as the cache key) and returns a single value
--- @return a function taking one argument and returning a single value either from the cache or by running the original input function
-function M.memoize(func)
-  local cache = {}
-  return function(k)
-    local res = cache[k]
-    if res == nil then
-      res = func(k)
-      cache[k] = res
-    end
-    return res
-  end
-end
 
 --- associate a function factory with a type.
 -- A function factory takes an object of the given type and
@@ -787,39 +780,6 @@ end
 function M.add_function_factory(mt, fun)
   _function_factories[mt] = fun
 end
-
-local function _string_lambda(f)
-  if f:find('^|') or f:find('_') then
-    local args, body = f:match('|([^|]*)|(.+)')
-    if f:find('_') then
-      args = '_'
-      body = f
-    else
-      if not args then
-        return raise('bad string lambda')
-      end
-    end
-    local fstr = 'return function(' .. args .. ') return ' .. body .. ' end'
-    local fn, err = M.load(fstr)
-    if not fn then
-      return raise(err)
-    end
-    fn = fn()
-    return fn
-  else
-    return raise('not a string lambda')
-  end
-end
-
---- an anonymous function as a string. This string is either of the form
--- '|args| expression' or is a function of one argument, '_'
--- @param lf function as a string
--- @return a function
--- @function utils.string_lambda
--- @usage
--- string_lambda '|x|x+1' (2) == 3
--- string_lambda '_+1' (2) == 3
-M.string_lambda = M.memoize(_string_lambda)
 
 --- bind the first argument of the function to a value.
 -- @param fn a function of at least two values (may be an operator string)
@@ -839,127 +799,6 @@ function M.bind1(fn, p)
   fn = M.function_arg(1, fn)
   return function(...)
     return fn(p, ...)
-  end
-end
-
---- bind the second argument of the function to a value.
--- @param fn a function of at least two values (may be an operator string)
--- @param p a value
--- @return a function such that f(x) is fn(x,p)
--- @raise same as @{function_arg}
--- @usage local function f(a, b, c)
---   print(a .. " " .. b .. " " .. c)
--- end
---
--- local hello = utils.bind1(f, "world")
---
--- print(hello("Hello", "!"))  --> "Hello world !"
--- print(hello("Bye", "?"))    --> "Bye world ?"
-function M.bind2(fn, p)
-  fn = M.function_arg(1, fn)
-  return function(x, ...)
-    return fn(x, p, ...)
-  end
-end
-
---- Deprecation
--- @section deprecation
-
-do
-  -- the default implementation
-  local deprecation_func = function(msg, trace)
-    if trace then
-      warn(msg, '\n', trace)
-    else
-      warn(msg)
-    end
-  end
-
-  --- Sets a deprecation warning function.
-  -- An application can override this function to support proper output of
-  -- deprecation warnings. The warnings can be generated from libraries or
-  -- functions by calling `utils.raise_deprecation`. The default function
-  -- will write to the 'warn' system (introduced in Lua 5.4, or the compatibility
-  -- function from the `compat` module for earlier versions).
-  --
-  -- Note: only applications should set/change this function, libraries should not.
-  -- @param func a callback with signature: `function(msg, trace)` both arguments are strings, the latter being optional.
-  -- @see utils.raise_deprecation
-  -- @usage
-  -- -- write to the Nginx logs with OpenResty
-  -- utils.set_deprecation_func(function(msg, trace)
-  --   ngx.log(ngx.WARN, msg, (trace and (" " .. trace) or nil))
-  -- end)
-  --
-  -- -- disable deprecation warnings
-  -- utils.set_deprecation_func()
-  function M.set_deprecation_func(func)
-    if func == nil then
-      deprecation_func = function() end
-    else
-      M.assert_arg(1, func, 'function')
-      deprecation_func = func
-    end
-  end
-
-  --- raises a deprecation warning.
-  -- For options see the usage example below.
-  --
-  -- Note: the `opts.deprecated_after` field is the last version in which
-  -- a feature or option was NOT YET deprecated! Because when writing the code it
-  -- is quite often not known in what version the code will land. But the last
-  -- released version is usually known.
-  -- @param opts options table
-  -- @see utils.set_deprecation_func
-  -- @usage
-  -- warn("@on")   -- enable Lua warnings, they are usually off by default
-  --
-  -- function stringx.islower(str)
-  --   raise_deprecation {
-  --     source = "Penlight " .. utils._VERSION,                   -- optional
-  --     message = "function 'islower' was renamed to 'is_lower'", -- required
-  --     version_removed = "2.0.0",                                -- optional
-  --     deprecated_after = "1.2.3",                               -- optional
-  --     no_trace = true,                                          -- optional
-  --   }
-  --   return stringx.is_lower(str)
-  -- end
-  -- -- output: "[Penlight 1.9.2] function 'islower' was renamed to 'is_lower' (deprecated after 1.2.3, scheduled for removal in 2.0.0)"
-  function M.raise_deprecation(opts)
-    M.assert_arg(1, opts, 'table')
-    if type(opts.message) ~= 'string' then
-      error("field 'message' of the options table must be a string", 2)
-    end
-    local trace
-    if not opts.no_trace then
-      trace = debug.traceback('', 2):match('[\n%s]*(.-)$')
-    end
-    local msg
-    if opts.deprecated_after and opts.version_removed then
-      msg = (' (deprecated after %s, scheduled for removal in %s)'):format(
-        tostring(opts.deprecated_after),
-        tostring(opts.version_removed)
-      )
-    elseif opts.deprecated_after then
-      msg = (' (deprecated after %s)'):format(tostring(opts.deprecated_after))
-    elseif opts.version_removed then
-      msg = (' (scheduled for removal in %s)'):format(tostring(opts.version_removed))
-    else
-      msg = ''
-    end
-
-    msg = opts.message .. msg
-
-    if opts.source then
-      msg = '[' .. opts.source .. '] ' .. msg
-    else
-      if msg:sub(1, 1) == '@' then
-        -- in Lua 5.4 "@" prefixed messages are control messages to the warn system
-        error("message cannot start with '@'", 2)
-      end
-    end
-
-    deprecation_func(msg, trace)
   end
 end
 

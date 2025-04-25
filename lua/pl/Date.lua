@@ -14,13 +14,6 @@ local stringx = require('pl.stringx')
 local utils = require('pl.utils')
 local assert_arg, assert_string = utils.assert_arg, utils.assert_string
 
-utils.raise_deprecation({
-  source = 'Penlight ' .. utils._VERSION,
-  message = "the 'Date' module is deprecated, see https://github.com/lunarmodules/Penlight/issues/285",
-  version_removed = '2.0.0',
-  version_deprecated = '1.9.2',
-})
-
 local Date = class()
 Date.Format = class()
 

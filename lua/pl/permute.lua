@@ -163,13 +163,6 @@ end
 -- @param ...
 -- @see permute.order_iter
 function permute.iter(...)
-  utils.raise_deprecation({
-    source = 'Penlight ' .. utils._VERSION,
-    message = "function 'iter' was renamed to 'order_iter'",
-    version_removed = '2.0.0',
-    deprecated_after = '1.9.2',
-  })
-
   return permute.order_iter(...)
 end
 
@@ -177,13 +170,6 @@ end
 -- @param ...
 -- @see permute.order_iter
 function permute.table(...)
-  utils.raise_deprecation({
-    source = 'Penlight ' .. utils._VERSION,
-    message = "function 'table' was renamed to 'order_table'",
-    version_removed = '2.0.0',
-    deprecated_after = '1.9.2',
-  })
-
   return permute.order_table(...)
 end
 

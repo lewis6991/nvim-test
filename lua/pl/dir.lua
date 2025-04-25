@@ -35,7 +35,7 @@ end
 
 local function _listfiles(dirname, filemode, match)
   local res = {}
-  local check = utils.choose(filemode, path.isfile, path.isdir)
+  local check = filemode and path.isfile or path.isdir
   if not dirname then
     dirname = '.'
   end

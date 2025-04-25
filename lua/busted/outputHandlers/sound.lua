@@ -1,7 +1,17 @@
-local app = require('pl.app')
-local io = io
-local io_popen = io.popen
-local math_random = math.random
+local path = require('pl.path')
+
+--- return string indicating operating system.
+-- @return 'Windows','OSX' or whatever uname returns (e.g. 'Linux')
+local function platform()
+  if path.is_windows then
+    return 'Windows'
+  end
+  local res = vim.uv.os_uname()
+  if res == 'Darwin' then
+    res = 'OSX'
+  end
+  return res
+end
 
 return function(options)
   local busted = require('busted')
@@ -9,7 +19,7 @@ return function(options)
   local language = require('busted.languages.' .. options.language)
 
   handler.suiteEnd = function()
-    local system = app.platform()
+    local system = platform()
     local sayer_pre, sayer_post
     local messages
 
@@ -30,7 +40,7 @@ return function(options)
       messages = language.success_messages
     end
 
-    io_popen(sayer_pre .. '"' .. messages[math_random(1, #messages)] .. '"' .. sayer_post)
+    io.popen(sayer_pre .. '"' .. messages[math.random(1, #messages)] .. '"' .. sayer_post)
 
     return nil, true
   end
