@@ -1,8 +1,7 @@
-local json = require('dkjson')
 local io_write = io.write
 local io_flush = io.flush
 
-return function(options)
+return function(_options)
   local busted = require('busted')
   local handler = require('busted.outputHandlers.base')()
 
@@ -14,7 +13,7 @@ return function(options)
       errors = handler.errors,
       duration = handler.getDuration(),
     }
-    local ok, result = pcall(json.encode, error_info)
+    local ok, result = pcall(vim.json.encode, error_info)
 
     if ok then
       io_write(result)

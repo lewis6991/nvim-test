@@ -35,15 +35,8 @@ return {
   end,
 
   --- Load configuration from a JSON file.
-  ---
-  --- Requires the "dkjson"[1] module to be present on the system. Get it with:
-  ---
-  ---     luarocks install dkjson
-  ---
-  --- [1] http://dkolf.de/src/dkjson-lua.fsl/home
   from_json = function(filepath)
     local src, config, _, err
-    local json = require('dkjson')
 
     src, err = read_file(filepath)
 
@@ -51,7 +44,7 @@ return {
       return nil, err
     end
 
-    config, _, err = json.decode(src)
+    config, _, err = vim.json.decode(src)
 
     if err then
       return nil, err
