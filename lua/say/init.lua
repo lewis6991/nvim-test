@@ -1,14 +1,14 @@
 local unpack = table.unpack or unpack
 
-local registry = { }
+local registry = {}
 local current_namespace
 local fallback_namespace
 
 local s = {
 
-  _COPYRIGHT   = "Copyright (c) 2012 Olivine Labs, LLC.",
-  _DESCRIPTION = "A simple string key/value store for i18n or any other case where you want namespaced strings.",
-  _VERSION     = "Say 1.3",
+  _COPYRIGHT = 'Copyright (c) 2012 Olivine Labs, LLC.',
+  _DESCRIPTION = 'A simple string key/value store for i18n or any other case where you want namespaced strings.',
+  _VERSION = 'Say 1.3',
 
   set_namespace = function(self, namespace)
     current_namespace = namespace
@@ -26,12 +26,12 @@ local s = {
 
   set = function(self, key, value)
     registry[current_namespace][key] = value
-  end
+  end,
 }
 
 local __meta = {
   __call = function(self, key, vars)
-    if vars ~= nil and type(vars) ~= "table" then
+    if vars ~= nil and type(vars) ~= 'table' then
       error(("expected parameter table to be a table, got '%s'"):format(type(vars)), 2)
     end
     vars = vars or {}
@@ -54,7 +54,7 @@ local __meta = {
 
   __index = function(self, key)
     return registry[key]
-  end
+  end,
 }
 
 s:set_fallback('en')

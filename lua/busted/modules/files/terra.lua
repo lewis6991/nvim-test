@@ -1,4 +1,4 @@
-local path = require 'pl.path'
+local path = require('pl.path')
 
 local ret = {}
 local terra_available, terralib = not not terralib, terralib --luacheck: ignore
@@ -18,7 +18,7 @@ end
 
 ret.load = function(busted, filename)
   if not terra_available then
-    error "unable to load terra, try running without terra language support enabled or installing terra."
+    error('unable to load terra, try running without terra language support enabled or installing terra.')
   else
     local file, err = terralib.loadfile(filename)
     if not file then

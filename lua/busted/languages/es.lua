@@ -25,7 +25,10 @@ s:set('output.success_single', 'éxito')
 
 s:set('output.seconds', 'segundos')
 
-s:set('output.no_test_files_match', 'Ningún fichero de prueba fue encontrado para el patrón de Lua: %s')
+s:set(
+  'output.no_test_files_match',
+  'Ningún fichero de prueba fue encontrado para el patrón de Lua: %s'
+)
 
 -- definitions following are not used within the 'say' namespace
 return {
@@ -37,7 +40,7 @@ return {
     'Juego extraño. La única forma de ganar es omitiendo las pruebas',
     'Mi abuela escribió mejores especificaciones en una 386',
     'Cada vez que encuentres un fallo, tómate otra cerveza',
-    'Esto no está del todo bien amigo'
+    'Esto no está del todo bien amigo',
   },
   success_messages = {
     'Ohhh si! Pasando todas las pruebas',
@@ -45,5 +48,5 @@ return {
     'Esto está bien amigo',
     'Un exitazo',
     'Pasaron las pruebas, tómate otra cerveza',
-  }
+  },
 }

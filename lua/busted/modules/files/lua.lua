@@ -1,4 +1,4 @@
-local path = require 'pl.path'
+local path = require('pl.path')
 
 local ret = {}
 

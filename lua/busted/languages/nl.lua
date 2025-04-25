@@ -31,7 +31,7 @@ return {
     'Vreemd spelletje. The enige manier om te winnen is door niet te testen',
     'Mijn oma schreef betere specs op een 3 86',
     'Elke keer dat iets mislukt, nog een biertje drinken',
-    'Voelt klote man'
+    'Voelt klote man',
   },
   success_messages = {
     'Joeperdepoep, de specs zijn er door',
@@ -39,5 +39,5 @@ return {
     'Voelt goed, man',
     'Fantastisch success',
     'Testen geslaagd, neem nog een biertje',
-  }
+  },
 }

@@ -1,14 +1,14 @@
-local s = require 'say'
+local s = require('say')
 
 return function(busted, loaders)
-  local path = require 'pl.path'
-  local dir = require 'pl.dir'
-  local tablex = require 'pl.tablex'
+  local path = require('pl.path')
+  local dir = require('pl.dir')
+  local tablex = require('pl.tablex')
   local fileLoaders = {}
 
   for _, v in pairs(loaders) do
-    local loader = require('busted.modules.files.'..v)
-    fileLoaders[#fileLoaders+1] = loader
+    local loader = require('busted.modules.files.' .. v)
+    fileLoaders[#fileLoaders + 1] = loader
   end
 
   local getTestFiles = function(rootFile, patterns, options)
@@ -77,9 +77,9 @@ return function(busted, loaders)
       if testFile then
         local file = setmetatable({
           getTrace = getTrace,
-          rewriteMessage = rewriteMessage
+          rewriteMessage = rewriteMessage,
         }, {
-          __call = testFile
+          __call = testFile,
         })
 
         busted.executors.file(fileName, file)
@@ -99,4 +99,3 @@ return function(busted, loaders)
 
   return loadTestFiles, loadTestFile, getAllTestFiles
 end
-

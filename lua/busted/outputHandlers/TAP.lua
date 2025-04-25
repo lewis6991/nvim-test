@@ -1,4 +1,4 @@
-local pretty = require 'pl.pretty'
+local pretty = require('pl.pretty')
 local io = io
 local type = type
 local string_format = string.format
@@ -11,8 +11,8 @@ local function print(msg)
 end
 
 return function(options)
-  local busted = require 'busted'
-  local handler = require 'busted.outputHandlers.base'()
+  local busted = require('busted')
+  local handler = require('busted.outputHandlers.base')()
 
   local success = 'ok %u - %s'
   local failure = 'not ' .. success
@@ -56,7 +56,7 @@ return function(options)
   handler.testStart = function(element, parent)
     local trace = element.trace
     if options.verbose and trace and trace.short_src then
-      local fileline = trace.short_src .. ' @ ' ..  trace.currentline .. ': '
+      local fileline = trace.short_src .. ' @ ' .. trace.currentline .. ': '
       local testName = fileline .. handler.getFullName(element)
       print('# ' .. testName)
     end

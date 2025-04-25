@@ -40,5 +40,5 @@ return {
     'Húrra!',
     'Frábært!',
     'Geggjað!',
-  }
+  },
 }

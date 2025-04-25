@@ -18,10 +18,10 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 -- THE SOFTWARE.
 
-local term    = require 'term.core'
+local term = require('term.core')
 local sformat = string.format
-local iotype  = io.type
-local stdout  = io.stdout
+local iotype = io.type
+local stdout = io.stdout
 
 function term.maketermfunc(sequence_fmt)
   sequence_fmt = '\027[' .. sequence_fmt
@@ -39,12 +39,12 @@ function term.maketermfunc(sequence_fmt)
   return func
 end
 
-term.colors = require 'term.colors'
-term.cursor = require 'term.cursor'
+term.colors = require('term.colors')
+term.cursor = require('term.cursor')
 
-term.clear    = term.maketermfunc '2J'
-term.cleareol = term.maketermfunc 'K'
-term.clearend = term.maketermfunc 'J'
+term.clear = term.maketermfunc('2J')
+term.cleareol = term.maketermfunc('K')
+term.clearend = term.maketermfunc('J')
 
 term.maketermfunc = nil
 

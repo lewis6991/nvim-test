@@ -3,15 +3,15 @@
 -- Dependencies `pl.utils`
 -- @module pl.types
 
-local utils = require 'pl.utils'
+local utils = require('pl.utils')
 local math_ceil = math.ceil
 local assert_arg = utils.assert_arg
 local types = {}
 
 --- is the object either a function or a callable object?.
 -- @param obj Object to check.
-function types.is_callable (obj)
-    return type(obj) == 'function' or getmetatable(obj) and getmetatable(obj).__call and true
+function types.is_callable(obj)
+  return type(obj) == 'function' or getmetatable(obj) and getmetatable(obj).__call and true
 end
 
 --- is the object of the specified type?.
@@ -33,29 +33,29 @@ local fileMT = getmetatable(io.stdout)
 -- Lua file objects return the type 'file'.
 -- @param obj an object
 -- @return a string like 'number', 'table', 'file' or 'List'
-function types.type (obj)
-    local t = type(obj)
-    if t == 'table' or t == 'userdata' then
-        local mt = getmetatable(obj)
-        if mt == fileMT then
-            return 'file'
-        elseif mt == nil then
-            return t
-        else
-            -- TODO: the "unknown" is weird, it should just return the type
-            return mt._name or "unknown "..t
-        end
+function types.type(obj)
+  local t = type(obj)
+  if t == 'table' or t == 'userdata' then
+    local mt = getmetatable(obj)
+    if mt == fileMT then
+      return 'file'
+    elseif mt == nil then
+      return t
     else
-        return t
+      -- TODO: the "unknown" is weird, it should just return the type
+      return mt._name or 'unknown ' .. t
     end
+  else
+    return t
+  end
 end
 
 --- is this number an integer?
 -- @param x a number
 -- @raise error if x is not a number
 -- @return boolean
-function types.is_integer (x)
-    return math_ceil(x)==x
+function types.is_integer(x)
+  return math_ceil(x) == x
 end
 
 --- Check if the object is "empty".
@@ -70,20 +70,22 @@ end
 -- considered empty if it only contains spaces.
 -- @return `true` if the object is empty, otherwise a falsy value.
 function types.is_empty(o, ignore_spaces)
-    if o == nil then
-        return true
-    elseif type(o) == "table" then
-        return next(o) == nil
-    elseif type(o) == "string" then
-        return o == "" or (not not ignore_spaces and (not not o:find("^%s+$")))
-    else
-        return true
-    end
+  if o == nil then
+    return true
+  elseif type(o) == 'table' then
+    return next(o) == nil
+  elseif type(o) == 'string' then
+    return o == '' or (not not ignore_spaces and (not not o:find('^%s+$')))
+  else
+    return true
+  end
 end
 
-local function check_meta (val)
-    if type(val) == 'table' then return true end
-    return getmetatable(val)
+local function check_meta(val)
+  if type(val) == 'table' then
+    return true
+  end
+  return getmetatable(val)
 end
 
 --- is an object 'array-like'?
@@ -95,10 +97,12 @@ end
 -- NOTE: since `__len` is 5.2+, on 5.1 is usually returns `false` for userdata
 -- @param val any value.
 -- @return `true` if the object is array-like, otherwise a falsy value.
-function types.is_indexable (val)
-    local mt = check_meta(val)
-    if mt == true then return true end
-    return mt and mt.__len and mt.__index and true
+function types.is_indexable(val)
+  local mt = check_meta(val)
+  if mt == true then
+    return true
+  end
+  return mt and mt.__len and mt.__index and true
 end
 
 --- can an object be iterated over with `pairs`?
@@ -110,10 +114,12 @@ end
 -- NOTE: since `__pairs` is 5.2+, on 5.1 is usually returns `false` for userdata
 -- @param val any value.
 -- @return `true` if the object is iterable, otherwise a falsy value.
-function types.is_iterable (val)
-    local mt = check_meta(val)
-    if mt == true then return true end
-    return mt and mt.__pairs and true
+function types.is_iterable(val)
+  local mt = check_meta(val)
+  if mt == true then
+    return true
+  end
+  return mt and mt.__pairs and true
 end
 
 --- can an object accept new key/pair values?
@@ -124,32 +130,43 @@ end
 --
 -- @param val any value.
 -- @return `true` if the object is writeable, otherwise a falsy value.
-function types.is_writeable (val)
-    local mt = check_meta(val)
-    if mt == true then return true end
-    return mt and mt.__newindex and true
+function types.is_writeable(val)
+  local mt = check_meta(val)
+  if mt == true then
+    return true
+  end
+  return mt and mt.__newindex and true
 end
 
 -- Strings that should evaluate to true.   -- TODO: add on/off ???
-local trues = { yes=true, y=true, ["true"]=true, t=true, ["1"]=true }
+local trues = { yes = true, y = true, ['true'] = true, t = true, ['1'] = true }
 -- Conditions types should evaluate to true.
 local true_types = {
-    boolean=function(o, true_strs, check_objs) return o end,
-    string=function(o, true_strs, check_objs)
-        o = o:lower()
-        if trues[o] then
-            return true
-        end
-        -- Check alternative user provided strings.
-        for _,v in ipairs(true_strs or {}) do
-            if type(v) == "string" and o == v:lower() then
-                return true
-            end
-        end
-        return false
-    end,
-    number=function(o, true_strs, check_objs) return o ~= 0 end,
-    table=function(o, true_strs, check_objs) if check_objs and next(o) ~= nil then return true end return false end
+  boolean = function(o, true_strs, check_objs)
+    return o
+  end,
+  string = function(o, true_strs, check_objs)
+    o = o:lower()
+    if trues[o] then
+      return true
+    end
+    -- Check alternative user provided strings.
+    for _, v in ipairs(true_strs or {}) do
+      if type(v) == 'string' and o == v:lower() then
+        return true
+      end
+    end
+    return false
+  end,
+  number = function(o, true_strs, check_objs)
+    return o ~= 0
+  end,
+  table = function(o, true_strs, check_objs)
+    if check_objs and next(o) ~= nil then
+      return true
+    end
+    return false
+  end,
 }
 --- Convert to a boolean value.
 -- True values are:
@@ -166,18 +183,17 @@ local true_types = {
 -- @param[opt] check_objs True if objects should be evaluated.
 -- @return true if the input evaluates to true, otherwise false.
 function types.to_bool(o, true_strs, check_objs)
-    local true_func
-    if true_strs then
-        assert_arg(2, true_strs, "table")
-    end
-    true_func = true_types[type(o)]
-    if true_func then
-        return true_func(o, true_strs, check_objs)
-    elseif check_objs and o ~= nil then
-        return true
-    end
-    return false
+  local true_func
+  if true_strs then
+    assert_arg(2, true_strs, 'table')
+  end
+  true_func = true_types[type(o)]
+  if true_func then
+    return true_func(o, true_strs, check_objs)
+  elseif check_objs and o ~= nil then
+    return true
+  end
+  return false
 end
-
 
 return types

@@ -31,20 +31,20 @@ s:set('output.file_not_found', 'Nessun file o cartella trovato: %s')
 -- definitions following are not used within the 'say' namespace
 return {
   failure_messages = {
-    "Hai %d specifiche non conformi",
-    "Le tue specifiche non sono conformi",
-    "Il tuo codice fa schifo e dovresti sentirti male per questo",
-    "Il tuo codice è in pericolo",
-    "Strano. Il solo modo per terminare con successo i tuoi test è fare nessun test",
-    "Mia nonna ha scritto migliori specifiche su un 3 86",
+    'Hai %d specifiche non conformi',
+    'Le tue specifiche non sono conformi',
+    'Il tuo codice fa schifo e dovresti sentirti male per questo',
+    'Il tuo codice è in pericolo',
+    'Strano. Il solo modo per terminare con successo i tuoi test è fare nessun test',
+    'Mia nonna ha scritto migliori specifiche su un 3 86',
     "Ogni volta che trovi un errore, bevi un'altra birra",
-    "I fallimenti fanno male alla salute"
+    'I fallimenti fanno male alla salute',
   },
   success_messages = {
-    "Ma andiamo! Specifiche Ok!",
-    "Non importa, avevi le specifiche",
-    "Bella zio",
-    "Gran successo",
-    "Test passato, hai vinto una birra"
-  }
+    'Ma andiamo! Specifiche Ok!',
+    'Non importa, avevi le specifiche',
+    'Bella zio',
+    'Gran successo',
+    'Test passato, hai vinto una birra',
+  },
 }

@@ -1,6 +1,6 @@
-local getfenv = require 'busted.compatibility'.getfenv
-local unpack = require 'busted.compatibility'.unpack
-local shuffle = require 'busted.utils'.shuffle
+local getfenv = require('busted.compatibility').getfenv
+local unpack = require('busted.compatibility').unpack
+local shuffle = require('busted.utils').shuffle
 
 local function sort(elements)
   table.sort(elements, function(t1, t2)
@@ -33,7 +33,9 @@ return function(busted)
   end
 
   local function exec(descriptor, element)
-    if not element.env then element.env = {} end
+    if not element.env then
+      element.env = {}
+    end
     block.rejectAll(element)
     local ret = { busted.safe(descriptor, element.run, element) }
     return unpack(ret)
@@ -60,7 +62,9 @@ return function(busted)
     local success = true
     for _, v in ipairs(list) do
       if not exec(descriptor, v):success() then
-        if err then err(descriptor) end
+        if err then
+          err(descriptor)
+        end
         success = false
       end
     end
@@ -85,7 +89,9 @@ return function(busted)
     local success = true
     for _, v in ipairs(list) do
       if not exec(descriptor, v):success() then
-        if err then err(descriptor) end
+        if err then
+          err(descriptor)
+        end
         success = nil
       end
     end
@@ -99,7 +105,9 @@ return function(busted)
     local success = true
     for _, v in ipairs(list) do
       if not exec(descriptor, v):success() then
-        if err then err(descriptor) end
+        if err then
+          err(descriptor)
+        end
         success = nil
       end
     end
@@ -124,22 +132,24 @@ return function(busted)
   end
 
   function block.setup(element, err)
-      return block.execAll('strict_setup', element, nil, err)
+    return block.execAll('strict_setup', element, nil, err)
   end
 
   function block.teardown(element, err)
-      return block.dexecAll('strict_teardown', element, nil, err)
+    return block.dexecAll('strict_teardown', element, nil, err)
   end
 
   function block.execute(descriptor, element)
-    if not element.env then element.env = {} end
+    if not element.env then
+      element.env = {}
+    end
 
     local randomize = busted.randomize
     local randomseed = busted.randomseed
     element.env.randomize = function(...)
       randomize = (select('#', ...) == 0 or ...)
       if randomize then
-        randomseed = tonumber(({...})[1]) or tonumber(({...})[2]) or randomseed
+        randomseed = tonumber(({ ... })[1]) or tonumber(({ ... })[2]) or randomseed
       end
     end
 

@@ -1,11 +1,11 @@
-local app = require 'pl.app'
+local app = require('pl.app')
 local io = io
 local io_popen = io.popen
 local math_random = math.random
 
 return function(options)
-  local busted = require 'busted'
-  local handler = require 'busted.outputHandlers.base'()
+  local busted = require('busted')
+  local handler = require('busted.outputHandlers.base')()
   local language = require('busted.languages.' .. options.language)
 
   handler.suiteEnd = function()

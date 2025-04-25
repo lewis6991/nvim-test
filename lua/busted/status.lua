@@ -14,10 +14,18 @@ end
 return function(inital_status)
   local objstat = get_status(inital_status)
   local obj = {
-    success = function(self) return (objstat == 'success') end,
-    pending = function(self) return (objstat == 'pending') end,
-    failure = function(self) return (objstat == 'failure') end,
-    error   = function(self) return (objstat == 'error') end,
+    success = function(self)
+      return (objstat == 'success')
+    end,
+    pending = function(self)
+      return (objstat == 'pending')
+    end,
+    failure = function(self)
+      return (objstat == 'failure')
+    end,
+    error = function(self)
+      return (objstat == 'error')
+    end,
 
     get = function(self)
       return objstat
@@ -33,11 +41,13 @@ return function(inital_status)
       if objstat == 'success' or (objstat == 'pending' and status ~= 'success') then
         objstat = status
       end
-    end
+    end,
   }
 
   return setmetatable(obj, {
     __index = {},
-    __tostring = function(self) return objstat end
+    __tostring = function(self)
+      return objstat
+    end,
   })
 end

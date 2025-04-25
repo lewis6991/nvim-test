@@ -37,14 +37,14 @@ return {
     'Your code is in the Danger Zone',
     'Strange game. The only way to win is not to test',
     'My grandmother wrote better specs on a 3 86',
-    'Every time there\'s a failure, drink another beer',
-    'Feels bad man'
+    "Every time there's a failure, drink another beer",
+    'Feels bad man',
   },
   success_messages = {
     'Aww yeah, passing specs',
-    'Doesn\'t matter, had specs',
+    "Doesn't matter, had specs",
     'Feels good, man',
     'Great success',
     'Tests pass, drink another beer',
-  }
+  },
 }

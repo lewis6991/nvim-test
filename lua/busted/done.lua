@@ -6,7 +6,7 @@ M.wait = function(self, ...)
 
   for _, token in ipairs(tlist) do
     if type(token) ~= 'string' then
-      error('Wait tokens must be strings. Got '..type(token), 2)
+      error('Wait tokens must be strings. Got ' .. type(token), 2)
     end
     table.insert(self.tokens, token)
   end
@@ -31,11 +31,11 @@ M.tokenlist = function(self)
   if #self.tokens_done == 0 then
     list = 'No tokens received.'
   else
-    list = 'Tokens received ('..tostring(#self.tokens_done)..')'
+    list = 'Tokens received (' .. tostring(#self.tokens_done) .. ')'
     local s = ': '
 
-    for _,t in ipairs(self.tokens_done) do
-      list = list .. s .. '\''..t..'\''
+    for _, t in ipairs(self.tokens_done) do
+      list = list .. s .. "'" .. t .. "'"
       s = ', '
     end
 
@@ -45,11 +45,11 @@ M.tokenlist = function(self)
   if #self.tokens == 0 then
     list = list .. ' No more tokens expected.'
   else
-    list = list .. ' Tokens not received ('..tostring(#self.tokens)..')'
+    list = list .. ' Tokens not received (' .. tostring(#self.tokens) .. ')'
     local s = ': '
 
     for _, t in ipairs(self.tokens) do
-      list = list .. s .. '\''..t..'\''
+      list = list .. s .. "'" .. t .. "'"
       s = ', '
     end
 
@@ -60,11 +60,13 @@ M.tokenlist = function(self)
 end
 
 -- marks a token as completed, checks for ordered/unordered, checks for completeness
-M.done = function(self, ...) self:_done(...) end  -- extra wrapper for same error level constant as __call method
+M.done = function(self, ...)
+  self:_done(...)
+end -- extra wrapper for same error level constant as __call method
 M._done = function(self, token)
   if token then
     if type(token) ~= 'string' then
-      error('Wait tokens must be strings. Got '..type(token), 3)
+      error('Wait tokens must be strings. Got ' .. type(token), 3)
     end
 
     if self.ordered then
@@ -73,9 +75,19 @@ M._done = function(self, token)
         table.insert(self.tokens_done, token)
       else
         if self.tokens[1] then
-          error(('Bad token, expected \'%s\' got \'%s\'. %s'):format(self.tokens[1], token, self:tokenlist()), 3)
+          error(
+            ("Bad token, expected '%s' got '%s'. %s"):format(
+              self.tokens[1],
+              token,
+              self:tokenlist()
+            ),
+            3
+          )
         else
-          error(('Bad token (no more tokens expected) got \'%s\'. %s'):format(token, self:tokenlist()), 3)
+          error(
+            ("Bad token (no more tokens expected) got '%s'. %s"):format(token, self:tokenlist()),
+            3
+          )
         end
       end
     else
@@ -90,7 +102,7 @@ M._done = function(self, token)
       end
 
       if token then
-        error(('Unknown token \'%s\'. %s'):format(token, self:tokenlist()), 3)
+        error(("Unknown token '%s'. %s"):format(token, self:tokenlist()), 3)
       end
     end
   end
@@ -100,17 +112,16 @@ M._done = function(self, token)
   end
 end
 
-
 -- wraps a done callback into a done-object supporting tokens to sign-off
 M.new = function(done_callback)
   local obj = {
     tokens = {},
     tokens_done = {},
     done_cb = done_callback,
-    ordered = true,  -- default for sign off of tokens
+    ordered = true, -- default for sign off of tokens
   }
 
-  return setmetatable( obj, {
+  return setmetatable(obj, {
     __call = function(self, ...)
       self:_done(...)
     end,

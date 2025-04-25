@@ -1,4 +1,4 @@
-local tablex = require 'pl.tablex'
+local tablex = require('pl.tablex')
 
 return function()
   -- Function to load the .busted configuration file if available

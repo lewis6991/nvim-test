@@ -22,43 +22,47 @@
 -- Dependencies: `pl.utils`, `pl.tablex`, `pl.class`, `pl.Map`, (`pl.List` if __tostring is used)
 -- @classmod pl.Set
 
-local tablex = require 'pl.tablex'
-local utils = require 'pl.utils'
+local tablex = require('pl.tablex')
+local utils = require('pl.utils')
 local array_tostring, concat = utils.array_tostring, table.concat
-local merge,difference = tablex.merge,tablex.difference
-local Map = require 'pl.Map'
-local class = require 'pl.class'
+local merge, difference = tablex.merge, tablex.difference
+local Map = require('pl.Map')
+local class = require('pl.class')
 local stdmt = utils.stdmt
 local Set = stdmt.Set
 
 -- the Set class --------------------
-class(Map,nil,Set)
+class(Map, nil, Set)
 
 -- note: Set has _no_ methods!
 Set.__index = nil
 
-local function makeset (t)
-    return setmetatable(t,Set)
+local function makeset(t)
+  return setmetatable(t, Set)
 end
 
 --- create a set. <br>
 -- @param t may be a Set, Map or list-like table.
 -- @class function
 -- @name Set
-function Set:_init (t)
-    t = t or {}
-    local mt = getmetatable(t)
-    if mt == Set or mt == Map then
-        for k in pairs(t) do self[k] = true end
-    else
-        for _,v in ipairs(t) do self[v] = true end
+function Set:_init(t)
+  t = t or {}
+  local mt = getmetatable(t)
+  if mt == Set or mt == Map then
+    for k in pairs(t) do
+      self[k] = true
     end
+  else
+    for _, v in ipairs(t) do
+      self[v] = true
+    end
+  end
 end
 
 --- string representation of a set.
 -- @within metamethods
-function Set:__tostring ()
-    return '['..concat(array_tostring(Set.values(self)),',')..']'
+function Set:__tostring()
+  return '[' .. concat(array_tostring(Set.values(self)), ',') .. ']'
 end
 
 --- get a list of the values in a set.
@@ -72,34 +76,34 @@ Set.values = Map.keys
 -- @param fn a function
 -- @param ... extra arguments to pass to the function.
 -- @return a new set
-function Set.map (self,fn,...)
-    fn = utils.function_arg(1,fn)
-    local res = {}
-    for k in pairs(self) do
-        res[fn(k,...)] = true
-    end
-    return makeset(res)
+function Set.map(self, fn, ...)
+  fn = utils.function_arg(1, fn)
+  local res = {}
+  for k in pairs(self) do
+    res[fn(k, ...)] = true
+  end
+  return makeset(res)
 end
 
 --- union of two sets (also +).
 -- @param self a Set
 -- @param set another set
 -- @return a new set
-function Set.union (self,set)
-    return merge(self,set,true)
+function Set.union(self, set)
+  return merge(self, set, true)
 end
 
 --- modifies '+' operator to allow addition of non-Set elements
 --- Preserves +/- semantics - does not modify first argument.
-local function setadd(self,other)
-    local mt = getmetatable(other)
-    if mt == Set or mt == Map then
-        return Set.union(self,other)
-    else
-        local new = Set(self)
-        new[other] = true
-        return new
-    end
+local function setadd(self, other)
+  local mt = getmetatable(other)
+  if mt == Set or mt == Map then
+    return Set.union(self, other)
+  else
+    local new = Set(self)
+    new[other] = true
+    return new
+  end
 end
 
 --- union of sets.
@@ -122,8 +126,8 @@ Set.__add = setadd
 -- > = s*t
 -- [30,20]
 
-function Set.intersection (self,set)
-    return merge(self,set,false)
+function Set.intersection(self, set)
+  return merge(self, set, false)
 end
 
 --- intersection of sets.
@@ -135,21 +139,21 @@ Set.__mul = Set.intersection
 -- @param self a Set
 -- @param set another set
 -- @return a new set
-function Set.difference (self,set)
-    return difference(self,set,false)
+function Set.difference(self, set)
+  return difference(self, set, false)
 end
 
 --- modifies "-" operator to remove non-Set values from set.
 --- Preserves +/- semantics - does not modify first argument.
-local function setminus (self,other)
-    local mt = getmetatable(other)
-    if mt == Set or mt == Map then
-        return Set.difference(self,other)
-    else
-        local new = Set(self)
-        new[other] = nil
-        return new
-    end
+local function setminus(self, other)
+  local mt = getmetatable(other)
+  if mt == Set or mt == Map then
+    return Set.difference(self, other)
+  else
+    local new = Set(self)
+    new[other] = nil
+    return new
+  end
 end
 
 --- difference of sets.
@@ -161,8 +165,8 @@ Set.__sub = setminus
 -- @param self a Set
 -- @param set another set
 -- @return a new set
-function Set.symmetric_difference (self,set)
-    return difference(self,set,true)
+function Set.symmetric_difference(self, set)
+  return difference(self, set, true)
 end
 
 --- symmetric difference of sets.
@@ -174,11 +178,13 @@ Set.__pow = Set.symmetric_difference
 -- @param self a Set
 -- @param set another set
 -- @return true or false
-function Set.issubset (self,set)
-    for k in pairs(self) do
-        if not set[k] then return false end
+function Set.issubset(self, set)
+  for k in pairs(self) do
+    if not set[k] then
+      return false
     end
-    return true
+  end
+  return true
 end
 
 --- first set subset of second?
@@ -189,8 +195,8 @@ Set.__lt = Set.issubset
 --- is the set empty?.
 -- @param self a Set
 -- @return true or false
-function Set.isempty (self)
-    return next(self) == nil
+function Set.isempty(self)
+  return next(self) == nil
 end
 
 --- are the sets disjoint? (no elements in common).
@@ -198,8 +204,8 @@ end
 -- @param s1 a Set
 -- @param s2 another set
 -- @return true or false
-function Set.isdisjoint (s1,s2)
-    return Set.isempty(Set.intersection(s1,s2))
+function Set.isdisjoint(s1, s2)
+  return Set.isempty(Set.intersection(s1, s2))
 end
 
 --- size of this set (also # for 5.2).
@@ -215,8 +221,8 @@ Set.__len = Set.len
 
 --- equality between sets.
 -- @within metamethods
-function Set.__eq (s1,s2)
-    return Set.issubset(s1,s2) and Set.issubset(s2,s1)
+function Set.__eq(s1, s2)
+  return Set.issubset(s1, s2) and Set.issubset(s2, s1)
 end
 
 return Set

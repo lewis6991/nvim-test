@@ -1,6 +1,6 @@
-local shuffle = require 'busted.utils'.shuffle
-local urandom = require 'busted.utils'.urandom
-local tablex = require 'pl.tablex'
+local shuffle = require('busted.utils').shuffle
+local urandom = require('busted.utils').urandom
+local tablex = require('pl.tablex')
 
 local function sort(elements)
   table.sort(elements, function(t1, t2)
@@ -13,7 +13,7 @@ local function sort(elements)
 end
 
 return function(busted)
-  local block = require 'busted.block'(busted)
+  local block = require('busted.block')(busted)
 
   local function execute(runs, options)
     local root = busted.context.get()

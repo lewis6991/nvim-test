@@ -18,16 +18,16 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 -- THE SOFTWARE.
 
-local term = require 'term.core'
+local term = require('term.core')
 
 local cursor = {
-  ['goto'] = term.maketermfunc '%d;%dH',
-  goup     = term.maketermfunc '%dA',
-  godown   = term.maketermfunc '%dB',
-  goright  = term.maketermfunc '%dC',
-  goleft   = term.maketermfunc '%dD',
-  save     = term.maketermfunc 's',
-  restore  = term.maketermfunc 'u',
+  ['goto'] = term.maketermfunc('%d;%dH'),
+  goup = term.maketermfunc('%dA'),
+  godown = term.maketermfunc('%dB'),
+  goright = term.maketermfunc('%dC'),
+  goleft = term.maketermfunc('%dD'),
+  save = term.maketermfunc('s'),
+  restore = term.maketermfunc('u'),
 }
 
 cursor.jump = cursor['goto']

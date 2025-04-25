@@ -10,10 +10,12 @@ return {
     end
   end,
 
-  split = require 'pl.utils'.split,
+  split = require('pl.utils').split,
 
   shuffle = function(t, seed)
-    if seed then math.randomseed(seed) end
+    if seed then
+      math.randomseed(seed)
+    end
     local n = #t
     while n >= 2 do
       local k = math.random(n)
@@ -25,9 +27,12 @@ return {
 
   urandom = function()
     local f = io.open('/dev/urandom', 'rb')
-    if not f then return nil end
-    local s = f:read(4) f:close()
-    local bytes = {s:byte(1, 4)}
+    if not f then
+      return nil
+    end
+    local s = f:read(4)
+    f:close()
+    local bytes = { s:byte(1, 4) }
     local value = 0
     for _, v in ipairs(bytes) do
       value = value * 256 + v

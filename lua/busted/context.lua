@@ -1,20 +1,20 @@
-local tablex = require 'pl.tablex'
+local tablex = require('pl.tablex')
 
 local function save()
   local g = {}
-  for k,_ in next, _G, nil do
+  for k, _ in next, _G, nil do
     g[k] = rawget(_G, k)
   end
   return {
     gmt = debug.getmetatable(_G),
     g = g,
-    loaded = tablex.copy(package.loaded)
+    loaded = tablex.copy(package.loaded),
   }
 end
 
 local function restore(state)
   setmetatable(_G, state.gmt)
-  for k,_ in next, _G, nil do
+  for k, _ in next, _G, nil do
     rawset(_G, k, state.g[k])
   end
   for k, v in next, state.g, nil do
@@ -23,7 +23,7 @@ local function restore(state)
       rawset(_G, k, v)
     end
   end
-  for k,_ in pairs(package.loaded) do
+  for k, _ in pairs(package.loaded) do
     package.loaded[k] = state.loaded[k]
   end
 end
@@ -46,18 +46,24 @@ return function()
       local parent = element
       for i = 1, levels do
         parent = ref.parent(parent)
-        if not parent then break end
+        if not parent then
+          break
+        end
       end
-      if not element.env then element.env = {} end
+      if not element.env then
+        element.env = {}
+      end
       setmetatable(element.env, {
         __newindex = function(self, key, value)
           if not parent then
             _G[key] = value
           else
-            if not parent.env then parent.env = {} end
+            if not parent.env then
+              parent.env = {}
+            end
             parent.env[key] = value
           end
-        end
+        end,
       })
     end
 
@@ -84,7 +90,9 @@ return function()
     end
 
     function ref.get(key)
-      if not key then return ctx end
+      if not key then
+        return ctx
+      end
       return ctx[key]
     end
 
@@ -102,7 +110,9 @@ return function()
     end
 
     function ref.attach(child)
-      if not children[ctx] then children[ctx] = {} end
+      if not children[ctx] then
+        children[ctx] = {}
+      end
       parents[child] = ctx
       table.insert(children[ctx], child)
     end
@@ -116,8 +126,12 @@ return function()
     end
 
     function ref.push(current)
-      if not parents[current] and current ~= data then error('Detached child. Cannot push.') end
-      if ctx ~= current then push_state(current) end
+      if not parents[current] and current ~= data then
+        error('Detached child. Cannot push.')
+      end
+      if ctx ~= current then
+        push_state(current)
+      end
       table.insert(stack, ctx)
       ctx = current
     end
@@ -125,8 +139,12 @@ return function()
     function ref.pop()
       local current = ctx
       ctx = table.remove(stack)
-      if ctx ~= current then pop_state(current) end
-      if not ctx then error('Context stack empty. Cannot pop.') end
+      if ctx ~= current then
+        pop_state(current)
+      end
+      if not ctx then
+        error('Context stack empty. Cannot pop.')
+      end
     end
 
     return ref

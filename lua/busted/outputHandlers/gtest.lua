@@ -1,6 +1,6 @@
-local pretty = require 'pl.pretty'
-local term = require 'term'
-local luassert = require 'luassert'
+local pretty = require('pl.pretty')
+local term = require('term')
+local luassert = require('luassert')
 local io = io
 local type = type
 local ipairs = ipairs
@@ -12,10 +12,10 @@ local colors
 local isatty = io.type(io.stdout) == 'file' and term.isatty(io.stdout)
 
 return function(options)
-  local busted = require 'busted'
-  local handler = require 'busted.outputHandlers.base'()
+  local busted = require('busted')
+  local handler = require('busted.outputHandlers.base')()
 
-  local cli = require 'cliargs'
+  local cli = require('cliargs')
   local args = options.arguments
 
   cli:set_name('gtest output handler')
@@ -25,60 +25,71 @@ return function(options)
   local cliArgs, err = cli:parse(args)
   if not cliArgs and err then
     io.stderr:write(string.format('%s: %s\n\n', cli.name, err))
-    io.stderr:write(cli.printer.generate_help_and_usage().. '\n')
+    io.stderr:write(cli.printer.generate_help_and_usage() .. '\n')
     os.exit(1)
   end
 
   if cliArgs.plain then
-    colors = setmetatable({}, {__index = function() return function(s) return s end end})
-    luassert:set_parameter("TableErrorHighlightColor", "none")
-
+    colors = setmetatable({}, {
+      __index = function()
+        return function(s)
+          return s
+        end
+      end,
+    })
+    luassert:set_parameter('TableErrorHighlightColor', 'none')
   elseif cliArgs.color then
-    colors = require 'term.colors'
-    luassert:set_parameter("TableErrorHighlightColor", "red")
-
+    colors = require('term.colors')
+    luassert:set_parameter('TableErrorHighlightColor', 'red')
   else
-    if package.config:sub(1,1) == '\\' and not os.getenv("ANSICON") or not isatty then
+    if package.config:sub(1, 1) == '\\' and not os.getenv('ANSICON') or not isatty then
       -- Disable colors on Windows.
-      colors = setmetatable({}, {__index = function() return function(s) return s end end})
-      luassert:set_parameter("TableErrorHighlightColor", "none")
+      colors = setmetatable({}, {
+        __index = function()
+          return function(s)
+            return s
+          end
+        end,
+      })
+      luassert:set_parameter('TableErrorHighlightColor', 'none')
     else
-      colors = require 'term.colors'
-      luassert:set_parameter("TableErrorHighlightColor", "red")
+      colors = require('term.colors')
+      luassert:set_parameter('TableErrorHighlightColor', 'red')
     end
   end
 
   local repeatSuiteString = '\nRepeating all tests (run %u of %u) . . .\n\n'
-  local randomizeString  = colors.yellow('Note: Randomizing test order with a seed of %u.\n')
-  local suiteStartString = colors.green  ('[==========]') .. ' Running tests from scanned files.\n'
-  local globalSetup      = colors.green  ('[----------]') .. ' Global test environment setup.\n'
-  local fileStartString  = colors.green  ('[----------]') .. ' Running tests from %s\n'
-  local runString        = colors.green  ('[ RUN      ]') .. ' %s\n'
-  local successString    = colors.green  ('[       OK ]') .. ' %s (%.2f ms)\n'
-  local skippedString    = colors.yellow ('[ SKIPPED  ]') .. ' %s (%.2f ms)\n'
-  local failureString    = colors.red    ('[  FAILED  ]') .. ' %s (%.2f ms)\n'
-  local errorString      = colors.magenta('[  ERROR   ]') .. ' %s (%.2f ms)\n'
-  local fileEndString    = colors.green  ('[----------]') .. ' %u %s from %s (%.2f ms total)\n\n'
-  local globalTeardown   = colors.green  ('[----------]') .. ' Global test environment teardown.\n'
-  local suiteEndString   = colors.green  ('[==========]') .. ' %u %s from %u test %s ran. (%.2f ms total)\n'
-  local successStatus    = colors.green  ('[  PASSED  ]') .. ' %u %s.\n'
+  local randomizeString = colors.yellow('Note: Randomizing test order with a seed of %u.\n')
+  local suiteStartString = colors.green('[==========]') .. ' Running tests from scanned files.\n'
+  local globalSetup = colors.green('[----------]') .. ' Global test environment setup.\n'
+  local fileStartString = colors.green('[----------]') .. ' Running tests from %s\n'
+  local runString = colors.green('[ RUN      ]') .. ' %s\n'
+  local successString = colors.green('[       OK ]') .. ' %s (%.2f ms)\n'
+  local skippedString = colors.yellow('[ SKIPPED  ]') .. ' %s (%.2f ms)\n'
+  local failureString = colors.red('[  FAILED  ]') .. ' %s (%.2f ms)\n'
+  local errorString = colors.magenta('[  ERROR   ]') .. ' %s (%.2f ms)\n'
+  local fileEndString = colors.green('[----------]') .. ' %u %s from %s (%.2f ms total)\n\n'
+  local globalTeardown = colors.green('[----------]') .. ' Global test environment teardown.\n'
+  local suiteEndString = colors.green('[==========]')
+    .. ' %u %s from %u test %s ran. (%.2f ms total)\n'
+  local successStatus = colors.green('[  PASSED  ]') .. ' %u %s.\n'
 
   local summaryStrings = {
     skipped = {
-      header = colors.yellow ('[ SKIPPED  ]') .. ' %u %s, listed below:\n',
-      test   = colors.yellow ('[ SKIPPED  ]') .. ' %s\n',
+      header = colors.yellow('[ SKIPPED  ]') .. ' %u %s, listed below:\n',
+      test = colors.yellow('[ SKIPPED  ]') .. ' %s\n',
       footer = ' %u SKIPPED %s\n',
     },
 
     failure = {
-      header = colors.red    ('[  FAILED  ]') .. ' %u %s, listed below:\n',
-      test   = colors.red    ('[  FAILED  ]') .. ' %s\n',
+      header = colors.red('[  FAILED  ]') .. ' %u %s, listed below:\n',
+      test = colors.red('[  FAILED  ]') .. ' %s\n',
       footer = ' %u FAILED %s\n',
     },
 
     error = {
       header = colors.magenta('[  ERROR   ]') .. ' %u %s, listed below:\n',
-      test   = colors.magenta('[  ERROR   ]') .. ' %s\n',
+      test = colors.magenta('[  ERROR   ]') .. ' %s\n',
       footer = ' %u %s\n',
     },
   }
@@ -125,8 +136,10 @@ return function(options)
   local getFileLine = function(element)
     local fileline = ''
     if element.trace or element.trace.short_src then
-      fileline = colors.cyan(element.trace.short_src) .. ':' ..
-                 colors.cyan(element.trace.currentline) .. ': '
+      fileline = colors.cyan(element.trace.short_src)
+        .. ':'
+        .. colors.cyan(element.trace.currentline)
+        .. ': '
     end
     return fileline
   end

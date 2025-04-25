@@ -1,6 +1,6 @@
-local path = require 'pl.path'
+local path = require('pl.path')
 local hasMoon, moonscript = pcall(require, 'moonscript')
-local utils = require 'busted.utils'
+local utils = require('busted.utils')
 
 return function()
   local loadHelper = function(busted, helper, options)
@@ -24,7 +24,7 @@ return function()
       end
     end)
 
-    arg = old_arg   --luacheck: ignore
+    arg = old_arg --luacheck: ignore
 
     if not success then
       return nil, err

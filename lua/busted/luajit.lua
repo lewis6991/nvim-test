@@ -7,8 +7,7 @@ end
 -- pre-load the ffi module, such that it becomes part of the environment
 -- and Busted will not try to GC and reload it. The ffi is not suited
 -- for that and will occasionally segfault if done so.
-local ffi = require "ffi"
-
+local ffi = require('ffi')
 
 -- patching assumes;
 --  * first parameter to be a unique key to identify repeated calls
@@ -18,7 +17,7 @@ local function patch_with_return_value(func_name)
   local original = ffi[func_name]
   local original_store = {}
 
-  ffi[func_name] = function (primary, ...)
+  ffi[func_name] = function(primary, ...)
     if original_store[primary] then
       return original_store[primary]
     end
@@ -41,7 +40,7 @@ local function patch_without_return_value(func_name)
   local original = ffi[func_name]
   local original_store = {}
 
-  ffi[func_name] = function (primary, ...)
+  ffi[func_name] = function(primary, ...)
     if original_store[primary] then
       return
     end
@@ -57,8 +56,8 @@ local function patch_without_return_value(func_name)
 end
 
 return function()
-    patch_without_return_value("cdef")
-    patch_with_return_value("typeof")
-    patch_with_return_value("metatype")
-    patch_with_return_value("load")
-  end
+  patch_without_return_value('cdef')
+  patch_with_return_value('typeof')
+  patch_with_return_value('metatype')
+  patch_with_return_value('load')
+end

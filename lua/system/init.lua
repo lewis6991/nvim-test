@@ -4,8 +4,7 @@
 --- Terminal
 -- @section terminal
 
-local system = require 'system.core'
-
+local system = require('system.core')
 
 --- UTF8 codepage.
 -- To be used with `system.setconsoleoutputcp` and `system.setconsolecp`.
@@ -45,39 +44,58 @@ do
     return backup
   end
 
-
-
   --- Restores terminal settings from a backup
   -- @tparam table backup the backup of terminal settings, see `termbackup`.
   -- @treturn boolean true
   function system.termrestore(backup)
     if getmetatable(backup) ~= backup_mt then
-      error("arg #1 to termrestore, expected backup table, got " .. type(backup), 2)
+      error('arg #1 to termrestore, expected backup table, got ' .. type(backup), 2)
     end
 
-    if backup.console_in  then system.setconsoleflags(io.stdin, backup.console_in) end
-    if backup.term_in     then system.tcsetattr(io.stdin, system.TCSANOW, backup.term_in) end
-    if backup.console_out then system.setconsoleflags(io.stdout, backup.console_out) end
-    if backup.term_out    then system.tcsetattr(io.stdout, system.TCSANOW, backup.term_out) end
-    if backup.console_err then system.setconsoleflags(io.stderr, backup.console_err) end
-    if backup.term_err    then system.tcsetattr(io.stderr, system.TCSANOW, backup.term_err) end
+    if backup.console_in then
+      system.setconsoleflags(io.stdin, backup.console_in)
+    end
+    if backup.term_in then
+      system.tcsetattr(io.stdin, system.TCSANOW, backup.term_in)
+    end
+    if backup.console_out then
+      system.setconsoleflags(io.stdout, backup.console_out)
+    end
+    if backup.term_out then
+      system.tcsetattr(io.stdout, system.TCSANOW, backup.term_out)
+    end
+    if backup.console_err then
+      system.setconsoleflags(io.stderr, backup.console_err)
+    end
+    if backup.term_err then
+      system.tcsetattr(io.stderr, system.TCSANOW, backup.term_err)
+    end
 
-    if backup.block_in  ~= nil then system.setnonblock(io.stdin,  backup.block_in) end
-    if backup.block_out ~= nil then system.setnonblock(io.stdout, backup.block_out) end
-    if backup.block_err ~= nil then system.setnonblock(io.stderr, backup.block_err) end
+    if backup.block_in ~= nil then
+      system.setnonblock(io.stdin, backup.block_in)
+    end
+    if backup.block_out ~= nil then
+      system.setnonblock(io.stdout, backup.block_out)
+    end
+    if backup.block_err ~= nil then
+      system.setnonblock(io.stderr, backup.block_err)
+    end
 
-    if backup.consoleoutcodepage then system.setconsoleoutputcp(backup.consoleoutcodepage) end
-    if backup.consolecp          then system.setconsolecp(backup.consolecp) end
+    if backup.consoleoutcodepage then
+      system.setconsoleoutputcp(backup.consoleoutcodepage)
+    end
+    if backup.consolecp then
+      system.setconsolecp(backup.consolecp)
+    end
     return true
   end
 end
 
-
 do -- autotermrestore
   local global_backup -- global backup for terminal settings
 
-
-  local add_gc_method do
+  local add_gc_method
+  do
     -- __gc meta-method is not available in all Lua versions
     local has_gc = not newproxy or false -- `__gc` was added when `newproxy` was removed
 
@@ -91,14 +109,13 @@ do -- autotermrestore
       function add_gc_method(t, f)
         local proxy = newproxy(true)
         getmetatable(proxy).__gc = function()
-          t["__gc_proxy"] = nil
+          t['__gc_proxy'] = nil
           f(t)
         end
-        t["__gc_proxy"] = proxy
+        t['__gc_proxy'] = proxy
       end
     end
   end
-
 
   --- Backs up terminal settings and restores them on application exit.
   -- Calls `termbackup` to back up terminal settings and sets up a GC method to
@@ -108,10 +125,12 @@ do -- autotermrestore
   -- @treturn[2] string error message
   function system.autotermrestore()
     if global_backup then
-      return nil, "global terminal backup was already set up"
+      return nil, 'global terminal backup was already set up'
     end
     global_backup = system.termbackup()
-    add_gc_method(global_backup, function(self) pcall(system.termrestore, self) end)
+    add_gc_method(global_backup, function(self)
+      pcall(system.termrestore, self)
+    end)
     return true
   end
 
@@ -123,20 +142,22 @@ do -- autotermrestore
   end
 end
 
-
-
 do
   local oldunpack = unpack or table.unpack
-  local pack = function(...) return { n = select("#", ...), ... } end
-  local unpack = function(t) return oldunpack(t, 1, t.n) end
+  local pack = function(...)
+    return { n = select('#', ...), ... }
+  end
+  local unpack = function(t)
+    return oldunpack(t, 1, t.n)
+  end
 
   --- Wraps a function to automatically restore terminal settings upon returning.
   -- Calls `termbackup` before calling the function and `termrestore` after.
   -- @tparam function f function to wrap
   -- @treturn function wrapped function
   function system.termwrap(f)
-    if type(f) ~= "function" then
-      error("arg #1 to wrap, expected function, got " .. type(f), 2)
+    if type(f) ~= 'function' then
+      error('arg #1 to wrap, expected function, got ' .. type(f), 2)
     end
 
     return function(...)
@@ -148,8 +169,6 @@ do
   end
 end
 
-
-
 --- Debug function for console flags (Windows).
 -- Pretty prints the current flags set for the handle.
 -- @param fh file handle (`io.stdin`, `io.stdout`, `io.stderr`)
@@ -160,34 +179,32 @@ end
 function system.listconsoleflags(fh)
   local flagtype
   if fh == io.stdin then
-    print "------ STDIN FLAGS WINDOWS ------"
-    flagtype = "CIF_"
+    print('------ STDIN FLAGS WINDOWS ------')
+    flagtype = 'CIF_'
   elseif fh == io.stdout then
-    print "------ STDOUT FLAGS WINDOWS ------"
-    flagtype = "COF_"
+    print('------ STDOUT FLAGS WINDOWS ------')
+    flagtype = 'COF_'
   elseif fh == io.stderr then
-    print "------ STDERR FLAGS WINDOWS ------"
-    flagtype = "COF_"
+    print('------ STDERR FLAGS WINDOWS ------')
+    flagtype = 'COF_'
   end
 
   local flags = assert(system.getconsoleflags(fh))
   local out = {}
-  for k,v in pairs(system) do
-    if type(k) == "string" and k:sub(1,4) == flagtype then
+  for k, v in pairs(system) do
+    if type(k) == 'string' and k:sub(1, 4) == flagtype then
       if flags:has_all_of(v) then
-        out[#out+1] = string.format("%10d [x] %s",v:value(),k)
+        out[#out + 1] = string.format('%10d [x] %s', v:value(), k)
       else
-        out[#out+1] = string.format("%10d [ ] %s",v:value(),k)
+        out[#out + 1] = string.format('%10d [ ] %s', v:value(), k)
       end
     end
   end
   table.sort(out)
-  for k,v in pairs(out) do
+  for k, v in pairs(out) do
     print(v)
   end
 end
-
-
 
 --- Debug function for terminal flags (Posix).
 -- Pretty prints the current flags set for the handle.
@@ -198,34 +215,32 @@ end
 -- system.listconsoleflags(io.stderr)
 function system.listtermflags(fh)
   if fh == io.stdin then
-    print "------ STDIN FLAGS POSIX ------"
+    print('------ STDIN FLAGS POSIX ------')
   elseif fh == io.stdout then
-    print "------ STDOUT FLAGS POSIX ------"
+    print('------ STDOUT FLAGS POSIX ------')
   elseif fh == io.stderr then
-    print "------ STDERR FLAGS POSIX ------"
+    print('------ STDERR FLAGS POSIX ------')
   end
 
   local flags = assert(system.tcgetattr(fh))
-  for _, flagtype in ipairs { "iflag", "oflag", "lflag" } do
-    local prefix = flagtype:sub(1,1):upper() .. "_"  -- I_, O_, or L_, the constant prefixes
+  for _, flagtype in ipairs({ 'iflag', 'oflag', 'lflag' }) do
+    local prefix = flagtype:sub(1, 1):upper() .. '_' -- I_, O_, or L_, the constant prefixes
     local out = {}
-    for k,v in pairs(system) do
-      if type(k) == "string" and k:sub(1,2) == prefix then
+    for k, v in pairs(system) do
+      if type(k) == 'string' and k:sub(1, 2) == prefix then
         if flags[flagtype]:has_all_of(v) then
-          out[#out+1] = string.format("%10d [x] %s",v:value(),k)
+          out[#out + 1] = string.format('%10d [x] %s', v:value(), k)
         else
-          out[#out+1] = string.format("%10d [ ] %s",v:value(),k)
+          out[#out + 1] = string.format('%10d [ ] %s', v:value(), k)
         end
       end
     end
     table.sort(out)
-    for k,v in pairs(out) do
+    for k, v in pairs(out) do
       print(v)
     end
   end
 end
-
-
 
 do
   --- Reads a single byte from the console, with a timeout.
@@ -240,8 +255,8 @@ do
   -- @treturn[2] nil if no key was read
   -- @treturn[2] string error message; `"timeout"` if the timeout was reached.
   function system.readkey(timeout)
-    if type(timeout) ~= "number" then
-      error("arg #1 to readkey, expected timeout in seconds, got " .. type(timeout), 2)
+    if type(timeout) ~= 'number' then
+      error('arg #1 to readkey, expected timeout in seconds, got ' .. type(timeout), 2)
     end
 
     local interval = 0.0125
@@ -256,11 +271,9 @@ do
     if key then
       return key
     end
-    return nil, "timeout"
+    return nil, 'timeout'
   end
 end
-
-
 
 do
   local left_over_key
@@ -281,8 +294,8 @@ do
   -- @treturn[2] string error message; `"timeout"` if the timeout was reached.
   -- @treturn[2] string partial result in case of an error while reading a sequence, the sequence so far.
   function system.readansi(timeout)
-    if type(timeout) ~= "number" then
-      error("arg #1 to readansi, expected timeout in seconds, got " .. type(timeout), 2)
+    if type(timeout) ~= 'number' then
+      error('arg #1 to readansi, expected timeout in seconds, got ' .. type(timeout), 2)
     end
 
     local key
@@ -311,7 +324,7 @@ do
           -- not the expected [ or O character, so we return the key as is
           -- and store the extra key read for the next call
           left_over_key = key2
-          return string.char(key), "char"
+          return string.char(key), 'char'
         end
 
         -- escape sequence detected
@@ -319,10 +332,10 @@ do
       else
         -- check UTF8 length
         utf8_length = key < 128 and 1 or key < 224 and 2 or key < 240 and 3 or key < 248 and 4
-        if utf8_length  == 1 then
+        if utf8_length == 1 then
           -- single byte character
           utf8_length = nil
-          return string.char(key), "char"
+          return string.char(key), 'char'
         else
           -- UTF8 sequence detected
           sequence = { key }
@@ -346,10 +359,9 @@ do
           local result = string.char(unpack(sequence))
           sequence = nil
           utf8_length = nil
-          return result, "char"
+          return result, 'char'
         end
       end
-
     else
       -- read remainder of ANSI sequence
       local timeout_end = system.gettime() + timeout
@@ -364,7 +376,7 @@ do
           -- end of sequence, return the full sequence
           local result = string.char(unpack(sequence))
           sequence = nil
-          return result, "ansi"
+          return result, 'ansi'
         end
       end
     end
@@ -374,7 +386,5 @@ do
     return nil, err, partial
   end
 end
-
-
 
 return system

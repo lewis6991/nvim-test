@@ -4,8 +4,7 @@ return function()
       local parent = busted.context.get()
       local names = { name }
 
-      while parent and (parent.name or parent.descriptor) and
-            parent.descriptor ~= 'file' do
+      while parent and (parent.name or parent.descriptor) and parent.descriptor ~= 'file' do
         table.insert(names, 1, parent.name or parent.descriptor)
         parent = busted.context.parent(parent)
       end
@@ -120,7 +119,9 @@ return function()
     local applyDescFilter = function(descriptors, name, fn)
       if options[name] and options[name] ~= '' then
         for _, descriptor in ipairs(descriptors) do
-          local f = function(...) return fn(descriptor, ...) end
+          local f = function(...)
+            return fn(descriptor, ...)
+          end
           busted.subscribe({ 'register', descriptor }, f, { priority = 1 })
         end
       end
@@ -147,12 +148,12 @@ return function()
     applyFilter({ 'file', 'describe', 'it', 'pending' }, 'nokeepgoing', skipOnError)
 
     -- The following filters are applied in reverse order
-    applyFilter({ 'it', 'pending' }            , 'filter'          , filterNames           )
-    applyFilter({ 'describe', 'it', 'pending' }, 'name'            , name                  )
-    applyFilter({ 'describe', 'it', 'pending' }, 'filterOut'       , filterOutNames        )
-    applyFilter({ 'describe', 'it', 'pending' }, 'excludeNamesFile', excludeNamesFile      )
-    applyFilter({ 'it', 'pending' }            , 'tags'            , filterTags            )
-    applyFilter({ 'describe', 'it', 'pending' }, 'excludeTags'     , filterExcludeTags     )
+    applyFilter({ 'it', 'pending' }, 'filter', filterNames)
+    applyFilter({ 'describe', 'it', 'pending' }, 'name', name)
+    applyFilter({ 'describe', 'it', 'pending' }, 'filterOut', filterOutNames)
+    applyFilter({ 'describe', 'it', 'pending' }, 'excludeNamesFile', excludeNamesFile)
+    applyFilter({ 'it', 'pending' }, 'tags', filterTags)
+    applyFilter({ 'describe', 'it', 'pending' }, 'excludeTags', filterExcludeTags)
   end
 
   return filter

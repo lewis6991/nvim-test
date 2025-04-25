@@ -13,14 +13,14 @@
 -- Dependencies: `pl.stringx`, `pl.utils`
 -- @module pl.text
 
-local utils = require("pl.utils")
+local utils = require('pl.utils')
 
-utils.raise_deprecation {
-  source = "Penlight " .. utils._VERSION,
+utils.raise_deprecation({
+  source = 'Penlight ' .. utils._VERSION,
   message = "the contents of module 'pl.text' has moved into 'pl.stringx'",
-  version_removed = "2.0.0",
-  deprecated_after = "1.11.0",
+  version_removed = '2.0.0',
+  deprecated_after = '1.11.0',
   no_trace = true,
-}
+})
 
-return require "pl.stringx"
+return require('pl.stringx')

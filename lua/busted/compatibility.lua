@@ -23,11 +23,15 @@ return {
     until name == '_ENV' or name == nil
 
     if name then
-      debug.upvaluejoin(f, up, function() return name end, 1)
+      debug.upvaluejoin(f, up, function()
+        return name
+      end, 1)
       debug.setupvalue(f, up, t)
     end
 
-    if f ~= 0 then return f end
+    if f ~= 0 then
+      return f
+    end
   end,
 
   loadstring = loadstring or load,
@@ -39,8 +43,10 @@ return {
     elseif code ~= 0 then
       code = 1
     end
-    if _VERSION == 'Lua 5.1' and
-      (type(jit) ~= 'table' or not jit.version or jit.version_num < 20000) then
+    if
+      _VERSION == 'Lua 5.1'
+      and (type(jit) ~= 'table' or not jit.version or jit.version_num < 20000)
+    then
       -- From Lua 5.1 manual:
       -- > The userdata itself is freed only in the next
       -- > garbage-collection cycle.
@@ -49,9 +55,9 @@ return {
       -- at max 100 times (to prevent infinite loop).
       local times_const = 0
       for i = 1, 100 do
-        local count_before = collectgarbage("count")
+        local count_before = collectgarbage('count')
         collectgarbage()
-        local count_after = collectgarbage("count")
+        local count_after = collectgarbage('count')
         if count_after == count_before then
           times_const = times_const + 1
           if times_const > 3 then
@@ -65,5 +71,5 @@ return {
     os.exit(code, true)
   end,
 
-  execute = require 'pl.utils'.execute,
+  execute = require('pl.utils').execute,
 }

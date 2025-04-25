@@ -1,7 +1,7 @@
-local path = require 'pl.path'
+local path = require('pl.path')
 
 local ok, moonscript, line_tables, util = pcall(function()
-  return require 'moonscript', require 'moonscript.line_tables', require 'moonscript.util'
+  return require('moonscript'), require('moonscript.line_tables'), require('moonscript.util')
 end)
 
 local _cache = {}
@@ -20,7 +20,7 @@ end
 local rewrite_linenumber = function(fname, lineno)
   local tbl = line_tables['@' .. fname]
   if fname and tbl then
-    for i = lineno, 0 ,-1 do
+    for i = lineno, 0, -1 do
       if tbl[i] then
         return lookup_line(fname, tbl[i])
       end
@@ -38,7 +38,9 @@ end
 
 local rewrite_traceback = function(fname, trace)
   local rewrite_one = function(line, pattern, sub)
-    if line == nil then return '' end
+    if line == nil then
+      return ''
+    end
 
     local fname, lineno = line:match(pattern)
 

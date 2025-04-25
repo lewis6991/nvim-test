@@ -1,5 +1,5 @@
 local function init(busted)
-  local block = require 'busted.block'(busted)
+  local block = require('busted.block')(busted)
 
   local file = function(file)
     busted.wrap(file.run)
@@ -26,10 +26,14 @@ local function init(busted)
       return
     end
 
-    if not element.env then element.env = {} end
+    if not element.env then
+      element.env = {}
+    end
 
     block.rejectAll(element)
-    element.env.finally = function(fn) finally = fn end
+    element.env.finally = function(fn)
+      finally = fn
+    end
     element.env.pending = busted.pending
 
     local pass, ancestor = block.execAll('before_each', parent, true)
@@ -87,13 +91,13 @@ local function init(busted)
 
   busted.hide('file')
 
-  local assert = require 'luassert'
-  local spy    = require 'luassert.spy'
-  local mock   = require 'luassert.mock'
-  local stub   = require 'luassert.stub'
-  local match  = require 'luassert.match'
+  local assert = require('luassert')
+  local spy = require('luassert.spy')
+  local mock = require('luassert.mock')
+  local stub = require('luassert.stub')
+  local match = require('luassert.match')
 
-  require 'busted.fixtures'  -- just load into the environment, not exposing it
+  require('busted.fixtures') -- just load into the environment, not exposing it
 
   busted.export('assert', assert)
   busted.export('spy', spy)
@@ -131,7 +135,7 @@ return setmetatable({}, {
 
       __newindex = function(self, key, value)
         error('Attempt to modify busted')
-      end
+      end,
     })
-  end
+  end,
 })

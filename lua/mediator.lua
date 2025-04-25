@@ -12,7 +12,7 @@ local function Subscriber(fn, options)
         self.fn = options.fn or self.fn
         self.options = options.options or self.options
       end
-    end
+    end,
   }
   sub.id = getUniqueId(sub)
   return sub
@@ -34,11 +34,8 @@ local function Channel(namespace, parent)
 
       options = options or {}
 
-      if options.priority and
-        options.priority >= 0 and
-        options.priority < priority
-      then
-          priority = options.priority
+      if options.priority and options.priority >= 0 and options.priority < priority then
+        priority = options.priority
       end
 
       table.insert(self.callbacks, priority, callback)
@@ -47,14 +44,18 @@ local function Channel(namespace, parent)
     end,
 
     getSubscriber = function(self, id)
-      for i=1, #self.callbacks do
+      for i = 1, #self.callbacks do
         local callback = self.callbacks[i]
-        if callback.id == id then return { index = i, value = callback } end
+        if callback.id == id then
+          return { index = i, value = callback }
+        end
       end
       local sub
       for _, channel in pairs(self.channels) do
         sub = channel:getSubscriber(id)
-        if sub then break end
+        if sub then
+          break
+        end
       end
       return sub
     end,
@@ -99,11 +100,15 @@ local function Channel(namespace, parent)
 
         -- if it doesn't have a predicate, or it does and it's true then run it
         if not callback.options.predicate or callback.options.predicate(...) then
-           -- just take the first result and insert it into the result table
+          -- just take the first result and insert it into the result table
           local value, continue = callback.fn(...)
 
-          if value then table.insert(result, value) end
-          if not continue then return result end
+          if value then
+            table.insert(result, value)
+          end
+          if not continue then
+            return result
+          end
         end
       end
 
@@ -112,26 +117,24 @@ local function Channel(namespace, parent)
       else
         return result
       end
-    end
+    end,
   }
 end
 
 -- Mediator class and functions --
 
-local Mediator = setmetatable(
-{
+local Mediator = setmetatable({
   Channel = Channel,
-  Subscriber = Subscriber
-},
-{
-  __call = function (fn, options)
+  Subscriber = Subscriber,
+}, {
+  __call = function(fn, options)
     return {
       channel = Channel('root'),
 
       getChannel = function(self, channelNamespace)
         local channel = self.channel
 
-        for i=1, #channelNamespace do
+        for i = 1, #channelNamespace do
           channel = channel:getChannel(channelNamespace[i])
         end
 
@@ -152,8 +155,8 @@ local Mediator = setmetatable(
 
       publish = function(self, channelNamespace, ...)
         return self:getChannel(channelNamespace):publish({}, ...)
-      end
+      end,
     }
-  end
+  end,
 })
 return Mediator

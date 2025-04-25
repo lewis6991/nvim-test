@@ -4,9 +4,9 @@
 -- Dependencies: `pl.utils`, `pl.path`
 -- @module pl.app
 
-local io,package,require = _G.io, _G.package, _G.require
-local utils = require 'pl.utils'
-local path = require 'pl.path'
+local io, package, require = _G.io, _G.package, _G.require
+local utils = require('pl.utils')
+local path = require('pl.path')
 
 local app = {}
 
@@ -14,10 +14,10 @@ local app = {}
 -- The name will be the name as passed on the command line
 -- @return string filename
 function app.script_name()
-    if _G.arg and _G.arg[0] then
-        return _G.arg[0]
-    end
-    return utils.raise("No script name found")
+  if _G.arg and _G.arg[0] then
+    return _G.arg[0]
+  end
+  return utils.raise('No script name found')
 end
 
 --- prefixes the current script's path to the Lua module path.
@@ -31,41 +31,41 @@ end
 -- @string base optional base directory (absolute, or relative path).
 -- @bool nofollow always use the invocation's directory, even if the invoked file is a symlink
 -- @treturn string the current script's path with a trailing slash
-function app.require_here (base, nofollow)
-    local p = app.script_name()
-    if not path.isabs(p) then
-        p = path.join(path.currentdir(),p)
-    end
-    if not nofollow then
-      local t = path.link_attrib(p)
-      if t and t.mode == 'link' then
-        t = t.target
-        if not path.isabs(t) then
-          t = path.join(path.dirname(p), t)
-        end
-        p = t
+function app.require_here(base, nofollow)
+  local p = app.script_name()
+  if not path.isabs(p) then
+    p = path.join(path.currentdir(), p)
+  end
+  if not nofollow then
+    local t = path.link_attrib(p)
+    if t and t.mode == 'link' then
+      t = t.target
+      if not path.isabs(t) then
+        t = path.join(path.dirname(p), t)
       end
+      p = t
     end
-    p = path.normpath(path.dirname(p))
-    if p:sub(-1,-1) ~= path.sep then
-        p = p..path.sep
+  end
+  p = path.normpath(path.dirname(p))
+  if p:sub(-1, -1) ~= path.sep then
+    p = p .. path.sep
+  end
+  if base then
+    if path.is_windows then
+      base = base:gsub('/', '\\')
     end
-    if base then
-        if path.is_windows then
-            base = base:gsub('/','\\')
-        end
-        if path.isabs(base) then
-            p = base .. path.sep
-        else
-            p = p..base..path.sep
-        end
+    if path.isabs(base) then
+      p = base .. path.sep
+    else
+      p = p .. base .. path.sep
     end
-    local so_ext = path.is_windows and 'dll' or 'so'
-    local lsep = package.path:find '^;' and '' or ';'
-    local csep = package.cpath:find '^;' and '' or ';'
-    package.path = ('%s?.lua;%s?%sinit.lua%s%s'):format(p,p,path.sep,lsep,package.path)
-    package.cpath = ('%s?.%s%s%s'):format(p,so_ext,csep,package.cpath)
-    return p
+  end
+  local so_ext = path.is_windows and 'dll' or 'so'
+  local lsep = package.path:find('^;') and '' or ';'
+  local csep = package.cpath:find('^;') and '' or ';'
+  package.path = ('%s?.lua;%s?%sinit.lua%s%s'):format(p, p, path.sep, lsep, package.path)
+  package.cpath = ('%s?.%s%s%s'):format(p, so_ext, csep, package.cpath)
+  return p
 end
 
 --- return a suitable path for files private to this application.
@@ -81,30 +81,36 @@ end
 -- print(app.appfile 'test.txt')
 -- -- C:\Documents and Settings\steve\.testapp\test.txt
 function app.appfile(file)
-    local sfullname, err = app.script_name()
-    if not sfullname then return utils.raise(err) end
-    local sname = path.basename(sfullname)
-    local name = path.splitext(sname)
-    local dir = path.join(path.expanduser('~'),'.'..name)
-    if not path.isdir(dir) then
-        local ret = path.mkdir(dir)
-        if not ret then return utils.raise('cannot create '..dir) end
+  local sfullname, err = app.script_name()
+  if not sfullname then
+    return utils.raise(err)
+  end
+  local sname = path.basename(sfullname)
+  local name = path.splitext(sname)
+  local dir = path.join(path.expanduser('~'), '.' .. name)
+  if not path.isdir(dir) then
+    local ret = path.mkdir(dir)
+    if not ret then
+      return utils.raise('cannot create ' .. dir)
     end
-    return path.join(dir,file)
+  end
+  return path.join(dir, file)
 end
 
 --- return string indicating operating system.
 -- @return 'Windows','OSX' or whatever uname returns (e.g. 'Linux')
 function app.platform()
-    if path.is_windows then
-        return 'Windows'
-    else
-        local f = io.popen('uname')
-        local res = f:read()
-        if res == 'Darwin' then res = 'OSX' end
-        f:close()
-        return res
+  if path.is_windows then
+    return 'Windows'
+  else
+    local f = io.popen('uname')
+    local res = f:read()
+    if res == 'Darwin' then
+      res = 'OSX'
     end
+    f:close()
+    return res
+  end
 end
 
 --- return the full command-line used to invoke this script.
@@ -117,20 +123,20 @@ end
 -- -- myscript.lua
 -- print(require("pl.app").lua())  --> "lua -lluacov -e 'print(_VERSION)'", "lua"
 function app.lua()
-    local args = _G.arg
-    if not args then
-        return utils.raise "not in a main program"
-    end
+  local args = _G.arg
+  if not args then
+    return utils.raise('not in a main program')
+  end
 
-    local cmd = {}
-    local i = -1
-    while true do
-        table.insert(cmd, 1, args[i])
-        if not args[i-1] then
-            return utils.quote_arg(cmd), args[i]
-        end
-        i = i - 1
+  local cmd = {}
+  local i = -1
+  while true do
+    table.insert(cmd, 1, args[i])
+    if not args[i - 1] then
+      return utils.quote_arg(cmd), args[i]
     end
+    i = i - 1
+  end
 end
 
 --- parse command-line arguments into flags and parameters.
@@ -185,125 +191,131 @@ end
 --     [1] = "param1"
 --     [2] = "param2"
 -- }
-function app.parse_args (args,flags_with_values, flags_valid)
+function app.parse_args(args, flags_with_values, flags_valid)
+  if not args then
+    args = _G.arg
     if not args then
-        args = _G.arg
-        if not args then utils.raise "Not in a main program: 'arg' not found" end
+      utils.raise("Not in a main program: 'arg' not found")
     end
+  end
 
-    local with_values = {}
-    for k,v in pairs(flags_with_values or {}) do
-        if type(k) == "number" then
-            k = v
-        end
-        with_values[k] = true
+  local with_values = {}
+  for k, v in pairs(flags_with_values or {}) do
+    if type(k) == 'number' then
+      k = v
     end
+    with_values[k] = true
+  end
 
-    local valid
-    if not flags_valid then
-        -- if no allowed flags provided, we create a table that always returns
-        -- the keyname, no matter what you look up
-        valid = setmetatable({},{ __index = function(_, key) return key end })
-    else
-        valid = {}
-        for k,aliases in pairs(flags_valid) do
-            if type(k) == "number" then         -- array/list entry
-                k = aliases
-            end
-            if type(aliases) == "string" then  -- single alias
-                aliases = { aliases }
-            end
-            if type(aliases) == "table" then   -- list of aliases
-                -- it's the alternate name, so add the proper mappings
-                for i, alias in ipairs(aliases) do
-                    valid[alias] = k
-                end
-            end
-            valid[k] = k
+  local valid
+  if not flags_valid then
+    -- if no allowed flags provided, we create a table that always returns
+    -- the keyname, no matter what you look up
+    valid = setmetatable({}, {
+      __index = function(_, key)
+        return key
+      end,
+    })
+  else
+    valid = {}
+    for k, aliases in pairs(flags_valid) do
+      if type(k) == 'number' then -- array/list entry
+        k = aliases
+      end
+      if type(aliases) == 'string' then -- single alias
+        aliases = { aliases }
+      end
+      if type(aliases) == 'table' then -- list of aliases
+        -- it's the alternate name, so add the proper mappings
+        for i, alias in ipairs(aliases) do
+          valid[alias] = k
         end
-        do
-            local new_with_values = {}  -- needed to prevent "invalid key to 'next'" error
-            for k,v in pairs(with_values) do
-                if not valid[k] then
-                    valid[k] = k   -- add the with_value entry as a valid one
-                    new_with_values[k] = true
-                else
-                    new_with_values[valid[k]] = true  --set, but by its alias
-                end
-            end
-            with_values = new_with_values
-        end
+      end
+      valid[k] = k
     end
-
-    -- now check that all flags with values are reported as such under all
-    -- of their aliases
-    for k, main_alias in pairs(valid) do
-        if with_values[main_alias] then
-            with_values[k] = true
-        end
-    end
-
-    local _args = {}
-    local flags = {}
-    local i = 1
-    while i <= #args do
-        local a = args[i]
-        local v = a:match('^-(.+)')
-        local is_long
-        if not v then
-            -- we have a parameter
-            _args[#_args+1] = a
+    do
+      local new_with_values = {} -- needed to prevent "invalid key to 'next'" error
+      for k, v in pairs(with_values) do
+        if not valid[k] then
+          valid[k] = k -- add the with_value entry as a valid one
+          new_with_values[k] = true
         else
-            -- it's a flag
-            if v:find '^-' then
-                is_long = true
-                v = v:sub(2)
-            end
-            if with_values[v] then
-                if i == #args or args[i+1]:find '^-' then
-                    return utils.raise ("no value for '"..v.."'")
-                end
-                flags[valid[v]] = args[i+1]
-                i = i + 1
-            else
-                -- a value can also be indicated with = or :
-                local var,val =  utils.splitv (v,'[=:]', false, 2)
-                var = var or v
-                val = val or true
-                if not is_long then
-                    if #var > 1 then
-                        if var:find '.%d+' then -- short flag, number value
-                            val = var:sub(2)
-                            var = var:sub(1,1)
-                        else -- multiple short flags
-                            for i = 1,#var do
-                                local f = var:sub(i,i)
-                                if not valid[f] then
-                                    return utils.raise("unknown flag '"..f.."'")
-                                else
-                                    f = valid[f]
-                                end
-                                flags[f] = true
-                            end
-                            val = nil -- prevents use of var as a flag below
-                        end
-                    else  -- single short flag (can have value, defaults to true)
-                        val = val or true
-                    end
-                end
-                if val then
-                    if not valid[var] then
-                        return utils.raise("unknown flag '"..var.."'")
-                    else
-                        var = valid[var]
-                    end
-                    flags[var] = val
-                end
-            end
+          new_with_values[valid[k]] = true --set, but by its alias
         end
-        i = i + 1
+      end
+      with_values = new_with_values
     end
-    return flags,_args
+  end
+
+  -- now check that all flags with values are reported as such under all
+  -- of their aliases
+  for k, main_alias in pairs(valid) do
+    if with_values[main_alias] then
+      with_values[k] = true
+    end
+  end
+
+  local _args = {}
+  local flags = {}
+  local i = 1
+  while i <= #args do
+    local a = args[i]
+    local v = a:match('^-(.+)')
+    local is_long
+    if not v then
+      -- we have a parameter
+      _args[#_args + 1] = a
+    else
+      -- it's a flag
+      if v:find('^-') then
+        is_long = true
+        v = v:sub(2)
+      end
+      if with_values[v] then
+        if i == #args or args[i + 1]:find('^-') then
+          return utils.raise("no value for '" .. v .. "'")
+        end
+        flags[valid[v]] = args[i + 1]
+        i = i + 1
+      else
+        -- a value can also be indicated with = or :
+        local var, val = utils.splitv(v, '[=:]', false, 2)
+        var = var or v
+        val = val or true
+        if not is_long then
+          if #var > 1 then
+            if var:find('.%d+') then -- short flag, number value
+              val = var:sub(2)
+              var = var:sub(1, 1)
+            else -- multiple short flags
+              for i = 1, #var do
+                local f = var:sub(i, i)
+                if not valid[f] then
+                  return utils.raise("unknown flag '" .. f .. "'")
+                else
+                  f = valid[f]
+                end
+                flags[f] = true
+              end
+              val = nil -- prevents use of var as a flag below
+            end
+          else -- single short flag (can have value, defaults to true)
+            val = val or true
+          end
+        end
+        if val then
+          if not valid[var] then
+            return utils.raise("unknown flag '" .. var .. "'")
+          else
+            var = valid[var]
+          end
+          flags[var] = val
+        end
+      end
+    end
+    i = i + 1
+  end
+  return flags, _args
 end
 
 return app

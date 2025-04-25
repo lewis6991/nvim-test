@@ -23,8 +23,10 @@ local assert = assert
 
 -- map opening brace <-> closing brace.
 local ends = { ['('] = ')', ['{'] = '}', ['['] = ']' }
-local begins = {}; for k,v in pairs(ends) do begins[v] = k end
-
+local begins = {}
+for k, v in pairs(ends) do
+  begins[v] = k
+end
 
 -- Match Lua string in string <s> starting at position <pos>.
 -- Returns <string>, <posnew>, where <string> is the matched
@@ -34,12 +36,12 @@ local begins = {}; for k,v in pairs(ends) do begins[v] = k end
 local function match_string(s, pos)
   pos = pos or 1
   local posa = pos
-  local c = s:sub(pos,pos)
+  local c = s:sub(pos, pos)
   if c == '"' or c == "'" then
     pos = pos + 1
     while 1 do
-      pos = assert(s:find("[" .. c .. "\\]", pos), 'syntax error')
-      if s:sub(pos,pos) == c then
+      pos = assert(s:find('[' .. c .. '\\]', pos), 'syntax error')
+      if s:sub(pos, pos) == c then
         local part = s:sub(posa, pos)
         return part, pos + 1
       else
@@ -47,9 +49,10 @@ local function match_string(s, pos)
       end
     end
   else
-    local sc = s:match("^%[(=*)%[", pos)
+    local sc = s:match('^%[(=*)%[', pos)
     if sc then
-      local _; _, pos = s:find("%]" .. sc .. "%]", pos)
+      local _
+      _, pos = s:find('%]' .. sc .. '%]', pos)
       assert(pos)
       local part = s:sub(posa, pos)
       return part, pos + 1
@@ -60,37 +63,39 @@ local function match_string(s, pos)
 end
 M.match_string = match_string
 
-
 -- Match bracketed Lua expression, e.g. "(...)", "{...}", "[...]", "[[...]]",
 -- [=[...]=], etc.
 -- Function interface is similar to match_string.
 local function match_bracketed(s, pos)
   pos = pos or 1
   local posa = pos
-  local ca = s:sub(pos,pos)
+  local ca = s:sub(pos, pos)
   if not ends[ca] then
     return nil, pos
   end
   local stack = {}
   while 1 do
-    pos = s:find('[%(%{%[%)%}%]\"\']', pos)
+    pos = s:find('[%(%{%[%)%}%]"\']', pos)
     assert(pos, 'syntax error: unbalanced')
-    local c = s:sub(pos,pos)
+    local c = s:sub(pos, pos)
     if c == '"' or c == "'" then
-      local part; part, pos = match_string(s, pos)
+      local part
+      part, pos = match_string(s, pos)
       assert(part)
     elseif ends[c] then -- open
       local mid, posb
-      if c == '[' then mid, posb = s:match('^%[(=*)%[()', pos) end
+      if c == '[' then
+        mid, posb = s:match('^%[(=*)%[()', pos)
+      end
       if mid then
         pos = s:match('%]' .. mid .. '%]()', posb)
         assert(pos, 'syntax error: long string not terminated')
         if #stack == 0 then
-          local part = s:sub(posa, pos-1)
+          local part = s:sub(posa, pos - 1)
           return part, pos
         end
       else
-        stack[#stack+1] = c
+        stack[#stack + 1] = c
         pos = pos + 1
       end
     else -- close
@@ -98,7 +103,7 @@ local function match_bracketed(s, pos)
       stack[#stack] = nil
       if #stack == 0 then
         local part = s:sub(posa, pos)
-        return part, pos+1
+        return part, pos + 1
       end
       pos = pos + 1
     end
@@ -106,12 +111,11 @@ local function match_bracketed(s, pos)
 end
 M.match_bracketed = match_bracketed
 
-
 -- Match Lua comment, e.g. "--...\n", "--[[...]]", "--[=[...]=]", etc.
 -- Function interface is similar to match_string.
 local function match_comment(s, pos)
   pos = pos or 1
-  if s:sub(pos, pos+1) ~= '--' then
+  if s:sub(pos, pos + 1) ~= '--' then
     return nil, pos
   end
   pos = pos + 2
@@ -119,15 +123,15 @@ local function match_comment(s, pos)
   if partt then
     return '--' .. partt, post
   end
-  local part; part, pos = s:match('^([^\n]*\n?)()', pos)
+  local part
+  part, pos = s:match('^([^\n]*\n?)()', pos)
   return '--' .. part, pos
 end
 
-
 -- Match Lua expression, e.g. "a + b * c[e]".
 -- Function interface is similar to match_string.
-local wordop = {['and']=true, ['or']=true, ['not']=true}
-local is_compare = {['>']=true, ['<']=true, ['~']=true}
+local wordop = { ['and'] = true, ['or'] = true, ['not'] = true }
+local is_compare = { ['>'] = true, ['<'] = true, ['~'] = true }
 local function match_expression(s, pos)
   pos = pos or 1
   local _
@@ -135,39 +139,41 @@ local function match_expression(s, pos)
   local lastident
   local poscs, posce
   while pos do
-    local c = s:sub(pos,pos)
-    if c == '"' or c == "'" or c == '[' and s:find('^[=%[]', pos+1) then
-      local part; part, pos = match_string(s, pos)
+    local c = s:sub(pos, pos)
+    if c == '"' or c == "'" or c == '[' and s:find('^[=%[]', pos + 1) then
+      local part
+      part, pos = match_string(s, pos)
       assert(part, 'syntax error')
-    elseif c == '-' and s:sub(pos+1,pos+1) == '-' then
+    elseif c == '-' and s:sub(pos + 1, pos + 1) == '-' then
       -- note: handle adjacent comments in loop to properly support
       -- backtracing (poscs/posce).
       poscs = pos
-      while s:sub(pos,pos+1) == '--' do
-        local part; part, pos = match_comment(s, pos)
+      while s:sub(pos, pos + 1) == '--' do
+        local part
+        part, pos = match_comment(s, pos)
         assert(part)
         pos = s:match('^%s*()', pos)
         posce = pos
       end
     elseif c == '(' or c == '{' or c == '[' then
       _, pos = match_bracketed(s, pos)
-    elseif c == '=' and s:sub(pos+1,pos+1) == '=' then
-      pos = pos + 2  -- skip over two-char op containing '='
-    elseif c == '=' and is_compare[s:sub(pos-1,pos-1)] then
-      pos = pos + 1  -- skip over two-char op containing '='
-    elseif c:match'^[%)%}%];,=]' then
-      local part = s:sub(posa, pos-1)
+    elseif c == '=' and s:sub(pos + 1, pos + 1) == '=' then
+      pos = pos + 2 -- skip over two-char op containing '='
+    elseif c == '=' and is_compare[s:sub(pos - 1, pos - 1)] then
+      pos = pos + 1 -- skip over two-char op containing '='
+    elseif c:match('^[%)%}%];,=]') then
+      local part = s:sub(posa, pos - 1)
       return part, pos
-    elseif c:match'^[%w_]' then
-      local newident,newpos = s:match('^([%w_]+)()', pos)
+    elseif c:match('^[%w_]') then
+      local newident, newpos = s:match('^([%w_]+)()', pos)
       if pos ~= posa and not wordop[newident] then -- non-first ident
         local pose = ((posce == pos) and poscs or pos) - 1
-        while s:match('^%s', pose) do pose = pose - 1 end
-        local ce = s:sub(pose,pose)
-        if ce:match'[%)%}\'\"%]]' or
-           ce:match'[%w_]' and not wordop[lastident]
-        then
-          local part = s:sub(posa, pos-1)
+        while s:match('^%s', pose) do
+          pose = pose - 1
+        end
+        local ce = s:sub(pose, pose)
+        if ce:match('[%)%}\'"%]]') or ce:match('[%w_]') and not wordop[lastident] then
+          local part = s:sub(posa, pos - 1)
           return part, pos
         end
       end
@@ -175,13 +181,12 @@ local function match_expression(s, pos)
     else
       pos = pos + 1
     end
-    pos = s:find('[%(%{%[%)%}%]\"\';,=%w_%-]', pos)
+    pos = s:find('[%(%{%[%)%}%]"\';,=%w_%-]', pos)
   end
   local part = s:sub(posa, #s)
-  return part, #s+1
+  return part, #s + 1
 end
 M.match_expression = match_expression
-
 
 -- Match name list (zero or more names).  E.g. "a,b,c"
 -- Function interface is similar to match_string,
@@ -192,13 +197,16 @@ local function match_namelist(s, pos)
   while 1 do
     local c = #list == 0 and '^' or '^%s*,%s*'
     local item, post = s:match(c .. '([%a_][%w_]*)%s*()', pos)
-    if item then pos = post else break end
-    list[#list+1] = item
+    if item then
+      pos = post
+    else
+      break
+    end
+    list[#list + 1] = item
   end
   return list, pos
 end
 M.match_namelist = match_namelist
-
 
 -- Match expression list (zero or more expressions).  E.g. "a+b,b*c".
 -- Function interface is similar to match_string,
@@ -209,16 +217,20 @@ local function match_explist(s, pos)
   while 1 do
     if #list ~= 0 then
       local post = s:match('^%s*,%s*()', pos)
-      if post then pos = post else break end
+      if post then
+        pos = post
+      else
+        break
+      end
     end
-    local item; item, pos = match_expression(s, pos)
+    local item
+    item, pos = match_expression(s, pos)
     assert(item, 'syntax error')
-    list[#list+1] = item
+    list[#list + 1] = item
   end
   return list, pos
 end
 M.match_explist = match_explist
-
 
 -- Replace snippets of code in Lua code string <s>
 -- using replacement function f(u,sin) --> sout.
@@ -232,21 +244,30 @@ local function gsub(s, f)
   local posa = 1
   local sret = ''
   while 1 do
-    pos = s:find('[%-\'\"%[]', pos)
-    if not pos then break end
+    pos = s:find('[%-\'"%[]', pos)
+    if not pos then
+      break
+    end
     if s:match('^%-%-', pos) then
-      local exp = s:sub(posa, pos-1)
-      if #exp > 0 then sret = sret .. (f('e', exp) or exp) end
-      local comment; comment, pos = match_comment(s, pos)
+      local exp = s:sub(posa, pos - 1)
+      if #exp > 0 then
+        sret = sret .. (f('e', exp) or exp)
+      end
+      local comment
+      comment, pos = match_comment(s, pos)
       sret = sret .. (f('c', assert(comment)) or comment)
       posa = pos
     else
-      local posb = s:find('^[\'\"%[]', pos)
+      local posb = s:find('^[\'"%[]', pos)
       local str
-      if posb then str, pos = match_string(s, posb) end
+      if posb then
+        str, pos = match_string(s, posb)
+      end
       if str then
-        local exp = s:sub(posa, posb-1)
-        if #exp > 0 then sret = sret .. (f('e', exp) or exp) end
+        local exp = s:sub(posa, posb - 1)
+        if #exp > 0 then
+          sret = sret .. (f('e', exp) or exp)
+        end
         sret = sret .. (f('s', str) or str)
         posa = pos
       else
@@ -255,10 +276,11 @@ local function gsub(s, f)
     end
   end
   local exp = s:sub(posa)
-  if #exp > 0 then sret = sret .. (f('e', exp) or exp) end
+  if #exp > 0 then
+    sret = sret .. (f('e', exp) or exp)
+  end
   return sret
 end
 M.gsub = gsub
-
 
 return M

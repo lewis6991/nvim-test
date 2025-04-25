@@ -1,6 +1,6 @@
-local path = require 'pl.path'
+local path = require('pl.path')
 local hasMoon, moonscript = pcall(require, 'moonscript')
-local utils = require 'busted.utils'
+local utils = require('busted.utils')
 
 return function()
   local loadOutputHandler = function(busted, output, options)
@@ -18,7 +18,9 @@ return function()
     end)
 
     if not success and err:match("module '.-' not found:") then
-      success, err = pcall(function() handler = require(output) end)
+      success, err = pcall(function()
+        handler = require(output)
+      end)
     end
 
     if not success then
@@ -27,7 +29,7 @@ return function()
     end
 
     if options.enableSound then
-      require 'busted.outputHandlers.sound'(options)
+      require('busted.outputHandlers.sound')(options)
     end
 
     handler(options):subscribe(options)

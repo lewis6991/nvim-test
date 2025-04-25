@@ -1,35 +1,39 @@
 -- Busted command-line runner
 
-local path = require 'pl.path'
-local tablex = require 'pl.tablex'
-local term = require 'term'
-local utils = require 'busted.utils'
-local exit = require 'busted.compatibility'.exit
-local loadstring = require 'busted.compatibility'.loadstring
+local path = require('pl.path')
+local tablex = require('pl.tablex')
+local term = require('term')
+local utils = require('busted.utils')
+local exit = require('busted.compatibility').exit
+local loadstring = require('busted.compatibility').loadstring
 local loaded = false
 
 return function(options)
-  if loaded then return function() end else loaded = true end
+  if loaded then
+    return function() end
+  else
+    loaded = true
+  end
 
   local isatty = io.type(io.stdout) == 'file' and term.isatty(io.stdout)
-  options = tablex.update(require 'busted.options', options or {})
+  options = tablex.update(require('busted.options'), options or {})
   options.output = options.output or (isatty and 'utfTerminal' or 'plainTerminal')
 
-  local busted = require 'busted.core'()
+  local busted = require('busted.core')()
 
-  local cli = require 'busted.modules.cli'(options)
-  local filterLoader = require 'busted.modules.filter_loader'()
-  local helperLoader = require 'busted.modules.helper_loader'()
-  local outputHandlerLoader = require 'busted.modules.output_handler_loader'()
+  local cli = require('busted.modules.cli')(options)
+  local filterLoader = require('busted.modules.filter_loader')()
+  local helperLoader = require('busted.modules.helper_loader')()
+  local outputHandlerLoader = require('busted.modules.output_handler_loader')()
 
-  local luacov = require 'busted.modules.luacov'()
+  local luacov = require('busted.modules.luacov')()
 
-  require 'busted'(busted)
+  require('busted')(busted)
 
   local level = 2
   local info = debug.getinfo(level, 'Sf')
   local source = info.source
-  local fileName = source:sub(1,1) == '@' and source:sub(2) or nil
+  local fileName = source:sub(1, 1) == '@' and source:sub(2) or nil
   local forceExit = fileName == nil
 
   -- Parse the cli arguments
@@ -76,16 +80,16 @@ return function(options)
 
   -- Add additional package paths based on lpath and cpath cliArgs
   if #cliArgs.lpath > 0 then
-    package.path = (cliArgs.lpath .. ';' .. package.path):gsub(';;',';')
+    package.path = (cliArgs.lpath .. ';' .. package.path):gsub(';;', ';')
   end
 
   if #cliArgs.cpath > 0 then
-    package.cpath = (cliArgs.cpath .. ';' .. package.cpath):gsub(';;',';')
+    package.cpath = (cliArgs.cpath .. ';' .. package.cpath):gsub(';;', ';')
   end
 
   -- Load and execute commands given on the command-line
   if cliArgs.e then
-    for k,v in ipairs(cliArgs.e) do
+    for k, v in ipairs(cliArgs.e) do
       loadstring(v)()
     end
   end
@@ -96,12 +100,16 @@ return function(options)
   local quitOnError = not cliArgs['keep-going']
 
   busted.subscribe({ 'error', 'output' }, function(element, parent, message)
-    io.stderr:write(appName .. ': error: Cannot load output library: ' .. element.name .. '\n' .. message .. '\n')
+    io.stderr:write(
+      appName .. ': error: Cannot load output library: ' .. element.name .. '\n' .. message .. '\n'
+    )
     return nil, true
   end)
 
   busted.subscribe({ 'error', 'helper' }, function(element, parent, message)
-    io.stderr:write(appName .. ': error: Cannot load helper script: ' .. element.name .. '\n' .. message .. '\n')
+    io.stderr:write(
+      appName .. ': error: Cannot load helper script: ' .. element.name .. '\n' .. message .. '\n'
+    )
     return nil, true
   end)
 
@@ -138,18 +146,24 @@ return function(options)
   })
 
   -- Pre-load the LuaJIT 'ffi' module if applicable
-  require 'busted.luajit'()
+  require('busted.luajit')()
 
   -- Set up helper script, must succeed to even start tests
   if cliArgs.helper and cliArgs.helper ~= '' then
     local ok, err = helperLoader(busted, cliArgs.helper, {
       verbose = cliArgs.verbose,
       language = cliArgs.lang,
-      arguments = cliArgs.Xhelper
+      arguments = cliArgs.Xhelper,
     })
     if not ok then
-      io.stderr:write(appName .. ': failed running the specified helper (' ..
-                      cliArgs.helper .. '), error: ' .. err .. '\n')
+      io.stderr:write(
+        appName
+          .. ': failed running the specified helper ('
+          .. cliArgs.helper
+          .. '), error: '
+          .. err
+          .. '\n'
+      )
       exit(1, forceExit)
     end
   end
@@ -158,8 +172,7 @@ return function(options)
     local parent = busted.context.get()
     local names = { name }
 
-    while parent and (parent.name or parent.descriptor) and
-      parent.descriptor ~= 'file' do
+    while parent and (parent.name or parent.descriptor) and parent.descriptor ~= 'file' do
       table.insert(names, 1, parent.name or parent.descriptor)
       parent = busted.context.parent(parent)
     end
@@ -169,9 +182,9 @@ return function(options)
 
   if cliArgs['log-success'] then
     local logFile = assert(io.open(cliArgs['log-success'], 'a'))
-    busted.subscribe({ 'test', 'end' }, function (test, parent, status)
-      if status == "success" then
-        logFile:write(getFullName() .. "\n")
+    busted.subscribe({ 'test', 'end' }, function(test, parent, status)
+      if status == 'success' then
+        logFile:write(getFullName() .. '\n')
       end
     end)
   end
@@ -193,7 +206,7 @@ return function(options)
     -- Load test directories/files
     local rootFiles = cliArgs.ROOT
     local patterns = cliArgs.pattern
-    local testFileLoader = require 'busted.modules.test_file_loader'(busted, cliArgs.loaders)
+    local testFileLoader = require('busted.modules.test_file_loader')(busted, cliArgs.loaders)
     testFileLoader(rootFiles, patterns, {
       excludes = cliArgs['exclude-pattern'],
       verbose = cliArgs.verbose,
@@ -201,12 +214,12 @@ return function(options)
     })
   else
     -- Running standalone, use standalone loader
-    local testFileLoader = require 'busted.modules.standalone_loader'(busted)
+    local testFileLoader = require('busted.modules.standalone_loader')(busted)
     testFileLoader(info, { verbose = cliArgs.verbose })
   end
 
   local runs = cliArgs['repeat']
-  local execute = require 'busted.execute'(busted)
+  local execute = require('busted.execute')(busted)
   execute(runs, {
     seed = cliArgs.seed,
     shuffle = cliArgs['shuffle-files'],

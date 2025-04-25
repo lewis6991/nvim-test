@@ -1,7 +1,7 @@
-local trim = require 'cliargs.utils.trim'
+local trim = require('cliargs.utils.trim')
 
 local function read_file(filepath)
-  local f, err = io.open(filepath, "r")
+  local f, err = io.open(filepath, 'r')
 
   if not f then
     return nil, err
@@ -16,11 +16,11 @@ end
 
 return {
   FORMAT_LOADERS = {
-    ["lua"]   = "from_lua",
-    ["json"]  = "from_json",
-    ["yaml"]  = "from_yaml",
-    ["yml"]   = "from_yaml",
-    ["ini"]   = "from_ini",
+    ['lua'] = 'from_lua',
+    ['json'] = 'from_json',
+    ['yaml'] = 'from_yaml',
+    ['yml'] = 'from_yaml',
+    ['ini'] = 'from_ini',
   },
 
   --- Load configuration from a Lua file that exports a table.
@@ -43,7 +43,7 @@ return {
   --- [1] http://dkolf.de/src/dkjson-lua.fsl/home
   from_json = function(filepath)
     local src, config, _, err
-    local json = require 'dkjson'
+    local json = require('dkjson')
 
     src, err = read_file(filepath)
 
@@ -79,14 +79,12 @@ return {
   ---
   --- [1] http://docs.bartbes.com/inifile
   from_ini = function(filepath, group, no_cast)
-    local inifile = require 'inifile'
+    local inifile = require('inifile')
     local config, err
 
     group = group or 'cli'
 
-    assert(type(group) == 'string',
-      'You must provide an INI group to read from.'
-    )
+    assert(type(group) == 'string', 'You must provide an INI group to read from.')
 
     config, err = inifile.parse(filepath)
 
@@ -120,7 +118,7 @@ return {
   --- [1] http://doc.lubyk.org/yaml.html
   from_yaml = function(filepath)
     local src, config, _, err
-    local yaml = require 'yaml'
+    local yaml = require('yaml')
 
     src, err = read_file(filepath)
 
@@ -135,5 +133,5 @@ return {
     end
 
     return config
-  end
+  end,
 }

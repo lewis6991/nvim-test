@@ -1,6 +1,3 @@
--- luacheck: ignore 212
-
-local _
 local disect = require('cliargs.utils.disect')
 local lookup = require('cliargs.utils.lookup')
 local filter = require('cliargs.utils.filter')
@@ -8,10 +5,10 @@ local shallow_copy = require('cliargs.utils.shallow_copy')
 local create_printer = require('cliargs.printer')
 local config_loader = require('cliargs.config_loader')
 local parser = require('cliargs.parser')
-local K = require 'cliargs.constants'
+local K = require('cliargs.constants')
 
 local function is_callable(fn)
-  return type(fn) == "function" or (getmetatable(fn) or {}).__call
+  return type(fn) == 'function' or (getmetatable(fn) or {}).__call
 end
 
 local function cast_to_boolean(v)
@@ -35,15 +32,15 @@ local function create_core()
   local colsz = { 0, 0 } -- column width, help text. Set to 0 for auto detect
   local options = {}
 
-  cli.name = ""
-  cli.description = ""
+  cli.name = ''
+  cli.description = ''
 
   cli.printer = create_printer(function()
     return {
       name = cli.name,
       description = cli.description,
       options = options,
-      colsz = colsz
+      colsz = colsz,
     }
   end)
 
@@ -58,11 +55,11 @@ local function create_core()
 
     -- guard against duplicates
     if lookup(k, ek, options) then
-      error("Duplicate option: " .. (k or ek) .. ", please rename one of them.")
+      error('Duplicate option: ' .. (k or ek) .. ', please rename one of them.')
     end
 
-    if negatable and lookup(nil, "no-"..ek, options) then
-      error("Duplicate option: " .. ("no-"..ek) .. ", please rename one of them.")
+    if negatable and lookup(nil, 'no-' .. ek, options) then
+      error('Duplicate option: ' .. ('no-' .. ek) .. ', please rename one of them.')
     end
 
     -- below description of full entry record, nils included for reference
@@ -75,7 +72,7 @@ local function create_core()
       label = label,
       flag = flag,
       negatable = negatable,
-      callback = callback
+      callback = callback,
     }
 
     table.insert(options, entry)
@@ -264,23 +261,22 @@ local function create_core()
   --- @param {function} [callback]
   ---        Callback to invoke when this argument is parsed.
   function cli:argument(key, desc, callback)
-    assert(type(key) == "string" and type(desc) == "string",
-      "Key and description are mandatory arguments (Strings)"
+    assert(
+      type(key) == 'string' and type(desc) == 'string',
+      'Key and description are mandatory arguments (Strings)'
     )
 
-    assert(callback == nil or is_callable(callback),
-      "Callback argument must be a function"
-    )
+    assert(callback == nil or is_callable(callback), 'Callback argument must be a function')
 
     if lookup(key, key, options) then
-      error("Duplicate argument: " .. key .. ", please rename one of them.")
+      error('Duplicate argument: ' .. key .. ', please rename one of them.')
     end
 
     table.insert(options, {
       type = K.TYPE_ARGUMENT,
       key = key,
       desc = desc,
-      callback = callback
+      callback = callback,
     })
 
     return self
@@ -335,26 +331,25 @@ local function create_core()
   ---        parsed.
   ---
   function cli:splat(key, desc, default, maxcount, callback)
-    assert(#filter(options, 'type', K.TYPE_SPLAT) == 0,
-      "Only one splat argument may be defined."
+    assert(#filter(options, 'type', K.TYPE_SPLAT) == 0, 'Only one splat argument may be defined.')
+
+    assert(
+      type(key) == 'string' and type(desc) == 'string',
+      'Key and description are mandatory arguments (Strings)'
     )
 
-    assert(type(key) == "string" and type(desc) == "string",
-      "Key and description are mandatory arguments (Strings)"
-    )
-
-    assert(type(default) == "string" or default == nil,
-      "Default value must either be omitted or be a string"
+    assert(
+      type(default) == 'string' or default == nil,
+      'Default value must either be omitted or be a string'
     )
 
     maxcount = tonumber(maxcount or 1)
 
-    assert(maxcount > 0 and maxcount < 1000,
-      "Maxcount must be a number from 1 to 999"
-    )
+    assert(maxcount > 0 and maxcount < 1000, 'Maxcount must be a number from 1 to 999')
 
-    assert(is_callable(callback) or callback == nil,
-      "Callback argument: expected a function or nil"
+    assert(
+      is_callable(callback) or callback == nil,
+      'Callback argument: expected a function or nil'
     )
 
     local typed_default = default or {}
@@ -369,7 +364,7 @@ local function create_core()
       desc = desc,
       default = typed_default,
       maxcount = maxcount,
-      callback = callback
+      callback = callback,
     })
 
     return self
@@ -408,12 +403,14 @@ local function create_core()
   ---
   ---     cli:option("-i, --input=FILE", "path to the input file", "file.txt")
   function cli:option(key, desc, default, callback)
-    assert(type(key) == "string" and type(desc) == "string",
-      "Key and description are mandatory arguments (Strings)"
+    assert(
+      type(key) == 'string' and type(desc) == 'string',
+      'Key and description are mandatory arguments (Strings)'
     )
 
-    assert(is_callable(callback) or callback == nil,
-      "Callback argument: expected a function or nil"
+    assert(
+      is_callable(callback) or callback == nil,
+      'Callback argument: expected a function or nil'
     )
 
     local k, ek, v = disect(key)
@@ -469,19 +466,20 @@ local function create_core()
   --- @param {*} default
   --- @param {function} callback
   function cli:flag(key, desc, default, callback)
-    if type(default) == "function" then
+    if type(default) == 'function' then
       callback = default
       default = nil
     end
 
-    assert(type(key) == "string" and type(desc) == "string",
-      "Key and description are mandatory arguments (Strings)"
+    assert(
+      type(key) == 'string' and type(desc) == 'string',
+      'Key and description are mandatory arguments (Strings)'
     )
 
     local k, ek, v = disect(key)
 
     if v ~= nil then
-      error("A flag type option cannot have a value set: " .. key)
+      error('A flag type option cannot have a value set: ' .. key)
     end
 
     define_option(k, ek, nil, key, desc, cast_to_boolean(default), callback)

@@ -25,7 +25,10 @@ s:set('output.success_single', 'succes')
 
 s:set('output.seconds', 'secunde')
 
-s:set('output.no_test_files_match', 'Niciun fișier de testare găsit care să se potrivească cu tiparul Lua: %s')
+s:set(
+  'output.no_test_files_match',
+  'Niciun fișier de testare găsit care să se potrivească cu tiparul Lua: %s'
+)
 s:set('output.file_not_found', 'Nu pot găsi fișierul sau folderul: %s')
 
 -- definitions following are not used within the 'say' namespace
@@ -38,7 +41,7 @@ return {
     'Ce joc ciudat. Singura cale de a câștiga este să nu testezi',
     'Bunica mea scria teste mai bune pe un 3 86',
     'De fiecare dată când este un eșec, bea incă o bere',
-    'Se simte rău omule'
+    'Se simte rău omule',
   },
   success_messages = {
     'Ooo da, trec testele',
@@ -46,5 +49,5 @@ return {
     'Se simte bine, omule',
     'Grozav succes',
     'Testele trec, bea altă bere',
-  }
+  },
 }

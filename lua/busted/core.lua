@@ -1,26 +1,30 @@
-local getfenv = require 'busted.compatibility'.getfenv
-local setfenv = require 'busted.compatibility'.setfenv
-local unpack = require 'busted.compatibility'.unpack
-local path = require 'pl.path'
-local pretty = require 'pl.pretty'
-local system = require 'system'
+local getfenv = require('busted.compatibility').getfenv
+local setfenv = require('busted.compatibility').setfenv
+local unpack = require('busted.compatibility').unpack
+local path = require('pl.path')
+local pretty = require('pl.pretty')
+local system = require('system')
 local throw = error
 
 local failureMt = {
   __index = {},
-  __tostring = function(e) return tostring(e.message) end,
-  __type = 'failure'
+  __tostring = function(e)
+    return tostring(e.message)
+  end,
+  __type = 'failure',
 }
 
 local failureMtNoString = {
   __index = {},
-  __type = 'failure'
+  __type = 'failure',
 }
 
 local pendingMt = {
   __index = {},
-  __tostring = function(p) return p.message end,
-  __type = 'pending'
+  __tostring = function(p)
+    return p.message
+  end,
+  __type = 'pending',
 }
 
 local function errortype(obj)
@@ -42,15 +46,15 @@ local function isCallable(obj)
 end
 
 return function()
-  local mediator = require 'mediator'()
+  local mediator = require('mediator')()
 
   local busted = {}
   busted.version = '2.2.0'
 
-  local root = require 'busted.context'()
+  local root = require('busted.context')()
   busted.context = root.ref()
 
-  local environment = require 'busted.environment'(busted.context)
+  local environment = require('busted.environment')(busted.context)
 
   busted.api = {}
   busted.executors = {}
@@ -60,7 +64,7 @@ return function()
   busted.gettime = system.gettime
   busted.monotime = system.monotime
   busted.sleep = system.sleep
-  busted.status = require 'busted.status'
+  busted.status = require('busted.status')
 
   function busted.getTrace(element, level, msg)
     local function trimTrace(info)
@@ -68,12 +72,15 @@ return function()
       info.traceback = info.traceback:sub(1, index)
       return info
     end
-    level = level or  3
+    level = level or 3
 
     local thisdir = path.dirname(debug.getinfo(1, 'Sl').source)
     local info = debug.getinfo(level, 'Sl')
-    while info.what == 'C' or info.short_src:match('luassert[/\\].*%.lua$') or
-          (info.source:sub(1,1) == '@' and thisdir == path.dirname(info.source)) do
+    while
+      info.what == 'C'
+      or info.short_src:match('luassert[/\\].*%.lua$')
+      or (info.source:sub(1, 1) == '@' and thisdir == path.dirname(info.source))
+    do
       level = level + 1
       info = debug.getinfo(level, 'Sl')
     end
@@ -122,7 +129,7 @@ return function()
         return {
           name = file.name,
           getTrace = file.run.getTrace,
-          rewriteMessage = file.run.rewriteMessage
+          rewriteMessage = file.run.rewriteMessage,
         }
       end
 
@@ -130,7 +137,7 @@ return function()
         return {
           name = parent.name,
           getTrace = parent.run.getTrace,
-          rewriteMessage = parent.run.rewriteMessage
+          rewriteMessage = parent.run.rewriteMessage,
         }
       end
 
@@ -143,10 +150,10 @@ return function()
   function busted.fail(msg, level)
     local rawlevel = (type(level) ~= 'number' or level <= 0) and level
     local level = level or 1
-    local _, emsg = pcall(throw, msg, rawlevel or level+2)
+    local _, emsg = pcall(throw, msg, rawlevel or level + 2)
     local e = { message = emsg }
     setmetatable(e, hasToString(msg) and failureMt or failureMtNoString)
-    throw(e, rawlevel or level+1)
+    throw(e, rawlevel or level + 1)
   end
 
   function busted.pending(msg)
@@ -175,11 +182,13 @@ return function()
     local trace, message
     local status = 'success'
 
-    local ret = { xpcall(run, function(msg)
-      status = errortype(msg)
-      trace = busted.getTrace(element, 3, msg)
-      message = busted.rewriteMessage(element, msg, trace)
-    end) }
+    local ret = {
+      xpcall(run, function(msg)
+        status = errortype(msg)
+        trace = busted.getTrace(element, 3, msg)
+        message = busted.rewriteMessage(element, msg, trace)
+      end),
+    }
 
     if not ret[1] then
       if status == 'success' then
@@ -198,7 +207,13 @@ return function()
       -- a test failure, but rather an error outside the test, much like a
       -- failure in a support function (i.e. before_each/after_each or
       -- setup/teardown).
-      busted.publish({ status, element.descriptor }, element, busted.context.parent(element), message, trace)
+      busted.publish(
+        { status, element.descriptor },
+        element,
+        busted.context.parent(element),
+        message,
+        trace
+      )
     end
     ret[1] = busted.status(status)
 
@@ -207,7 +222,7 @@ return function()
   end
 
   function busted.safe_publish(descriptor, channel, element, ...)
-    local args = {...}
+    local args = { ... }
     local n = select('#', ...)
     if channel[2] == 'start' then
       element.starttick = busted.monotime()
@@ -274,7 +289,11 @@ return function()
         busted.publish({ 'register', descriptor }, name, f, trace, attributes)
       end
 
-      if fn then publish(fn) else return publish end
+      if fn then
+        publish(fn)
+      else
+        return publish
+      end
     end
 
     local edescriptor = alias or descriptor
@@ -301,17 +320,21 @@ return function()
       if not ctx[descriptor] then
         ctx[descriptor] = { plugin }
       else
-        ctx[descriptor][#ctx[descriptor]+1] = plugin
+        ctx[descriptor][#ctx[descriptor] + 1] = plugin
       end
     end)
   end
 
   function busted.execute(current)
-    if not current then current = busted.context.get() end
+    if not current then
+      current = busted.context.get()
+    end
     for _, v in pairs(busted.context.children(current)) do
       local executor = executors[v.descriptor]
       if executor and not busted.skipAll then
-        busted.safe(v.descriptor, function() executor(v) end, v)
+        busted.safe(v.descriptor, function()
+          executor(v)
+        end, v)
       end
     end
   end

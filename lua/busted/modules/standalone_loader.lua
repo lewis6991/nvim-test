@@ -7,7 +7,7 @@ end
 return function(busted)
   local loadCurrentFile = function(info, options)
     local filename = 'string'
-    if info.source:sub(1,1) == '@' or info.source:sub(1,1) == '=' then
+    if info.source:sub(1, 1) == '@' or info.source:sub(1, 1) == '=' then
       filename = info.source:sub(2)
     end
 
@@ -15,9 +15,9 @@ return function(busted)
     if info.func then
       local file = setmetatable({
         getTrace = getTrace,
-        rewriteMessage = nil
+        rewriteMessage = nil,
       }, {
-        __call = info.func
+        __call = info.func,
       })
 
       busted.executors.file(filename, file)

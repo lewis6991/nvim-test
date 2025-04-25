@@ -1,5 +1,5 @@
-local namespace = require 'luassert.namespaces'
-local util = require 'luassert.util'
+local namespace = require('luassert.namespaces')
+local util = require('luassert.util')
 
 local matcher_mt = {
   __call = function(self, value)
@@ -9,7 +9,7 @@ local matcher_mt = {
 
 local state_mt = {
   __call = function(self, ...)
-    local keys = util.extract_keys("matcher", self.tokens)
+    local keys = util.extract_keys('matcher', self.tokens)
     self.tokens = {}
 
     local matcher
@@ -52,21 +52,28 @@ local state_mt = {
     end
 
     return self
-  end
+  end,
 }
 
 local match = {
-  _ = setmetatable({mod=true, callback=function() return true end}, matcher_mt),
+  _ = setmetatable({
+    mod = true,
+    callback = function()
+      return true
+    end,
+  }, matcher_mt),
 
-  state = function() return setmetatable({mod=true, tokens={}}, state_mt) end,
+  state = function()
+    return setmetatable({ mod = true, tokens = {} }, state_mt)
+  end,
 
   is_matcher = function(object)
-    return type(object) == "table" and getmetatable(object) == matcher_mt
+    return type(object) == 'table' and getmetatable(object) == matcher_mt
   end,
 
   is_ref_matcher = function(object)
-    local ismatcher = (type(object) == "table" and getmetatable(object) == matcher_mt)
-    return ismatcher and object.name == "ref"
+    local ismatcher = (type(object) == 'table' and getmetatable(object) == matcher_mt)
+    return ismatcher and object.name == 'ref'
   end,
 }
 

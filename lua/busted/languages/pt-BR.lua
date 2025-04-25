@@ -37,7 +37,7 @@ return {
     'Jogo estranho. A única forma de ganhar é não testar',
     'Minha avó escreveu testes melhores em um 386',
     'Cada vez que encontrar uma falha, beba outra cerveja',
-    'Isso não está poético'
+    'Isso não está poético',
   },
   success_messages = {
     'Perfeito! Todos os testes estão passando',
@@ -45,5 +45,5 @@ return {
     'Isso está poético',
     'Excelente',
     'Os testes passaram, beba outra cerveja',
-  }
+  },
 }

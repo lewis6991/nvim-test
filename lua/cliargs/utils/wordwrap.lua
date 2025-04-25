@@ -16,12 +16,12 @@ local function buildline(words, size, overflow)
   else
     local len = 0
     while words[1] and (len + #words[1] + 1 <= size) or (len == 0 and #words[1] == size) do
-      line[#line+1] = words[1]
+      line[#line + 1] = words[1]
       len = len + #words[1] + 1
       table.remove(words, 1)
     end
   end
-  return table.concat(line, " "), words
+  return table.concat(line, ' '), words
 end
 
 local function wordwrap(str, size, overflow)
@@ -29,7 +29,7 @@ local function wordwrap(str, size, overflow)
   -- otherwise, they'll be chopped in pieces
   local out, words = {}, split(str, ' ')
   while words[1] do
-    out[#out+1], words = buildline(words, size, overflow)
+    out[#out + 1], words = buildline(words, size, overflow)
   end
   return out
 end

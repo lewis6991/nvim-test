@@ -23,7 +23,7 @@ local function create_printer(get_parser_state)
       end
     end
 
-    for _,table_name in ipairs({"options"}) do
+    for _, table_name in ipairs({ 'options' }) do
       for _, entry in ipairs(state[table_name]) do
         local key = entry.label or entry.key or entry.__key__
 
@@ -43,7 +43,7 @@ local function create_printer(get_parser_state)
   -- Generate the USAGE heading message.
   function printer.generate_usage()
     local state = get_parser_state()
-    local msg = "Usage:"
+    local msg = 'Usage:'
 
     local required = filter(state.options, 'type', K.TYPE_ARGUMENT)
     local optional = filter(state.options, 'type', K.TYPE_OPTION)
@@ -54,26 +54,26 @@ local function create_printer(get_parser_state)
     end
 
     if #optional > 0 then
-      msg = msg .. " [OPTIONS]"
+      msg = msg .. ' [OPTIONS]'
     end
 
     if #required > 0 or optargument then
-      msg = msg .. " [--]"
+      msg = msg .. ' [--]'
     end
 
     if #required > 0 then
-      for _,entry in ipairs(required) do
-        msg = msg .. " " .. entry.key
+      for _, entry in ipairs(required) do
+        msg = msg .. ' ' .. entry.key
       end
     end
 
     if optargument then
       if optargument.maxcount == 1 then
-        msg = msg .. " [" .. optargument.key .. "]"
+        msg = msg .. ' [' .. optargument.key .. ']'
       elseif optargument.maxcount == 2 then
-        msg = msg .. " [" .. optargument.key .. "-1 [" .. optargument.key .. "-2]]"
+        msg = msg .. ' [' .. optargument.key .. '-1 [' .. optargument.key .. '-2]]'
       elseif optargument.maxcount > 2 then
-        msg = msg .. " [" .. optargument.key .. "-1 [" .. optargument.key .. "-2 [...]]]"
+        msg = msg .. ' [' .. optargument.key .. '-1 [' .. optargument.key .. '-2 [...]]]'
       end
     end
 
@@ -91,11 +91,11 @@ local function create_printer(get_parser_state)
     local optargument = filter(state.options, 'type', K.TYPE_SPLAT)[1]
 
     local function append(label, desc)
-      label = "  " .. label .. string.rep(" ", col1 - (#label + 2))
-      desc = table.concat(wordwrap(desc, col2), "\n") -- word-wrap
-      desc = desc:gsub("\n", "\n" .. string.rep(" ", col1)) -- add padding
+      label = '  ' .. label .. string.rep(' ', col1 - (#label + 2))
+      desc = table.concat(wordwrap(desc, col2), '\n') -- word-wrap
+      desc = desc:gsub('\n', '\n' .. string.rep(' ', col1)) -- add padding
 
-      msg = msg .. label .. desc .. "\n"
+      msg = msg .. label .. desc .. '\n'
     end
 
     if col1 == 0 then
@@ -114,7 +114,7 @@ local function create_printer(get_parser_state)
     end
 
     if #commands > 0 then
-      msg = msg .. "\nCOMMANDS: \n"
+      msg = msg .. '\nCOMMANDS: \n'
 
       for _, entry in ipairs(commands) do
         append(entry.__key__, entry.description or '')
@@ -122,39 +122,39 @@ local function create_printer(get_parser_state)
     end
 
     if required[1] or optargument then
-      msg = msg .. "\nARGUMENTS: \n"
+      msg = msg .. '\nARGUMENTS: \n'
 
-      for _,entry in ipairs(required) do
-        append(entry.key, entry.desc .. " (required)")
+      for _, entry in ipairs(required) do
+        append(entry.key, entry.desc .. ' (required)')
       end
     end
 
     if optargument then
       local optarg_desc = ' ' .. optargument.desc
-      local default_value = optargument.maxcount > 1 and
-        optargument.default[1] or
-        optargument.default
+      local default_value = optargument.maxcount > 1 and optargument.default[1]
+        or optargument.default
 
       if #optargument.default > 0 then
-        optarg_desc = optarg_desc .. " (optional, default: " .. tostring(default_value[1]) .. ")"
+        optarg_desc = optarg_desc .. ' (optional, default: ' .. tostring(default_value[1]) .. ')'
       else
-        optarg_desc = optarg_desc .. " (optional)"
+        optarg_desc = optarg_desc .. ' (optional)'
       end
 
       append(optargument.key, optarg_desc)
     end
 
     if #optional > 0 then
-      msg = msg .. "\nOPTIONS: \n"
+      msg = msg .. '\nOPTIONS: \n'
 
-      for _,entry in ipairs(optional) do
+      for _, entry in ipairs(optional) do
         local desc = entry.desc
         if not entry.flag and entry.default and #tostring(entry.default) > 0 then
-          local readable_default = type(entry.default) == "table" and "[]" or tostring(entry.default)
-          desc = desc .. " (default: " .. readable_default .. ")"
+          local readable_default = type(entry.default) == 'table' and '[]'
+            or tostring(entry.default)
+          desc = desc .. ' (default: ' .. readable_default .. ')'
         elseif entry.flag and entry.negatable then
           local readable_default = entry.default and 'on' or 'off'
-          desc = desc .. " (default: " .. readable_default .. ")"
+          desc = desc .. ' (default: ' .. readable_default .. ')'
         end
         append(entry.label, desc)
       end
@@ -175,76 +175,85 @@ local function create_printer(get_parser_state)
       msg = msg .. fragment .. '\n'
     end
 
-    print("\n======= Provided command line =============")
-    print("\nNumber of arguments: ", #arg)
+    print('\n======= Provided command line =============')
+    print('\nNumber of arguments: ', #arg)
 
-    for i,v in ipairs(arg) do -- use gloabl 'arg' not the modified local 'args'
+    for i, v in ipairs(arg) do -- use gloabl 'arg' not the modified local 'args'
       print(string.format("%3i = '%s'", i, v))
     end
 
-    print("\n======= Parsed command line ===============")
-    if #required > 0 then print("\nArguments:") end
+    print('\n======= Parsed command line ===============')
+    if #required > 0 then
+      print('\nArguments:')
+    end
     for _, entry in ipairs(required) do
       print(
-        "  " ..
-        entry.key .. string.rep(" ", maxlabel + 2 - #entry.key) ..
-        " => '" ..
-        tostring(values[entry]) ..
-        "'"
+        '  '
+          .. entry.key
+          .. string.rep(' ', maxlabel + 2 - #entry.key)
+          .. " => '"
+          .. tostring(values[entry])
+          .. "'"
       )
     end
 
     if optargument then
       print(
-        "\nOptional arguments:" ..
-        optargument.key ..
-        "; allowed are " ..
-        tostring(optargument.maxcount) ..
-        " arguments"
+        '\nOptional arguments:'
+          .. optargument.key
+          .. '; allowed are '
+          .. tostring(optargument.maxcount)
+          .. ' arguments'
       )
 
       if optargument.maxcount == 1 then
-          print(
-            "  " .. optargument.key ..
-            string.rep(" ", maxlabel + 2 - #optargument.key) ..
-            " => '" ..
-            optargument.key ..
-            "'"
-          )
+        print(
+          '  '
+            .. optargument.key
+            .. string.rep(' ', maxlabel + 2 - #optargument.key)
+            .. " => '"
+            .. optargument.key
+            .. "'"
+        )
       else
         for i = 1, optargument.maxcount do
           if values[optargument] and values[optargument][i] then
             print(
-              "  " .. tostring(i) ..
-              string.rep(" ", maxlabel + 2 - #tostring(i)) ..
-              " => '" ..
-              tostring(values[optargument][i]) ..
-              "'"
+              '  '
+                .. tostring(i)
+                .. string.rep(' ', maxlabel + 2 - #tostring(i))
+                .. " => '"
+                .. tostring(values[optargument][i])
+                .. "'"
             )
           end
         end
       end
     end
 
-    if #optional > 0 then print("\nOptional parameters:") end
+    if #optional > 0 then
+      print('\nOptional parameters:')
+    end
     local doubles = {}
     for _, entry in pairs(optional) do
       if not doubles[entry] then
         local value = values[entry]
 
-        if type(value) == "string" then
-          value = "'"..value.."'"
+        if type(value) == 'string' then
+          value = "'" .. value .. "'"
         else
-          value = tostring(value) .." (" .. type(value) .. ")"
+          value = tostring(value) .. ' (' .. type(value) .. ')'
         end
 
-        print("  " .. entry.label .. string.rep(" ", maxlabel + 2 - #entry.label) .. " => " .. value)
+        print(
+          '  ' .. entry.label .. string.rep(' ', maxlabel + 2 - #entry.label) .. ' => ' .. value
+        )
 
         doubles[entry] = entry
       end
     end
 
-    print("\n===========================================\n\n")
+    print('\n===========================================\n\n')
 
     return msg
   end

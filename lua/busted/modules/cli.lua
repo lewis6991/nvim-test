@@ -1,15 +1,15 @@
-local utils = require 'busted.utils'
-local path = require 'pl.path'
-local tablex = require 'pl.tablex'
-local exit = require 'busted.compatibility'.exit
-local execute = require 'busted.compatibility'.execute
+local utils = require('busted.utils')
+local path = require('pl.path')
+local tablex = require('pl.tablex')
+local exit = require('busted.compatibility').exit
+local execute = require('busted.compatibility').execute
 
 return function(options)
   local appName = ''
   local options = options or {}
-  local cli = require 'cliargs.core'()
+  local cli = require('cliargs.core')()
 
-  local configLoader = require 'busted.modules.configuration_loader'()
+  local configLoader = require('busted.modules.configuration_loader')()
 
   -- Default cli arg values
   local defaultOutput = options.output or 'utfTerminal'
@@ -17,7 +17,8 @@ return function(options)
   local defaultPattern = '_spec'
   local defaultSeed = '/dev/urandom or os.time()'
   local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
-  local cpathprefix = path.is_windows and './csrc/?.dll;./csrc/?/?.dll;' or './csrc/?.so;./csrc/?/?.so;'
+  local cpathprefix = path.is_windows and './csrc/?.dll;./csrc/?/?.dll;'
+    or './csrc/?.so;./csrc/?/?.so;'
 
   local cliArgsParsed = {}
 
@@ -36,7 +37,9 @@ return function(options)
   end
 
   local function processOption(key, value, altkey, opt)
-    if altkey then cliArgsParsed[altkey] = value end
+    if altkey then
+      cliArgsParsed[altkey] = value
+    end
     cliArgsParsed[key] = value
     return true
   end
@@ -58,7 +61,9 @@ return function(options)
     if not number then
       return nil, 'argument to ' .. opt:gsub('=.*', '') .. ' must be a number'
     end
-    if altkey then cliArgsParsed[altkey] = number end
+    if altkey then
+      cliArgsParsed[altkey] = number
+    end
     cliArgsParsed[key] = number
     return true
   end
@@ -79,7 +84,9 @@ return function(options)
 
   local function append(s1, s2, sep)
     local sep = sep or ''
-    if not s1 then return s2 end
+    if not s1 then
+      return s2
+    end
     return s1 .. sep .. s2
   end
 
@@ -115,49 +122,157 @@ return function(options)
   cli:flag('--version', 'prints the program version and exits', false, processOption)
 
   if not options.standalone then
-    cli:splat('ROOT', 'test script file/folder. Folders will be traversed for any file that matches the --pattern option.', 'spec', 999, processArgList)
+    cli:splat(
+      'ROOT',
+      'test script file/folder. Folders will be traversed for any file that matches the --pattern option.',
+      'spec',
+      999,
+      processArgList
+    )
 
-    cli:option('-p, --pattern=PATTERN', 'only run test files matching the Lua pattern', defaultPattern, processMultiOption)
-    cli:option('--exclude-pattern=PATTERN', 'do not run test files matching the Lua pattern, takes precedence over --pattern', nil, processMultiOption)
+    cli:option(
+      '-p, --pattern=PATTERN',
+      'only run test files matching the Lua pattern',
+      defaultPattern,
+      processMultiOption
+    )
+    cli:option(
+      '--exclude-pattern=PATTERN',
+      'do not run test files matching the Lua pattern, takes precedence over --pattern',
+      nil,
+      processMultiOption
+    )
   end
 
   cli:option('-e STATEMENT', 'execute statement STATEMENT', nil, processMultiOption)
   cli:option('-o, --output=LIBRARY', 'output library to load', defaultOutput, processOption)
-  cli:option('-C, --directory=DIR', 'change to directory DIR before running tests. If multiple options are specified, each is interpreted relative to the previous one.', './', processDir)
+  cli:option(
+    '-C, --directory=DIR',
+    'change to directory DIR before running tests. If multiple options are specified, each is interpreted relative to the previous one.',
+    './',
+    processDir
+  )
   cli:option('-f, --config-file=FILE', 'load configuration options from FILE', nil, processOption)
-  cli:option('--coverage-config-file=FILE', 'load luacov configuration options from FILE', nil, processOption)
+  cli:option(
+    '--coverage-config-file=FILE',
+    'load luacov configuration options from FILE',
+    nil,
+    processOption
+  )
   cli:option('-t, --tags=TAGS', 'only run tests with these #tags', {}, processList)
-  cli:option('--exclude-tags=TAGS', 'do not run tests with these #tags, takes precedence over --tags', {}, processList)
-  cli:option('--filter=PATTERN', 'only run test names matching the Lua pattern', {}, processMultiOption)
+  cli:option(
+    '--exclude-tags=TAGS',
+    'do not run tests with these #tags, takes precedence over --tags',
+    {},
+    processList
+  )
+  cli:option(
+    '--filter=PATTERN',
+    'only run test names matching the Lua pattern',
+    {},
+    processMultiOption
+  )
   cli:option('--name=NAME', 'run test with the given full name', {}, processMultiOption)
-  cli:option('--filter-out=PATTERN', 'do not run test names matching the Lua pattern, takes precedence over --filter', {}, processMultiOption)
-  cli:option('--exclude-names-file=FILE', 'do not run the tests with names listed in the given file, takes precedence over --filter', nil, processOption)
-  cli:option('--log-success=FILE', 'append the name of each successful test to the given file', nil, processOption)
-  cli:option('-m, --lpath=PATH', 'optional path to be prefixed to the Lua module search path', lpathprefix, processPath)
-  cli:option('--cpath=PATH', 'optional path to be prefixed to the Lua C module search path', cpathprefix, processPath)
+  cli:option(
+    '--filter-out=PATTERN',
+    'do not run test names matching the Lua pattern, takes precedence over --filter',
+    {},
+    processMultiOption
+  )
+  cli:option(
+    '--exclude-names-file=FILE',
+    'do not run the tests with names listed in the given file, takes precedence over --filter',
+    nil,
+    processOption
+  )
+  cli:option(
+    '--log-success=FILE',
+    'append the name of each successful test to the given file',
+    nil,
+    processOption
+  )
+  cli:option(
+    '-m, --lpath=PATH',
+    'optional path to be prefixed to the Lua module search path',
+    lpathprefix,
+    processPath
+  )
+  cli:option(
+    '--cpath=PATH',
+    'optional path to be prefixed to the Lua C module search path',
+    cpathprefix,
+    processPath
+  )
   cli:option('-r, --run=RUN', 'config to run from .busted file', nil, processOption)
   cli:option('--repeat=COUNT', 'run the tests repeatedly', '1', processNumber)
-  cli:option('--seed=SEED', 'random seed value to use for shuffling test order', defaultSeed, processNumber)
+  cli:option(
+    '--seed=SEED',
+    'random seed value to use for shuffling test order',
+    defaultSeed,
+    processNumber
+  )
   cli:option('--lang=LANG', 'language for error messages', 'en', processOption)
   cli:option('--loaders=NAME', 'test file loaders', defaultLoaders, processLoaders)
   cli:option('--helper=PATH', 'A helper script that is run before tests', nil, processOption)
-  cli:option('--lua=LUA', 'The path to the lua interpreter busted should run under', nil, processOption)
+  cli:option(
+    '--lua=LUA',
+    'The path to the lua interpreter busted should run under',
+    nil,
+    processOption
+  )
 
-  cli:option('-Xoutput OPTION', 'pass `OPTION` as an option to the output handler. If `OPTION` contains commas, it is split into multiple options at the commas.', {}, processList)
-  cli:option('-Xhelper OPTION', 'pass `OPTION` as an option to the helper script. If `OPTION` contains commas, it is split into multiple options at the commas.', {}, processList)
+  cli:option(
+    '-Xoutput OPTION',
+    'pass `OPTION` as an option to the output handler. If `OPTION` contains commas, it is split into multiple options at the commas.',
+    {},
+    processList
+  )
+  cli:option(
+    '-Xhelper OPTION',
+    'pass `OPTION` as an option to the helper script. If `OPTION` contains commas, it is split into multiple options at the commas.',
+    {},
+    processList
+  )
 
-  cli:flag('-c, --[no-]coverage', 'do code coverage analysis (requires `LuaCov` to be installed)', false, processOption)
+  cli:flag(
+    '-c, --[no-]coverage',
+    'do code coverage analysis (requires `LuaCov` to be installed)',
+    false,
+    processOption
+  )
   cli:flag('-v, --[no-]verbose', 'verbose output of errors', false, processOption)
   cli:flag('-s, --[no-]enable-sound', 'executes `say` command if available', false, processOption)
-  cli:flag('-l, --list', 'list the names of all tests instead of running them', false, processOption)
+  cli:flag(
+    '-l, --list',
+    'list the names of all tests instead of running them',
+    false,
+    processOption
+  )
   cli:flag('--ignore-lua', 'Whether or not to ignore the lua directive', false, processOption)
   cli:flag('--[no-]lazy', 'use lazy setup/teardown as the default', false, processOption)
   cli:flag('--[no-]auto-insulate', 'enable file insulation', true, processOption)
-  cli:flag('-k, --[no-]keep-going', 'continue as much as possible after an error or failure', true, processOption)
+  cli:flag(
+    '-k, --[no-]keep-going',
+    'continue as much as possible after an error or failure',
+    true,
+    processOption
+  )
   cli:flag('-R, --[no-]recursive', 'recurse into subdirectories', true, processOption)
-  cli:flag('--[no-]shuffle', 'randomize file and test order, takes precedence over --sort (--shuffle-test and --shuffle-files)', processShuffle)
-  cli:flag('--[no-]shuffle-files', 'randomize file execution order, takes precedence over --sort-files', processOption)
-  cli:flag('--[no-]shuffle-tests', 'randomize test order within a file, takes precedence over --sort-tests', processOption)
+  cli:flag(
+    '--[no-]shuffle',
+    'randomize file and test order, takes precedence over --sort (--shuffle-test and --shuffle-files)',
+    processShuffle
+  )
+  cli:flag(
+    '--[no-]shuffle-files',
+    'randomize file execution order, takes precedence over --sort-files',
+    processOption
+  )
+  cli:flag(
+    '--[no-]shuffle-tests',
+    'randomize test order within a file, takes precedence over --sort-tests',
+    processOption
+  )
   cli:flag('--[no-]sort', 'sort file and test order (--sort-tests and --sort-files)', processSort)
   cli:flag('--[no-]sort-files', 'sort file execution order', processOption)
   cli:flag('--[no-]sort-tests', 'sort test order within a file', processOption)
@@ -183,13 +298,13 @@ return function(options)
       -- try default file
       bustedConfigFilePath = path.normpath(path.join(cliArgs.directory, '.busted'))
       if not path.isfile(bustedConfigFilePath) then
-        bustedConfigFilePath = nil  -- clear default file, since it doesn't exist
+        bustedConfigFilePath = nil -- clear default file, since it doesn't exist
       end
     end
     if bustedConfigFilePath then
       local bustedConfigFile, err = loadfile(bustedConfigFilePath)
       if not bustedConfigFile then
-        return nil, ("failed loading config file `%s`: %s"):format(bustedConfigFilePath, err)
+        return nil, ('failed loading config file `%s`: %s'):format(bustedConfigFilePath, err)
       else
         local ok, config = pcall(function()
           local conf, err = configLoader(bustedConfigFile(), cliArgsParsed, cliArgs)
@@ -208,9 +323,8 @@ return function(options)
     -- Switch lua, we should rebuild this feature once luarocks changes how it
     -- handles executeable lua files.
     if cliArgs['lua'] and not cliArgs['ignore-lua'] then
-      local _, code = execute(
-        cliArgs['lua']..' '..args[0]..' --ignore-lua '..table.concat(args, ' ')
-      )
+      local _, code =
+        execute(cliArgs['lua'] .. ' ' .. args[0] .. ' --ignore-lua ' .. table.concat(args, ' '))
       exit(code)
     end
 
@@ -260,6 +374,6 @@ return function(options)
 
     parse = function(self, args)
       return parse(args)
-    end
+    end,
   }
 end

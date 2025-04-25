@@ -1,9 +1,7 @@
--- luacheck: ignore 212
-
 local core = require('cliargs.core')()
 local unpack = _G.unpack or table.unpack
 
-local cli = setmetatable({},{ __index = core })
+local cli = setmetatable({}, { __index = core })
 
 function cli:parse(arguments, no_cleanup)
   if not no_cleanup then
@@ -27,6 +25,6 @@ function cli:cleanup()
   cli = nil
 end
 
-cli.VERSION = "3.0-2"
+cli.VERSION = '3.0-2'
 
 return cli

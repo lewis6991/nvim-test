@@ -2,7 +2,7 @@ local table_concat = table.concat
 local table_insert = table.insert
 
 return function()
-  local busted = require 'busted'
+  local busted = require('busted')
   local handler = {
     successes = {},
     successesCount = 0,
@@ -12,11 +12,13 @@ return function()
     failuresCount = 0,
     errors = {},
     errorsCount = 0,
-    inProgress = {}
+    inProgress = {},
   }
 
   handler.cancelOnPending = function(element, parent, status)
-    return not ((element.descriptor == 'pending' or status == 'pending') and handler.options.suppressPending)
+    return not (
+      (element.descriptor == 'pending' or status == 'pending') and handler.options.suppressPending
+    )
   end
 
   handler.subscribe = function(handler, options)
@@ -30,9 +32,21 @@ return function()
     busted.subscribe({ 'suite', 'reset' }, handler.baseSuiteReset, { priority = 1 })
     busted.subscribe({ 'suite', 'start' }, handler.baseSuiteStart, { priority = 1 })
     busted.subscribe({ 'suite', 'end' }, handler.baseSuiteEnd, { priority = 1 })
-    busted.subscribe({ 'test', 'start' }, handler.baseTestStart, { priority = 1, predicate = handler.cancelOnPending })
-    busted.subscribe({ 'test', 'end' }, handler.baseTestEnd, { priority = 1, predicate = handler.cancelOnPending })
-    busted.subscribe({ 'pending' }, handler.basePending, { priority = 1, predicate = handler.cancelOnPending })
+    busted.subscribe(
+      { 'test', 'start' },
+      handler.baseTestStart,
+      { priority = 1, predicate = handler.cancelOnPending }
+    )
+    busted.subscribe(
+      { 'test', 'end' },
+      handler.baseTestEnd,
+      { priority = 1, predicate = handler.cancelOnPending }
+    )
+    busted.subscribe(
+      { 'pending' },
+      handler.basePending,
+      { priority = 1, predicate = handler.cancelOnPending }
+    )
     busted.subscribe({ 'failure', 'it' }, handler.baseTestFailure, { priority = 1 })
     busted.subscribe({ 'error', 'it' }, handler.baseTestError, { priority = 1 })
     busted.subscribe({ 'failure' }, handler.baseError, { priority = 1 })
@@ -43,9 +57,7 @@ return function()
     local parent = busted.parent(context)
     local names = { (context.name or context.descriptor) }
 
-    while parent and (parent.name or parent.descriptor) and
-          parent.descriptor ~= 'file' do
-
+    while parent and (parent.name or parent.descriptor) and parent.descriptor ~= 'file' do
       table_insert(names, 1, parent.name or parent.descriptor)
       parent = busted.parent(parent)
     end
@@ -56,7 +68,7 @@ return function()
   handler.format = function(element, parent, message, debug, isError)
     local function copyElement(e)
       local copy = {}
-      for k,v in next, e do
+      for k, v in next, e do
         if type(v) ~= 'function' and k ~= 'env' then
           copy[k] = v
         end
@@ -70,7 +82,7 @@ return function()
       name = handler.getFullName(element),
       message = message,
       randomseed = parent and parent.randomseed,
-      isError = isError
+      isError = isError,
     }
     formatted.element.trace = element.trace or debug
 

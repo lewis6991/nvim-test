@@ -1,5 +1,5 @@
-local xml = require 'pl.xml'
-local string = require("string")
+local xml = require('pl.xml')
+local string = require('string')
 local io = io
 local type = type
 local string_format = string.format
@@ -11,8 +11,8 @@ local table_insert = table.insert
 local table_remove = table.remove
 
 return function(options)
-  local busted = require 'busted'
-  local handler = require 'busted.outputHandlers.base'()
+  local busted = require('busted')
+  local handler = require('busted.outputHandlers.base')()
   local top = {
     start_tick = busted.monotime(),
     xml_doc = xml.new('testsuites', {
@@ -20,7 +20,7 @@ return function(options)
       errors = 0,
       failures = 0,
       skip = 0,
-    })
+    }),
   }
   local output_file_name
   local stack = {}
@@ -40,7 +40,7 @@ return function(options)
         failures = 0,
         skip = 0,
         timestamp = os_date('!%Y-%m-%dT%H:%M:%S'),
-      })
+      }),
     }
     top.xml_doc:add_direct_child(suite_xml.xml_doc)
     table_insert(stack, top)
@@ -50,7 +50,7 @@ return function(options)
   end
 
   local function formatDuration(duration)
-    return string_format("%.2f", duration)
+    return string_format('%.2f', duration)
   end
 
   local function elapsed(start_time)
@@ -75,7 +75,7 @@ return function(options)
     local output_string = xml.tostring(top.xml_doc, '', '\t', nil, false)
     local file
     if 'string' == type(output_file_name) then
-      file = io_open(output_file_name, 'w+b' )
+      file = io_open(output_file_name, 'w+b')
     end
     if file then
       file:write(output_string)
@@ -83,7 +83,7 @@ return function(options)
       file:close()
     else
       io_write(output_string)
-      io_write("\n")
+      io_write('\n')
       io_flush()
     end
     return nil, true
@@ -95,8 +95,12 @@ return function(options)
       if status ~= 'pending' and parent and parent.randomseed then
         testcase_node:text('Random seed: ' .. parent.randomseed .. '\n')
       end
-      if message then testcase_node:text(message) end
-      if trace and trace.traceback then testcase_node:text(trace.traceback) end
+      if message then
+        testcase_node:text(message)
+      end
+      if trace and trace.traceback then
+        testcase_node:text(trace.traceback)
+      end
       testcase_node:up()
     end
   end
@@ -113,7 +117,7 @@ return function(options)
 
   handler.testEnd = function(element, parent, status)
     top.xml_doc.attr.tests = top.xml_doc.attr.tests + 1
-    testcase_node:set_attrib("time", formatDuration(element.duration))
+    testcase_node:set_attrib('time', formatDuration(element.duration))
 
     if status == 'success' then
       testStatus(element, parent, nil, 'success')

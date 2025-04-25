@@ -4,10 +4,10 @@
 local state_mt = {
   __call = function(self)
     self:revert()
-  end
+  end,
 }
 
-local spies_mt = { __mode = "kv" }
+local spies_mt = { __mode = 'kv' }
 
 local nilvalue = {} -- unique ID to refer to nil values for parameters
 
@@ -29,7 +29,9 @@ state.revert = function(self)
       return
     end
   end
-  if getmetatable(self) ~= state_mt then error("Value provided is not a valid snapshot", 2) end
+  if getmetatable(self) ~= state_mt then
+    error('Value provided is not a valid snapshot', 2)
+  end
 
   if self.next then
     self.next:revert()
@@ -39,7 +41,7 @@ state.revert = function(self)
   -- revert parameters in 'last'
   self.parameters = {}
   -- revert spies/stubs in 'last'
-  for s,_ in pairs(self.spies) do
+  for s, _ in pairs(self.spies) do
     self.spies[s] = nil
     s:revert()
   end
@@ -52,18 +54,19 @@ end
 -- Creates a new snapshot.
 -- @return snapshot table
 state.snapshot = function()
-  local new = setmetatable ({
+  local new = setmetatable({
     formatters = {},
     parameters = {},
     spies = setmetatable({}, spies_mt),
     previous = current,
     revert = state.revert,
   }, state_mt)
-  if current then current.next = new end
+  if current then
+    current.next = new
+  end
   current = new
   return current
 end
-
 
 --  FORMATTERS
 state.add_formatter = function(callback)
@@ -88,7 +91,9 @@ state.format_argument = function(val, s, fmtargs)
   s = s or current
   for _, fmt in ipairs(s.formatters) do
     local valfmt = fmt(val, fmtargs)
-    if valfmt ~= nil then return valfmt end
+    if valfmt ~= nil then
+      return valfmt
+    end
   end
   -- nothing found, check snapshot 1 up in list
   if s.previous then
@@ -97,10 +102,11 @@ state.format_argument = function(val, s, fmtargs)
   return nil -- end of list, couldn't format
 end
 
-
 --  PARAMETERS
 state.set_parameter = function(name, value)
-  if value == nil then value = nilvalue end
+  if value == nil then
+    value = nilvalue
+  end
   current.parameters[name] = value
 end
 
@@ -122,6 +128,6 @@ state.add_spy = function(spy)
   current.spies[spy] = true
 end
 
-state.snapshot()  -- create initial state
+state.snapshot() -- create initial state
 
 return state

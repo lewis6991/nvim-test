@@ -1,5 +1,5 @@
-local s = require 'say'
-local pretty = require 'pl.pretty'
+local s = require('say')
+local pretty = require('pl.pretty')
 local io = io
 local type = type
 local string_format = string.format
@@ -9,21 +9,24 @@ local io_flush = io.flush
 local pairs = pairs
 
 return function(options)
-  local busted = require 'busted'
-  local handler = require 'busted.outputHandlers.base'()
+  local busted = require('busted')
+  local handler = require('busted.outputHandlers.base')()
 
-  local successDot =  '+'
-  local failureDot =  '-'
-  local errorDot =  '*'
+  local successDot = '+'
+  local failureDot = '-'
+  local errorDot = '*'
   local pendingDot = '.'
 
   local pendingDescription = function(pending)
     local name = pending.name
 
-    local string = s('output.pending') .. ' -> ' ..
-      pending.trace.short_src .. ' @ ' ..
-      pending.trace.currentline  ..
-      '\n' .. name
+    local string = s('output.pending')
+      .. ' -> '
+      .. pending.trace.short_src
+      .. ' @ '
+      .. pending.trace.currentline
+      .. '\n'
+      .. name
 
     if type(pending.message) == 'string' then
       string = string .. '\n' .. pending.message
@@ -54,15 +57,16 @@ return function(options)
     end
 
     if not failure.element.trace or not failure.element.trace.short_src then
-      string = string ..
-        failureMessage(failure) .. '\n' ..
-        failure.name
+      string = string .. failureMessage(failure) .. '\n' .. failure.name
     else
-      string = string ..
-        failure.element.trace.short_src .. ' @ ' ..
-        failure.element.trace.currentline .. '\n' ..
-        failure.name .. '\n' ..
-        failureMessage(failure)
+      string = string
+        .. failure.element.trace.short_src
+        .. ' @ '
+        .. failure.element.trace.currentline
+        .. '\n'
+        .. failure.name
+        .. '\n'
+        .. failureMessage(failure)
     end
 
     if options.verbose and failure.trace and failure.trace.traceback then
@@ -110,11 +114,25 @@ return function(options)
 
     local formattedTime = string_gsub(string_format('%.6f', sec), '([0-9])0+$', '%1')
 
-    return successes .. ' ' .. successString .. ' / ' ..
-      failures .. ' ' .. failureString .. ' / ' ..
-      errors .. ' ' .. errorString .. ' / ' ..
-      pendings .. ' ' .. pendingString .. ' : ' ..
-      formattedTime .. ' ' .. s('output.seconds')
+    return successes
+      .. ' '
+      .. successString
+      .. ' / '
+      .. failures
+      .. ' '
+      .. failureString
+      .. ' / '
+      .. errors
+      .. ' '
+      .. errorString
+      .. ' / '
+      .. pendings
+      .. ' '
+      .. pendingString
+      .. ' : '
+      .. formattedTime
+      .. ' '
+      .. s('output.seconds')
   end
 
   handler.testEnd = function(element, parent, status, debug)
@@ -146,21 +164,21 @@ return function(options)
 
   handler.suiteEnd = function()
     io_write('\n')
-    io_write(statusString()..'\n')
+    io_write(statusString() .. '\n')
 
     for i, pending in pairs(handler.pendings) do
       io_write('\n')
-      io_write(pendingDescription(pending)..'\n')
+      io_write(pendingDescription(pending) .. '\n')
     end
 
     for i, err in pairs(handler.failures) do
       io_write('\n')
-      io_write(failureDescription(err)..'\n')
+      io_write(failureDescription(err) .. '\n')
     end
 
     for i, err in pairs(handler.errors) do
       io_write('\n')
-      io_write(failureDescription(err, true)..'\n')
+      io_write(failureDescription(err, true) .. '\n')
     end
 
     return nil, true

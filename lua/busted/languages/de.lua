@@ -31,12 +31,12 @@ return {
     'Ein seltsames Spiel. Der einzig gewinnbringende Zug ist nicht zu testen.',
     'Meine Großmutter hat auf einem 386er bessere Tests geschrieben.',
     'Immer wenn ein Test fehlschlägt, stirbt ein kleines Kätzchen.',
-    'Das fühlt sich schlecht an, oder?'
+    'Das fühlt sich schlecht an, oder?',
   },
   success_messages = {
     'Yeah, die Tests laufen durch.',
     'Fühlt sich gut an, oder?',
     'Großartig!',
     'Tests sind durchgelaufen, Zeit für ein Bier.',
-  }
+  },
 }

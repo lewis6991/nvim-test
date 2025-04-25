@@ -1,12 +1,12 @@
-local K = require 'cliargs.constants'
+local K = require('cliargs.constants')
 
 -------------------------------------------------------------------------------
 -- UTILS
 -------------------------------------------------------------------------------
-local shallow_copy = require 'cliargs.utils.shallow_copy'
-local filter = require 'cliargs.utils.filter'
-local disect_argument = require 'cliargs.utils.disect_argument'
-local lookup = require 'cliargs.utils.lookup'
+local shallow_copy = require('cliargs.utils.shallow_copy')
+local filter = require('cliargs.utils.filter')
+local disect_argument = require('cliargs.utils.disect_argument')
+local lookup = require('cliargs.utils.lookup')
 
 local function clone_table_shift(t)
   local clone = shallow_copy(t)
@@ -69,7 +69,7 @@ end
 function p.print_help(args, printer, done)
   -- has --help or -h ? display the help listing and abort!
   for _, v in pairs(args) do
-    if v == "--help" or v == "-h" then
+    if v == '--help' or v == '-h' then
       return nil, printer.generate_help_and_usage()
     end
   end
@@ -79,7 +79,7 @@ end
 
 function p.track_dump_request(args, done)
   -- starts with --__DUMP__; set dump to true to dump the parsed arguments
-  if args[1] == "--__DUMP__" then
+  if args[1] == '--__DUMP__' then
     return done(true, clone_table_shift(args))
   else
     return done(false, args)
@@ -104,7 +104,7 @@ function p.process_arguments(args, options, done)
     local symbol, key, value, flag_negated = disect_argument(curr_opt)
 
     -- end-of-options indicator:
-    if curr_opt == "--" then
+    if curr_opt == '--' then
       argument_delimiter_found = true
 
     -- an option:
@@ -112,9 +112,9 @@ function p.process_arguments(args, options, done)
       local entry = lookup(key, key, options)
 
       if not key or not entry then
-        local option_type = value and "option" or "flag"
+        local option_type = value and 'option' or 'flag'
 
-        return nil, "unknown/bad " .. option_type .. ": " .. curr_opt
+        return nil, 'unknown/bad ' .. option_type .. ': ' .. curr_opt
       end
 
       if flag_negated and not entry.negatable then
@@ -123,7 +123,7 @@ function p.process_arguments(args, options, done)
 
       -- a flag and a value specified? that's an error
       if entry.flag and value then
-        return nil, "flag " .. curr_opt .. " does not take a value"
+        return nil, 'flag ' .. curr_opt .. ' does not take a value'
       elseif entry.flag then
         value = not flag_negated
       -- an option:
@@ -149,7 +149,7 @@ function p.process_arguments(args, options, done)
             value = consume()
 
             if not value then
-              return nil, "option " .. curr_opt .. " requires a value to be set"
+              return nil, 'option ' .. curr_opt .. ' requires a value to be set'
             end
           end
         end
@@ -223,16 +223,23 @@ function p.validate(options, arg_count, done)
   -- missing any required arguments, or too many?
   if arg_count < min_arg_count or arg_count > max_arg_count then
     if splatarg.maxcount > 0 then
-      return nil, (
-        "bad number of arguments: " ..
-        min_arg_count .. "-" .. max_arg_count ..
-        " argument(s) must be specified, not " .. arg_count
-      )
+      return nil,
+        (
+          'bad number of arguments: '
+          .. min_arg_count
+          .. '-'
+          .. max_arg_count
+          .. ' argument(s) must be specified, not '
+          .. arg_count
+        )
     else
-      return nil, (
-        "bad number of arguments: " ..
-        min_arg_count .. " argument(s) must be specified, not " .. arg_count
-      )
+      return nil,
+        (
+          'bad number of arguments: '
+          .. min_arg_count
+          .. ' argument(s) must be specified, not '
+          .. arg_count
+        )
     end
   end
 
@@ -259,8 +266,12 @@ function p.collect_results(cli_values, options)
   end
 
   local function write(entry, value)
-    if entry.key then results[entry.key] = value end
-    if entry.expanded_key then results[entry.expanded_key] = value end
+    if entry.key then
+      results[entry.key] = value
+    end
+    if entry.expanded_key then
+      results[entry.expanded_key] = value
+    end
   end
 
   for _, entry in pairs(options) do
@@ -288,11 +299,10 @@ function p.collect_results(cli_values, options)
   return results
 end
 
-
 return function(arguments, options, printer)
-  assert(arguments == nil or type(arguments) == "table",
-    "expected an argument table to be passed in, " ..
-    "got something of type " .. type(arguments)
+  assert(
+    arguments == nil or type(arguments) == 'table',
+    'expected an argument table to be passed in, ' .. 'got something of type ' .. type(arguments)
   )
 
   local args = arguments or _G.arg or {}
