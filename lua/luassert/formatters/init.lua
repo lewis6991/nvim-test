@@ -3,32 +3,29 @@ local assert = require('luassert.assert')
 local match = require('luassert.match')
 local util = require('luassert.util')
 
-local isatty, colors
-do
-  local ok, term = pcall(require, 'term')
-  isatty = io.type(io.stdout) == 'file' and ok and term.isatty(io.stdout)
-  if not isatty then
-    local isWindows = package.config:sub(1, 1) == '\\'
-    if isWindows and os.getenv('ANSICON') then
-      isatty = true
-    end
-  end
+local isatty = io.type(io.stdout) == 'file' and vim.uv.guess_handle(1) == 'tty'
 
-  colors = setmetatable({
-    none = function(c)
-      return c
-    end,
-  }, {
-    __index = function(self, key)
-      return function(c)
-        for token in key:gmatch('[^%.]+') do
-          c = term.colors[token](c)
-        end
-        return c
-      end
-    end,
-  })
+if not isatty then
+  local isWindows = package.config:sub(1, 1) == '\\'
+  if isWindows and os.getenv('ANSICON') then
+    isatty = true
+  end
 end
+
+local colors = setmetatable({
+  none = function(c)
+    return c
+  end,
+}, {
+  __index = function(_self, key)
+    return function(c)
+      for token in key:gmatch('[^%.]+') do
+        c = term.colors[token](c)
+      end
+      return c
+    end
+  end,
+})
 
 local function fmt_string(arg)
   if type(arg) == 'string' then

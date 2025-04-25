@@ -1,15 +1,11 @@
 local pretty = require('pl.pretty')
-local term = require('term')
 local luassert = require('luassert')
-local io = io
-local type = type
-local ipairs = ipairs
 local string_format = string.format
 local io_write = io.write
 local io_flush = io.flush
 local colors
 
-local isatty = io.type(io.stdout) == 'file' and term.isatty(io.stdout)
+local isatty = io.type(io.stdout) == 'file' and vim.uv.guess_handle(1) == 'tty'
 
 return function(options)
   local busted = require('busted')

@@ -18,11 +18,6 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 -- THE SOFTWARE.
 
-local pairs = pairs
-local tostring = tostring
-local setmetatable = setmetatable
-local schar = string.char
-
 local colors = {}
 
 local colormt = {}
@@ -40,7 +35,7 @@ function colormt:__call(s)
 end
 
 local function makecolor(value)
-  return setmetatable({ value = schar(27) .. '[' .. tostring(value) .. 'm' }, colormt)
+  return setmetatable({ value = string.char(27) .. '[' .. tostring(value) .. 'm' }, colormt)
 end
 
 local colorvalues = {
