@@ -2,7 +2,6 @@ local s = require('say')
 
 return function(busted, loaders)
   local path = require('pl.path')
-  local dir = require('pl.dir')
   local utils = require('busted.utils')
   local fileLoaders = {}
 
@@ -17,7 +16,7 @@ return function(busted, loaders)
     if path.isfile(rootFile) then
       fileList = { rootFile }
     elseif path.isdir(rootFile) then
-      local getfiles = options.recursive and dir.getallfiles or dir.getfiles
+      local getfiles = options.recursive and utils.getallfiles or utils.getfiles
       fileList = getfiles(rootFile)
 
       fileList = vim.tbl_filter(function(filename)
