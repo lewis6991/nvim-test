@@ -15,19 +15,14 @@ return function()
     inProgress = {},
   }
 
-  handler.cancelOnPending = function(element, parent, status)
+  handler.cancelOnPending = function(element, _parent, status)
     return not (
       (element.descriptor == 'pending' or status == 'pending') and handler.options.suppressPending
     )
   end
 
   handler.subscribe = function(handler, options)
-    require('busted.languages.en')
     handler.options = options
-
-    if options.language ~= 'en' then
-      require('busted.languages.' .. options.language)
-    end
 
     busted.subscribe({ 'suite', 'reset' }, handler.baseSuiteReset, { priority = 1 })
     busted.subscribe({ 'suite', 'start' }, handler.baseSuiteStart, { priority = 1 })
@@ -123,7 +118,7 @@ return function()
     return nil, true
   end
 
-  handler.baseTestStart = function(element, parent)
+  handler.baseTestStart = function(element, _parent)
     handler.inProgress[tostring(element)] = {}
     return nil, true
   end
@@ -162,7 +157,7 @@ return function()
     return nil, true
   end
 
-  handler.basePending = function(element, parent, message, debug)
+  handler.basePending = function(element, _parent, message, debug)
     local id = tostring(element)
     handler.inProgress[id].message = message
     handler.inProgress[id].trace = debug
