@@ -1,5 +1,3 @@
-local trim = require('cliargs.utils.trim')
-
 local function read_file(filepath)
   local f, err = io.open(filepath, 'r')
 
@@ -87,7 +85,7 @@ return {
 
     if not no_cast then
       for k, src_value in pairs(config[group]) do
-        local v = trim(src_value)
+        local v = vim.trim(src_value)
 
         if v == 'true' then
           v = true
