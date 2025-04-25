@@ -11,9 +11,6 @@
 -- @module pl.path
 
 local uv = vim.uv
-local sub = string.sub
-local getenv = os.getenv
-local tmpnam = os.tmpname
 
 local M = {}
 
@@ -27,9 +24,8 @@ function M.attrib(path, attr)
     end
     local mtime = stat.mtime
     return mtime.sec + mtime.nsec * 1e-9
-  else
-    error('not implemented')
   end
+  error('not implemented')
 end
 
 --- Lua iterator over the entries of a given directory.
@@ -52,22 +48,6 @@ function M.mkdir(d)
   return uv.fs_mkdir(d, 493) -- octal 755
 end
 
---- Get the working directory.
--- Implicit link to [`luafilesystem.currentdir`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
--- @function currentdir
-function M.currentdir()
-  return assert(uv.cwd())
-end
-
---- Changes the working directory.
--- On Windows, if a drive is specified, it also changes the current drive. If
--- only specifying the drive, it will only switch drive, but not modify the path.
--- Implicit link to [`luafilesystem.chdir`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
--- @function chdir
-function M.chdir(d)
-  return uv.chdir(d)
-end
-
 --- is this a directory?
 -- @string P A file path
 function M.isdir(P)
@@ -80,35 +60,11 @@ function M.isfile(P)
   return M.attrib(P, 'mode') == 'file'
 end
 
---- return size of a file.
--- @string P A file path
-function M.getsize(P)
-  return M.attrib(P, 'size')
-end
-
 --- does a path exist?
 -- @string P A file path
 -- @return the file path if it exists (either as file, directory, socket, etc), nil otherwise
 function M.exists(P)
   return M.attrib(P, 'mode') ~= nil and P
-end
-
---- Return the time of last access as the number of seconds since the epoch.
--- @string P A file path
-function M.getatime(P)
-  return M.attrib(P, 'access')
-end
-
---- Return the time of last modification as the number of seconds since the epoch.
--- @string P A file path
-function M.getmtime(P)
-  return M.attrib(P, 'modification')
-end
-
----Return the system's ctime as the number of seconds since the epoch.
--- @string P A file path
-function M.getctime(P)
-  return M.attrib(P, 'change')
 end
 
 local function at(s, i)
@@ -177,7 +133,7 @@ function M.splitpath(P)
   if i == 0 then
     return '', P
   end
-  return sub(P, 1, i - 1), sub(P, i + 1)
+  return P:sub(1, i - 1), P:sub(i + 1)
 end
 
 --- return an absolute path.
@@ -191,7 +147,7 @@ function M.abspath(P, pwd)
   P = P:gsub('[\\/]$', '')
   pwd = pwd or uv.cwd()
   if not M.isabs(P) then
-    P = M.join(pwd, P)
+    P = vim.fs.joinpath.join(pwd, P)
   elseif M.is_windows and not use_pwd and at(P, 2) ~= ':' and at(P, 2) ~= '\\' then
     P = pwd:sub(1, 2) .. P -- attach current drive to path like '\\fred.txt'
   end
@@ -224,7 +180,7 @@ function M.splitext(P)
   if i == 0 then
     return P, ''
   end
-  return sub(P, 1, i - 1), sub(P, i)
+  return P:sub(1, i - 1), P:sub(i)
 end
 
 --- get the extension part of a path.
@@ -256,52 +212,6 @@ function M.isabs(P)
   return seps[at(P, 1)] ~= nil
 end
 
---- return the path resulting from combining the individual paths.
--- if the second (or later) path is absolute, we return the last absolute path (joined with any non-absolute paths following).
--- empty elements (except the last) will be ignored.
--- @string p1 A file path
--- @string p2 A file path
--- @string ... more file paths
--- @treturn string the combined path
--- @usage
--- path.join("/first","second","third")   -- "/first/second/third"
--- path.join("first","second/third")      -- "first/second/third"
--- path.join("/first","/second","third")  -- "/second/third"
-function M.join(p1, p2, ...)
-  if select('#', ...) > 0 then
-    local p = M.join(p1, p2)
-    local args = { ... }
-    for i = 1, #args do
-      p = M.join(p, args[i])
-    end
-    return p
-  end
-  if M.isabs(p2) then
-    return p2
-  end
-  local endc = at(p1, #p1)
-  if endc ~= M.sep and endc ~= other_sep and endc ~= '' then
-    p1 = p1 .. M.sep
-  end
-  return p1 .. p2
-end
-
---- normalize the case of a pathname. On Unix, this returns the path unchanged,
--- for Windows it converts;
---
--- * the path to lowercase
--- * forward slashes to backward slashes
--- @string P A file path
--- @usage path.normcase("/Some/Path/File.txt")
--- -- Windows: "\some\path\file.txt"
--- -- Others : "/Some/Path/File.txt"
-function M.normcase(P)
-  if M.is_windows then
-    return P:gsub('/', '\\'):lower()
-  end
-  return P
-end
-
 --- normalize a path name.
 -- `A//B`, `A/./B`, and `A/foo/../B` all become `A/B`.
 --
@@ -309,19 +219,6 @@ end
 -- @string P a file path
 function M.normpath(P)
   return vim.fs.normalize(P)
-end
-
----Return a suitable full path to a new temporary file name.
--- unlike os.tmpname(), it always gives you a writeable path (uses TEMP environment variable on Windows)
-function M.tmpname()
-  local res = tmpnam()
-  -- On Windows if Lua is compiled using MSVC14 os.tmpname
-  -- already returns an absolute path within TEMP env variable directory,
-  -- no need to prepend it.
-  if M.is_windows and not res:find(':') then
-    res = getenv('TEMP') .. res
-  end
-  return res
 end
 
 return M

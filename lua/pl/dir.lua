@@ -4,9 +4,6 @@
 
 local path = require('pl.path')
 
-local exists, isdir = path.exists, path.isdir
-local sep = path.sep
-
 local M = {}
 
 --- escape any Lua 'magic' characters in a string
@@ -15,8 +12,24 @@ local function escape(s)
   return (s:gsub('[%-%.%+%[%]%(%)%$%^%%%?%*]', '%%%1'))
 end
 
+--- normalize the case of a pathname. On Unix, this returns the path unchanged,
+-- for Windows it converts;
+--
+-- * the path to lowercase
+-- * forward slashes to backward slashes
+-- @string P A file path
+-- @usage path.normcase("/Some/Path/File.txt")
+-- -- Windows: "\some\path\file.txt"
+-- -- Others : "/Some/Path/File.txt"
+local function normcase(P)
+  if M.is_windows then
+    return P:gsub('/', '\\'):lower()
+  end
+  return P
+end
+
 local function filemask(mask)
-  mask = escape(path.normcase(mask))
+  mask = escape(normcase(mask))
   return '^' .. mask:gsub('%%%*', '.*'):gsub('%%%?', '.') .. '$'
 end
 
@@ -28,7 +41,7 @@ local function listfiles(dirname, filemode, match)
   end
   for f in path.dir(dirname) do
     if f ~= '.' and f ~= '..' then
-      local p = path.join(dirname, f)
+      local p = vim.fs.joinpath(dirname, f)
       if check(p) and (not match or match(f)) then
         table.insert(res, p)
       end
@@ -49,20 +62,10 @@ function M.getfiles(dirname, mask)
   if mask then
     mask = filemask(mask)
     match = function(f)
-      return path.normcase(f):find(mask)
+      return normcase(f):find(mask)
     end
   end
   return listfiles(dirname, true, match)
-end
-
---- return a list of all subdirectories of the directory.
--- @string[opt='.'] dirname A directory.
--- @treturn {string} a list of directories
--- @raise dir must be a valid directory
-function M.getdirectories(dirname)
-  dirname = dirname or '.'
-  assert(path.isdir(dirname), 'not a directory')
-  return listfiles(dirname, false)
 end
 
 -- each entry of the stack is an array with three items:
@@ -83,9 +86,9 @@ local function treeiter(iterstack)
   end
 
   if entry ~= '.' and entry ~= '..' then
-    entry = dirname .. sep .. entry
-    if exists(entry) then -- Just in case a symlink is broken.
-      local is_dir = isdir(entry)
+    entry = dirname .. path.sep .. entry
+    if path.exists(entry) then -- Just in case a symlink is broken.
+      local is_dir = path.isdir(entry)
       if is_dir then
         table.insert(iterstack, { entry, path.dir(entry) })
       end
@@ -104,7 +107,7 @@ local function dirtree(d)
   assert(d and d ~= '', 'directory parameter is missing or empty')
 
   local last = d:sub(-1)
-  if last == sep or last == '/' then
+  if last == path.sep or last == '/' then
     d = d:sub(1, -2)
   end
 
@@ -125,7 +128,6 @@ function M.getallfiles(start_path, shell_pattern)
   shell_pattern = shell_pattern or '*'
 
   local files = {}
-  local normcase = path.normcase
   for filename, mode in dirtree(start_path) do
     if not mode then
       local mask = filemask(shell_pattern)

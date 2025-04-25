@@ -59,7 +59,7 @@ return function(options)
   end
 
   do -- Load current working directory
-    local _, err = path.chdir(path.normpath(cliArgs.directory))
+    local _, err = vim.uv.chdir(vim.fs.normalize(cliArgs.directory))
     if err then
       io.stderr:write(appName, ': error: ', err, '\n')
       exit(1, forceExit)

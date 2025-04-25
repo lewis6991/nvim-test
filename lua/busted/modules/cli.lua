@@ -103,7 +103,7 @@ return function(options)
   end
 
   local function processDir(key, value, altkey, opt)
-    local dpath = vim.fs.normalize(path.join(cliArgsParsed[key] or '', value))
+    local dpath = vim.fs.normalize(vim.fs.joinpath(cliArgsParsed[key] or '', value))
     processOption(key, dpath, altkey, opt)
     return true
   end
