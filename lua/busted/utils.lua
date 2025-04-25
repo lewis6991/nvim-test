@@ -1,5 +1,31 @@
 local M = {}
 
+--- insert values into a table.
+-- similar to `table.insert` but inserts values from given table `values`,
+-- not the object itself, into table `t` at position `pos`.
+-- @within Copying
+-- @array t the list
+-- @int[opt] position (default is at end)
+-- @array values
+function M.insertvalues(t, ...)
+  local pos, values
+  if select('#', ...) == 1 then
+    pos, values = #t + 1, ...
+  else
+    pos, values = ...
+  end
+  if #values > 0 then
+    for i = #t, pos, -1 do
+      t[i + #values] = t[i]
+    end
+    local offset = 1 - pos
+    for i = pos, pos + #values - 1 do
+      t[i] = values[i + offset]
+    end
+  end
+  return t
+end
+
 function M.readfile(filename, is_bin)
   local mode = is_bin and 'b' or ''
   local f = assert(io.open(filename, 'r' .. mode))

@@ -3,7 +3,7 @@ local s = require('say')
 return function(busted, loaders)
   local path = require('pl.path')
   local dir = require('pl.dir')
-  local tablex = require('pl.tablex')
+  local utils = require('busted.utils')
   local fileLoaders = {}
 
   for _, v in pairs(loaders) do
@@ -54,7 +54,7 @@ return function(busted, loaders)
   local getAllTestFiles = function(rootFiles, patterns, options)
     local fileList = {}
     for _, root in ipairs(rootFiles) do
-      tablex.insertvalues(fileList, getTestFiles(root, patterns, options))
+      utils.insertvalues(fileList, getTestFiles(root, patterns, options))
     end
     return fileList
   end
