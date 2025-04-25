@@ -159,7 +159,7 @@ end
 -- @return a table with field n set to the length
 -- @function table.pack
 if not table.pack then
-  function table.pack(...) -- luacheck: ignore
+  function table.pack(...)
     return { n = select('#', ...), ... }
   end
 end
@@ -175,7 +175,7 @@ end
 -- @function table.unpack
 -- @see utils.unpack
 if not table.unpack then
-  table.unpack = unpack -- luacheck: ignore
+  table.unpack = unpack
 end
 
 --- return the full path where a file name would be matched.
@@ -190,7 +190,7 @@ end
 -- @return on success: path of the file
 -- @return on failure: nil, error string listing paths tried
 if not package.searchpath then
-  function package.searchpath(name, path, sep, rep) -- luacheck: ignore
+  function package.searchpath(name, path, sep, rep)
     if type(name) ~= 'string' then
       error(("bad argument #1 to 'searchpath' (string expected, got %s)"):format(type(path)), 2)
     end

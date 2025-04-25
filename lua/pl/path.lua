@@ -8,29 +8,50 @@
 -- is Windows paths to allow both forward and backward slashes (since Lua
 -- also accepts those)
 --
--- Dependencies: `pl.utils`, `lfs`
+-- Dependencies: `pl.utils`
 -- @module pl.path
 
--- imports and locals
-local _G = _G
+local uv = vim.uv
 local sub = string.sub
 local getenv = os.getenv
 local tmpnam = os.tmpname
 local package = package
 local append, concat, remove = table.insert, table.concat, table.remove
 local utils = require('pl.utils')
+local compat = require('pl.compat')
 local assert_string, raise = utils.assert_string, utils.raise
 
-local res, lfs = _G.pcall(_G.require, 'lfs')
-if not res then
-  error('pl.path requires LuaFileSystem')
+local function link_attrib(path, attr)
+  local stat = uv.fs_lstat(path)
+  if attr == 'mode' then
+    return stat and stat.type or ''
+  elseif attr == 'modification' then
+    if not stat then
+      return nil
+    end
+    local mtime = stat.mtime
+    return mtime.sec + mtime.nsec * 1e-9
+  else
+    error('not implemented')
+  end
 end
 
-local attrib = lfs.attributes
-local currentdir = lfs.currentdir
-local link_attrib = lfs.symlinkattributes
+local function attrib(path, attr)
+  local stat = uv.fs_stat(path)
+  if attr == 'mode' then
+    return stat and stat.type or ''
+  elseif attr == 'modification' then
+    if not stat then
+      return nil
+    end
+    local mtime = stat.mtime
+    return mtime.sec + mtime.nsec * 1e-9
+  else
+    error('not implemented')
+  end
+end
 
-local path = {}
+local M = {}
 
 local function err_func(name, param, err, code)
   local ret = ('%s failed'):format(tostring(name))
@@ -47,26 +68,23 @@ end
 --- Lua iterator over the entries of a given directory.
 -- Implicit link to [`luafilesystem.dir`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
 -- @function dir
-path.dir = lfs.dir
+function M.dir(p)
+  local fs = uv.fs_scandir(p)
+  return function()
+    if not fs then
+      return
+    end
+    return uv.fs_scandir_next(fs)
+  end
+end
 
 --- Creates a directory.
 -- Implicit link to [`luafilesystem.mkdir`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
 -- @function mkdir
-path.mkdir = function(d)
-  local ok, err, code = lfs.mkdir(d)
+function M.mkdir(d)
+  local ok, err, code = uv.fs_mkdir(d, 493) -- octal 755
   if not ok then
     return ok, err_func('mkdir', d, err, code), code
-  end
-  return ok, err, code
-end
-
---- Removes a directory.
--- Implicit link to [`luafilesystem.rmdir`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
--- @function rmdir
-path.rmdir = function(d)
-  local ok, err, code = lfs.rmdir(d)
-  if not ok then
-    return ok, err_func('rmdir', d, err, code), code
   end
   return ok, err, code
 end
@@ -74,7 +92,7 @@ end
 --- Gets attributes.
 -- Implicit link to [`luafilesystem.attributes`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
 -- @function attrib
-path.attrib = function(d, r)
+M.attrib = function(d, r)
   local ok, err, code = attrib(d, r)
   if not ok then
     return ok, err_func('attrib', d, err, code), code
@@ -85,8 +103,8 @@ end
 --- Get the working directory.
 -- Implicit link to [`luafilesystem.currentdir`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
 -- @function currentdir
-path.currentdir = function()
-  local ok, err, code = currentdir()
+M.currentdir = function()
+  local ok, err, code = uv.cwd()
   if not ok then
     return ok, err_func('currentdir', nil, err, code), code
   end
@@ -96,7 +114,7 @@ end
 --- Gets symlink attributes.
 -- Implicit link to [`luafilesystem.symlinkattributes`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
 -- @function link_attrib
-path.link_attrib = function(d, r)
+M.link_attrib = function(d, r)
   local ok, err, code = link_attrib(d, r)
   if not ok then
     return ok, err_func('link_attrib', d, err, code), code
@@ -104,13 +122,22 @@ path.link_attrib = function(d, r)
   return ok, err, code
 end
 
+local function chdir(dir)
+  local status, err = pcall(uv.chdir, dir)
+  if status then
+    return true
+  else
+    return nil, err
+  end
+end
+
 --- Changes the working directory.
 -- On Windows, if a drive is specified, it also changes the current drive. If
 -- only specifying the drive, it will only switch drive, but not modify the path.
 -- Implicit link to [`luafilesystem.chdir`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
 -- @function chdir
-path.chdir = function(d)
-  local ok, err, code = lfs.chdir(d)
+function M.chdir(d)
+  local ok, err, code = chdir(d)
   if not ok then
     return ok, err_func('chdir', d, err, code), code
   end
@@ -119,21 +146,21 @@ end
 
 --- is this a directory?
 -- @string P A file path
-function path.isdir(P)
+function M.isdir(P)
   assert_string(1, P)
   return attrib(P, 'mode') == 'directory'
 end
 
 --- is this a file?
 -- @string P A file path
-function path.isfile(P)
+function M.isfile(P)
   assert_string(1, P)
   return attrib(P, 'mode') == 'file'
 end
 
 -- is this a symbolic link?
 -- @string P A file path
-function path.islink(P)
+function M.islink(P)
   assert_string(1, P)
   if link_attrib then
     return link_attrib(P, 'mode') == 'link'
@@ -144,7 +171,7 @@ end
 
 --- return size of a file.
 -- @string P A file path
-function path.getsize(P)
+function M.getsize(P)
   assert_string(1, P)
   return attrib(P, 'size')
 end
@@ -152,52 +179,52 @@ end
 --- does a path exist?
 -- @string P A file path
 -- @return the file path if it exists (either as file, directory, socket, etc), nil otherwise
-function path.exists(P)
+function M.exists(P)
   assert_string(1, P)
   return attrib(P, 'mode') ~= nil and P
 end
 
 --- Return the time of last access as the number of seconds since the epoch.
 -- @string P A file path
-function path.getatime(P)
+function M.getatime(P)
   assert_string(1, P)
   return attrib(P, 'access')
 end
 
 --- Return the time of last modification as the number of seconds since the epoch.
 -- @string P A file path
-function path.getmtime(P)
+function M.getmtime(P)
   assert_string(1, P)
   return attrib(P, 'modification')
 end
 
 ---Return the system's ctime as the number of seconds since the epoch.
 -- @string P A file path
-function path.getctime(P)
+function M.getctime(P)
   assert_string(1, P)
-  return path.attrib(P, 'change')
+  return M.attrib(P, 'change')
 end
 
 local function at(s, i)
   return sub(s, i, i)
 end
 
-path.is_windows = utils.is_windows
+M.is_windows = compat.is_windows
 
 local sep, other_sep, seps
 -- constant sep is the directory separator for this platform.
 -- constant dirsep is the separator in the PATH environment variable
-if path.is_windows then
-  path.sep = '\\'
+if M.is_windows then
+  M.sep = '\\'
   other_sep = '/'
-  path.dirsep = ';'
+  M.dirsep = ';'
   seps = { ['/'] = true, ['\\'] = true }
 else
-  path.sep = '/'
-  path.dirsep = ':'
+  M.sep = '/'
+  M.dirsep = ':'
   seps = { ['/'] = true }
 end
-sep = path.sep
+sep = M.sep
 
 --- are we running Windows?
 -- @class field
@@ -228,7 +255,7 @@ sep = path.sep
 -- local dir, file = path.splitpath("some_dir")
 -- assert(dir == "")
 -- assert(file == "some_dir")
-function path.splitpath(P)
+function M.splitpath(P)
   assert_string(1, P)
   local i = #P
   local ch = at(P, i)
@@ -246,23 +273,23 @@ end
 --- return an absolute path.
 -- @string P A file path
 -- @string[opt] pwd optional start path to use (default is current dir)
-function path.abspath(P, pwd)
+function M.abspath(P, pwd)
   assert_string(1, P)
   if pwd then
     assert_string(2, pwd)
   end
   local use_pwd = pwd ~= nil
-  if not use_pwd and not currentdir() then
+  if not use_pwd and not uv.cwd() then
     return P
   end
   P = P:gsub('[\\/]$', '')
-  pwd = pwd or currentdir()
-  if not path.isabs(P) then
-    P = path.join(pwd, P)
-  elseif path.is_windows and not use_pwd and at(P, 2) ~= ':' and at(P, 2) ~= '\\' then
+  pwd = pwd or uv.cwd()
+  if not M.isabs(P) then
+    P = M.join(pwd, P)
+  elseif M.is_windows and not use_pwd and at(P, 2) ~= ':' and at(P, 2) ~= '\\' then
     P = pwd:sub(1, 2) .. P -- attach current drive to path like '\\fred.txt'
   end
-  return path.normpath(P)
+  return M.normpath(P)
 end
 
 --- given a path, return the root part and the extension part.
@@ -278,7 +305,7 @@ end
 -- local file_path, ext = path.splitext("")
 -- assert(file_path == "")
 -- assert(ext == "")
-function path.splitext(P)
+function M.splitext(P)
   assert_string(1, P)
   local i = #P
   local ch = at(P, i)
@@ -303,9 +330,9 @@ end
 -- @usage
 -- path.dirname("/some/path/file.txt")   -- "/some/path"
 -- path.dirname("file.txt")              -- "" (empty string)
-function path.dirname(P)
+function M.dirname(P)
   assert_string(1, P)
-  local p1 = path.splitpath(P)
+  local p1 = M.splitpath(P)
   return p1
 end
 
@@ -316,9 +343,9 @@ end
 -- @usage
 -- path.basename("/some/path/file.txt")  -- "file.txt"
 -- path.basename("/some/path/file/")     -- "" (empty string)
-function path.basename(P)
+function M.basename(P)
   assert_string(1, P)
-  local _, p2 = path.splitpath(P)
+  local _, p2 = M.splitpath(P)
   return p2
 end
 
@@ -329,9 +356,9 @@ end
 -- @usage
 -- path.extension("/some/path/file.txt") -- ".txt"
 -- path.extension("/some/path/file_txt") -- "" (empty string)
-function path.extension(P)
+function M.extension(P)
   assert_string(1, P)
-  local _, p2 = path.splitext(P)
+  local _, p2 = M.splitext(P)
   return p2
 end
 
@@ -345,9 +372,9 @@ end
 -- path.isabs("\hello\path")   -- true
 -- path.isabs("C:\hello\path") -- true
 -- path.isabs("C:hello\path")  -- false
-function path.isabs(P)
+function M.isabs(P)
   assert_string(1, P)
-  if path.is_windows and at(P, 2) == ':' then
+  if M.is_windows and at(P, 2) == ':' then
     return seps[at(P, 3)] ~= nil
   end
   return seps[at(P, 1)] ~= nil
@@ -364,24 +391,24 @@ end
 -- path.join("/first","second","third")   -- "/first/second/third"
 -- path.join("first","second/third")      -- "first/second/third"
 -- path.join("/first","/second","third")  -- "/second/third"
-function path.join(p1, p2, ...)
+function M.join(p1, p2, ...)
   assert_string(1, p1)
   assert_string(2, p2)
   if select('#', ...) > 0 then
-    local p = path.join(p1, p2)
+    local p = M.join(p1, p2)
     local args = { ... }
     for i = 1, #args do
       assert_string(i, args[i])
-      p = path.join(p, args[i])
+      p = M.join(p, args[i])
     end
     return p
   end
-  if path.isabs(p2) then
+  if M.isabs(p2) then
     return p2
   end
   local endc = at(p1, #p1)
-  if endc ~= path.sep and endc ~= other_sep and endc ~= '' then
-    p1 = p1 .. path.sep
+  if endc ~= M.sep and endc ~= other_sep and endc ~= '' then
+    p1 = p1 .. M.sep
   end
   return p1 .. p2
 end
@@ -395,9 +422,9 @@ end
 -- @usage path.normcase("/Some/Path/File.txt")
 -- -- Windows: "\some\path\file.txt"
 -- -- Others : "/Some/Path/File.txt"
-function path.normcase(P)
+function M.normcase(P)
   assert_string(1, P)
-  if path.is_windows then
+  if M.is_windows then
     return P:gsub('/', '\\'):lower()
   else
     return P
@@ -409,11 +436,11 @@ end
 --
 -- An empty path results in '.'.
 -- @string P a file path
-function path.normpath(P)
+function M.normpath(P)
   assert_string(1, P)
   -- Split path into anchor and relative path.
   local anchor = ''
-  if path.is_windows then
+  if M.is_windows then
     if P:match('^\\\\') then -- UNC
       anchor = '\\\\'
       P = P:sub(3)
@@ -462,16 +489,16 @@ end
 --- relative path from current directory or optional start point
 -- @string P a path
 -- @string[opt] start optional start point (default current directory)
-function path.relpath(P, start)
+function M.relpath(P, start)
   assert_string(1, P)
   if start then
     assert_string(2, start)
   end
   local split, min, append = utils.split, math.min, table.insert
-  P = path.abspath(P, start)
-  start = start or currentdir()
+  P = M.abspath(P, start)
+  start = start or uv.cwd()
   local compare
-  if path.is_windows then
+  if M.is_windows then
     P = P:gsub('/', '\\')
     start = start:gsub('/', '\\')
     compare = function(v)
@@ -484,7 +511,7 @@ function path.relpath(P, start)
   end
   local startl, Pl = split(start, sep), split(P, sep)
   local n = min(#startl, #Pl)
-  if path.is_windows and n > 0 and at(Pl[1], 2) == ':' and Pl[1] ~= startl[1] then
+  if M.is_windows and n > 0 and at(Pl[1], 2) == ':' and Pl[1] ~= startl[1] then
     return P
   end
   local k = n + 1 -- default value if this loop doesn't bail out!
@@ -513,14 +540,14 @@ end
 -- @treturn[1] string The file path with the `~` prefix substituted, or the input path if it had no prefix.
 -- @treturn[2] nil
 -- @treturn[2] string Error message if the environment variables were unavailable.
-function path.expanduser(P)
+function M.expanduser(P)
   assert_string(1, P)
   if P:sub(1, 1) ~= '~' then
     return P
   end
 
   local home = getenv('HOME')
-  if (not home) and not path.is_windows then
+  if (not home) and not M.is_windows then
     -- no more options to try on Nix
     return nil, "failed to expand '~' (HOME not set)"
   end
@@ -544,12 +571,12 @@ end
 
 ---Return a suitable full path to a new temporary file name.
 -- unlike os.tmpname(), it always gives you a writeable path (uses TEMP environment variable on Windows)
-function path.tmpname()
+function M.tmpname()
   local res = tmpnam()
   -- On Windows if Lua is compiled using MSVC14 os.tmpname
   -- already returns an absolute path within TEMP env variable directory,
   -- no need to prepend it.
-  if path.is_windows and not res:find(':') then
+  if M.is_windows and not res:find(':') then
     res = getenv('TEMP') .. res
   end
   return res
@@ -559,7 +586,7 @@ end
 -- @string path1 a file path
 -- @string path2 a file path
 -- @return the common prefix (Windows: separators will be normalized, casing will be original)
-function path.common_prefix(path1, path2)
+function M.common_prefix(path1, path2)
   assert_string(1, path1)
   assert_string(2, path2)
   -- get them in order!
@@ -567,7 +594,7 @@ function path.common_prefix(path1, path2)
     path2, path1 = path1, path2
   end
   local compare
-  if path.is_windows then
+  if M.is_windows then
     path1 = path1:gsub('/', '\\')
     path2 = path2:gsub('/', '\\')
     compare = function(v)
@@ -582,13 +609,13 @@ function path.common_prefix(path1, path2)
     if compare(at(path1, i)) ~= compare(at(path2, i)) then
       local cp = path1:sub(1, i - 1)
       if at(path1, i - 1) ~= sep then
-        cp = path.dirname(cp)
+        cp = M.dirname(cp)
       end
       return cp
     end
   end
   if at(path2, #path1 + 1) ~= sep then
-    path1 = path.dirname(path1)
+    path1 = M.dirname(path1)
   end
   return path1
   --return ''
@@ -600,7 +627,7 @@ end
 -- @string mod name of the module
 -- @return on success: path of module, lua or binary
 -- @return on error: nil, error string listing paths tried
-function path.package_path(mod)
+function M.package_path(mod)
   assert_string(1, mod)
   local res, err1, err2
   res, err1 = package.searchpath(mod, package.path)
@@ -614,5 +641,4 @@ function path.package_path(mod)
   return raise('cannot find module on path\n' .. err1 .. '\n' .. err2)
 end
 
----- finis -----
-return path
+return M

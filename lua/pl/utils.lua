@@ -22,14 +22,14 @@ local raise
 local operators
 local _function_factories = {}
 
-local utils = { _VERSION = '1.14.0' }
+local M = { _VERSION = '1.14.0' }
 for k, v in pairs(compat) do
-  utils[k] = v
+  M[k] = v
 end
 
 --- Some standard patterns
 -- @table patterns
-utils.patterns = {
+M.patterns = {
   FLOAT = '[%+%-%d]%d*%.?%d*[eE]?[%+%-]?%d*', -- floating point number
   INTEGER = '[+%-%d]%d*', -- integer number
   IDEN = '[%a_][%w_]*', -- identifier
@@ -42,7 +42,7 @@ utils.patterns = {
 -- @field Map the Map metatable
 -- @field Set the Set metatable
 -- @field MultiMap the MultiMap metatable
-utils.stdmt = {
+M.stdmt = {
   List = { _name = 'List' },
   Map = { _name = 'Map' },
   Set = { _name = 'Set' },
@@ -56,7 +56,7 @@ utils.stdmt = {
 -- @see compat.pack
 -- @see utils.npairs
 -- @see utils.unpack
-utils.pack = table.pack -- added here to be symmetrical with unpack
+M.pack = table.pack -- added here to be symmetrical with unpack
 
 --- unpack a table and return its contents.
 --
@@ -75,7 +75,7 @@ utils.pack = table.pack -- added here to be symmetrical with unpack
 -- local a, b, c, d = table.unpack(t)   -- this `unpack` is NOT nil-safe, so d == nil
 --
 -- local a, b, c, d = utils.unpack(t)   -- this is nil-safe, so d == 4
-function utils.unpack(t, i, j)
+function M.unpack(t, i, j)
   return _unpack(t, i or 1, j or t.n or #t)
 end
 
@@ -83,17 +83,17 @@ end
 -- Output will be sent to `stdout`.
 -- @param fmt The format (see `string.format`)
 -- @param ... Extra arguments for format
-function utils.printf(fmt, ...)
-  utils.assert_string(1, fmt)
-  utils.fprintf(stdout, fmt, ...)
+function M.printf(fmt, ...)
+  M.assert_string(1, fmt)
+  M.fprintf(stdout, fmt, ...)
 end
 
 --- write an arbitrary number of arguments to a file using a format.
 -- @param f File handle to write to.
 -- @param fmt The format (see `string.format`).
 -- @param ... Extra arguments for format
-function utils.fprintf(f, fmt, ...)
-  utils.assert_string(2, fmt)
+function M.fprintf(f, fmt, ...)
+  M.assert_string(2, fmt)
   f:write(format(fmt, ...))
 end
 
@@ -102,7 +102,7 @@ do
     local key = rawget(T, k)
     -- warn about collisions!
     if key and k ~= '_M' and k ~= '_NAME' and k ~= '_PACKAGE' and k ~= '_VERSION' then
-      utils.fprintf(io.stderr, "warning: '%s.%s' will not override existing symbol\n", libname, k)
+      M.fprintf(io.stderr, "warning: '%s.%s' will not override existing symbol\n", libname, k)
       return
     end
     rawset(T, k, v)
@@ -122,9 +122,9 @@ do
   --- take a table and 'inject' it into the local namespace.
   -- @param t The table (table), or module name (string), defaults to this `utils` module table
   -- @param T An optional destination table (defaults to callers environment)
-  function utils.import(t, T)
+  function M.import(t, T)
     T = T or _G
-    t = t or utils
+    t = t or M
     if type(t) == 'string' then
       t = require(t)
     end
@@ -143,7 +143,7 @@ end
 -- @param cond A condition
 -- @param value1 Value returned if cond is truthy
 -- @param value2 Value returned if cond is falsy
-function utils.choose(cond, value1, value2)
+function M.choose(cond, value1, value2)
   if cond then
     return value1
   else
@@ -156,7 +156,7 @@ end
 -- @param[opt] temp (table) buffer to use, otherwise allocate
 -- @param[opt] tostr custom tostring function, called with (value,index). Defaults to `tostring`.
 -- @return the converted buffer
-function utils.array_tostring(t, temp, tostr)
+function M.array_tostring(t, temp, tostr)
   temp, tostr = temp or {}, tostr or tostring
   for i = 1, #t do
     temp[i] = tostr(t[i], i)
@@ -174,7 +174,7 @@ end
 -- local my_mt = {}
 -- local my_obj = setmetatable(my_obj, my_mt)
 -- utils.is_type(my_obj, my_mt)  --> true
-function utils.is_type(obj, tp)
+function M.is_type(obj, tp)
   if type(tp) == 'string' then
     return type(obj) == tp
   end
@@ -201,7 +201,7 @@ end
 -- end
 --
 -- -- t = { n = 3, [2] = "123", [3] = "nil" }
-function utils.npairs(t, i_start, i_end, step)
+function M.npairs(t, i_start, i_end, step)
   step = step or 1
   if step == 0 then
     error('iterator step-size cannot be 0', 2)
@@ -252,7 +252,7 @@ end
 -- -- output;
 -- -- German: hallo
 -- -- German: Welt
-function utils.kpairs(t)
+function M.kpairs(t)
   local index
   return function()
     local value
@@ -282,7 +282,7 @@ end
 -- local param1 = assert_arg(1,"hello",'table')  --> error: argument 1 expected a 'table', got a 'string'
 -- local param4 = assert_arg(4,'!@#$%^&*','string',path.isdir,'not a directory')
 --      --> error: argument 4: '!@#$%^&*' not a directory
-function utils.assert_arg(n, val, tp, verify, msg, lev)
+function M.assert_arg(n, val, tp, verify, msg, lev)
   if type(val) ~= tp then
     error(("argument %d expected a '%s', got a '%s'"):format(n, tp, type(val)), lev or 2)
   end
@@ -352,21 +352,21 @@ end
 --   -- "bad 'color', 'purple' is not a valid value (expected one of: 'black', 'red', 'green')"
 --   os.exit(1)
 -- end
-function utils.enum(...)
+function M.enum(...)
   local first = select(1, ...)
   local enum = {}
   local lst
 
   if type(first) ~= 'table' then
     -- vararg with strings
-    lst = utils.pack(...)
-    for i, value in utils.npairs(lst) do
-      utils.assert_arg(i, value, 'string')
+    lst = M.pack(...)
+    for i, value in M.npairs(lst) do
+      M.assert_arg(i, value, 'string')
       enum[value] = value
     end
   else
     -- table/array with values
-    utils.assert_arg(1, first, 'table')
+    M.assert_arg(1, first, 'table')
     lst = {}
     -- first add array part
     for i, value in ipairs(first) do
@@ -377,7 +377,7 @@ function utils.enum(...)
       enum[value] = value
     end
     -- add key-ed part
-    for key, value in utils.kpairs(first) do
+    for key, value in M.kpairs(first) do
       if type(key) ~= 'string' then
         error(("expected key to be 'string' but got '%s'"):format(type(key)), 2)
       end
@@ -425,8 +425,8 @@ end
 -- @param msg optional error message
 -- @return a callable
 -- @raise if idx is not a number or if f is not callable
-function utils.function_arg(idx, f, msg)
-  utils.assert_arg(1, idx, 'number')
+function M.function_arg(idx, f, msg)
+  M.assert_arg(1, idx, 'number')
   local tp = type(f)
   if tp == 'function' then
     return f
@@ -440,7 +440,7 @@ function utils.function_arg(idx, f, msg)
     if fn then
       return fn
     end
-    local fn, err = utils.string_lambda(f)
+    local fn, err = M.string_lambda(f)
     if not fn then
       error(err .. ': ' .. f)
     end
@@ -478,8 +478,8 @@ end
 -- @usage
 -- local val = 42
 -- local param2 = utils.assert_string(2, val) --> error: argument 2 expected a 'string', got a 'number'
-function utils.assert_string(n, val)
-  return utils.assert_arg(n, val, 'string', nil, nil, 3)
+function M.assert_string(n, val)
+  return M.assert_arg(n, val, 'string', nil, nil, 3)
 end
 
 --- control the error strategy used by Penlight.
@@ -491,7 +491,7 @@ end
 --
 -- @param mode either 'default', 'quit'  or 'error'
 -- @see utils.raise
-function utils.on_error(mode)
+function M.on_error(mode)
   mode = tostring(mode)
   if ({ ['default'] = 1, ['quit'] = 2, ['error'] = 3 })[mode] then
     err_mode = mode
@@ -517,16 +517,16 @@ end
 -- if some_condition then
 --   return utils.raise("some condition was not met")  -- MUST use 'return'!
 -- end
-function utils.raise(err)
+function M.raise(err)
   if err_mode == 'default' then
     return nil, err
   elseif err_mode == 'quit' then
-    return utils.quit(err)
+    return M.quit(err)
   else
     error(err, 2)
   end
 end
-raise = utils.raise
+raise = M.raise
 
 --- File handling
 -- @section files
@@ -535,9 +535,9 @@ raise = utils.raise
 -- @param filename The file path
 -- @param is_bin open in binary mode
 -- @return file contents
-function utils.readfile(filename, is_bin)
+function M.readfile(filename, is_bin)
   local mode = is_bin and 'b' or ''
-  utils.assert_string(1, filename)
+  M.assert_string(1, filename)
   local f, open_err = io.open(filename, 'r' .. mode)
   if not f then
     return raise(open_err)
@@ -559,10 +559,10 @@ end
 -- @return true or nil
 -- @return error message
 -- @raise error if filename or str aren't strings
-function utils.writefile(filename, str, is_bin)
+function M.writefile(filename, str, is_bin)
   local mode = is_bin and 'b' or ''
-  utils.assert_string(1, filename)
-  utils.assert_string(2, str)
+  M.assert_string(1, filename)
+  M.assert_string(2, str)
   local f, err = io.open(filename, 'w' .. mode)
   if not f then
     return raise(err)
@@ -581,8 +581,8 @@ end
 -- @param filename The file path
 -- @return file contents as a table
 -- @raise error if filename is not a string
-function utils.readlines(filename)
-  utils.assert_string(1, filename)
+function M.readlines(filename)
+  M.assert_string(1, filename)
   local f, err = io.open(filename, 'r')
   if not f then
     return raise(err)
@@ -606,7 +606,7 @@ end
 -- @return actual return code
 -- @return stdout output (string)
 -- @return errout output (string)
-function utils.executeex(cmd, bin)
+function M.executeex(cmd, bin)
   local outfile = os.tmpname()
   local errfile = os.tmpname()
 
@@ -614,11 +614,11 @@ function utils.executeex(cmd, bin)
     outfile = os.getenv('TEMP') .. outfile
     errfile = os.getenv('TEMP') .. errfile
   end
-  cmd = cmd .. ' > ' .. utils.quote_arg(outfile) .. ' 2> ' .. utils.quote_arg(errfile)
+  cmd = cmd .. ' > ' .. M.quote_arg(outfile) .. ' 2> ' .. M.quote_arg(errfile)
 
-  local success, retcode = utils.execute(cmd)
-  local outcontent = utils.readfile(outfile, bin)
-  local errcontent = utils.readfile(errfile, bin)
+  local success, retcode = M.execute(cmd)
+  local outcontent = M.readfile(outfile, bin)
+  local errcontent = M.readfile(errfile, bin)
   os.remove(outfile)
   os.remove(errfile)
   return success, retcode, (outcontent or ''), (errcontent or '')
@@ -637,12 +637,12 @@ end
 --     "utils = print(require('pl.utils')._VERSION",
 -- }
 -- -- returns: -lluacov -e 'utils = print(require('\''pl.utils'\'')._VERSION'
-function utils.quote_arg(argument)
+function M.quote_arg(argument)
   if type(argument) == 'table' then
     -- encode an entire table
     local r = {}
     for i, arg in ipairs(argument) do
-      r[i] = utils.quote_arg(arg)
+      r[i] = M.quote_arg(arg)
     end
 
     return concat(r, ' ')
@@ -681,13 +681,13 @@ end
 -- @usage utils.quit(-1, "Error '%s' happened", "42")
 -- -- is equivalent to
 -- utils.quit("Error '%s' happened", "42")  --> Error '42' happened
-function utils.quit(code, msg, ...)
+function M.quit(code, msg, ...)
   if type(code) == 'string' then
-    utils.fprintf(io.stderr, code, msg, ...)
+    M.fprintf(io.stderr, code, msg, ...)
     io.stderr:write('\n')
     code = -1 -- TODO: this is odd, see the test. Which returns 255 as exit code
   elseif msg then
-    utils.fprintf(io.stderr, msg, ...)
+    M.fprintf(io.stderr, msg, ...)
     io.stderr:write('\n')
   end
   os.exit(code, true)
@@ -698,8 +698,8 @@ end
 
 --- escape any Lua 'magic' characters in a string
 -- @param s The input string
-function utils.escape(s)
-  utils.assert_string(1, s)
+function M.escape(s)
+  M.assert_string(1, s)
   return (s:gsub('[%-%.%+%[%]%(%)%$%^%%%?%*]', '%%%1'))
 end
 
@@ -711,8 +711,8 @@ end
 -- @return a list-like table
 -- @raise error if s is not a string
 -- @see splitv
-function utils.split(s, re, plain, n)
-  utils.assert_string(1, s)
+function M.split(s, re, plain, n)
+  M.assert_string(1, s)
   local i1, ls = 1, {}
   if not re then
     re = '%s+'
@@ -754,8 +754,8 @@ end
 -- assert(first == "user")
 -- assert(next == "jane=doe")
 -- @see split
-function utils.splitv(s, re, plain, n)
-  return _unpack(utils.split(s, re, plain, n))
+function M.splitv(s, re, plain, n)
+  return _unpack(M.split(s, re, plain, n))
 end
 
 --- Functional
@@ -767,7 +767,7 @@ end
 -- building a table upfront is wasteful/impossible.
 -- @param func a function that takes exactly one argument (which later serves as the cache key) and returns a single value
 -- @return a function taking one argument and returning a single value either from the cache or by running the original input function
-function utils.memoize(func)
+function M.memoize(func)
   local cache = {}
   return function(k)
     local res = cache[k]
@@ -784,7 +784,7 @@ end
 -- returns a function for evaluating it
 -- @tab mt metatable
 -- @func fun a callable that returns a function
-function utils.add_function_factory(mt, fun)
+function M.add_function_factory(mt, fun)
   _function_factories[mt] = fun
 end
 
@@ -800,7 +800,7 @@ local function _string_lambda(f)
       end
     end
     local fstr = 'return function(' .. args .. ') return ' .. body .. ' end'
-    local fn, err = utils.load(fstr)
+    local fn, err = M.load(fstr)
     if not fn then
       return raise(err)
     end
@@ -819,7 +819,7 @@ end
 -- @usage
 -- string_lambda '|x|x+1' (2) == 3
 -- string_lambda '_+1' (2) == 3
-utils.string_lambda = utils.memoize(_string_lambda)
+M.string_lambda = M.memoize(_string_lambda)
 
 --- bind the first argument of the function to a value.
 -- @param fn a function of at least two values (may be an operator string)
@@ -835,8 +835,8 @@ utils.string_lambda = utils.memoize(_string_lambda)
 --
 -- print(hello("world"))     --> "Hello world"
 -- print(hello("sunshine"))  --> "Hello sunshine"
-function utils.bind1(fn, p)
-  fn = utils.function_arg(1, fn)
+function M.bind1(fn, p)
+  fn = M.function_arg(1, fn)
   return function(...)
     return fn(p, ...)
   end
@@ -855,8 +855,8 @@ end
 --
 -- print(hello("Hello", "!"))  --> "Hello world !"
 -- print(hello("Bye", "?"))    --> "Bye world ?"
-function utils.bind2(fn, p)
-  fn = utils.function_arg(1, fn)
+function M.bind2(fn, p)
+  fn = M.function_arg(1, fn)
   return function(x, ...)
     return fn(x, p, ...)
   end
@@ -869,9 +869,9 @@ do
   -- the default implementation
   local deprecation_func = function(msg, trace)
     if trace then
-      warn(msg, '\n', trace) -- luacheck: ignore
+      warn(msg, '\n', trace)
     else
-      warn(msg) -- luacheck: ignore
+      warn(msg)
     end
   end
 
@@ -893,11 +893,11 @@ do
   --
   -- -- disable deprecation warnings
   -- utils.set_deprecation_func()
-  function utils.set_deprecation_func(func)
+  function M.set_deprecation_func(func)
     if func == nil then
       deprecation_func = function() end
     else
-      utils.assert_arg(1, func, 'function')
+      M.assert_arg(1, func, 'function')
       deprecation_func = func
     end
   end
@@ -925,8 +925,8 @@ do
   --   return stringx.is_lower(str)
   -- end
   -- -- output: "[Penlight 1.9.2] function 'islower' was renamed to 'is_lower' (deprecated after 1.2.3, scheduled for removal in 2.0.0)"
-  function utils.raise_deprecation(opts)
-    utils.assert_arg(1, opts, 'table')
+  function M.raise_deprecation(opts)
+    M.assert_arg(1, opts, 'table')
     if type(opts.message) ~= 'string' then
       error("field 'message' of the options table must be a string", 2)
     end
@@ -963,4 +963,4 @@ do
   end
 end
 
-return utils
+return M

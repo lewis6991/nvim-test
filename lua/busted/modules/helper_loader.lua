@@ -24,7 +24,7 @@ return function()
       end
     end)
 
-    arg = old_arg --luacheck: ignore
+    arg = old_arg
 
     if not success then
       return nil, err
