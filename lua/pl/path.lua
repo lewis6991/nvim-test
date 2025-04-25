@@ -17,7 +17,9 @@ local getenv = os.getenv
 local tmpnam = os.tmpname
 local compat = require('pl.compat')
 
-local function attrib(path, attr)
+local M = {}
+
+function M.attrib(path, attr)
   local stat = uv.fs_stat(path)
   if attr == 'mode' then
     return stat and stat.type or ''
@@ -30,20 +32,6 @@ local function attrib(path, attr)
   else
     error('not implemented')
   end
-end
-
-local M = {}
-
-local function err_func(name, param, err, code)
-  local ret = ('%s failed'):format(tostring(name))
-  if param ~= nil then
-    ret = ret .. (" for '%s'"):format(tostring(param))
-  end
-  ret = ret .. (': %s'):format(tostring(err))
-  if code ~= nil then
-    ret = ret .. (' (code %s)'):format(tostring(code))
-  end
-  return ret
 end
 
 --- Lua iterator over the entries of a given directory.
@@ -63,22 +51,7 @@ end
 -- Implicit link to [`luafilesystem.mkdir`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
 -- @function mkdir
 function M.mkdir(d)
-  local ok, err, code = uv.fs_mkdir(d, 493) -- octal 755
-  if not ok then
-    return ok, err_func('mkdir', d, err, code), code
-  end
-  return ok, err, code
-end
-
---- Gets attributes.
--- Implicit link to [`luafilesystem.attributes`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
--- @function attrib
-M.attrib = function(d, r)
-  local ok, err, code = attrib(d, r)
-  if not ok then
-    return ok, err_func('attrib', d, err, code), code
-  end
-  return ok, err, code
+  return uv.fs_mkdir(d, 493) -- octal 755
 end
 
 --- Get the working directory.
@@ -88,63 +61,50 @@ function M.currentdir()
   return assert(uv.cwd())
 end
 
-local function chdir(dir)
-  local status, err = pcall(uv.chdir, dir)
-  if status then
-    return true
-  else
-    return nil, err
-  end
-end
-
 --- Changes the working directory.
 -- On Windows, if a drive is specified, it also changes the current drive. If
 -- only specifying the drive, it will only switch drive, but not modify the path.
 -- Implicit link to [`luafilesystem.chdir`](https://keplerproject.github.io/luafilesystem/manual.html#reference)
 -- @function chdir
 function M.chdir(d)
-  local ok, err, code = chdir(d)
-  if not ok then
-    return ok, err_func('chdir', d, err, code), code
-  end
-  return ok, err, code
+  return uv.chdir(d)
 end
 
 --- is this a directory?
 -- @string P A file path
 function M.isdir(P)
-  return attrib(P, 'mode') == 'directory'
+  return M.attrib(P, 'mode') == 'directory'
 end
 
 --- is this a file?
 -- @string P A file path
 function M.isfile(P)
-  return attrib(P, 'mode') == 'file'
+  return M.attrib(P, 'mode') == 'file'
 end
 
 --- return size of a file.
 -- @string P A file path
 function M.getsize(P)
-  return attrib(P, 'size')
+  return M.attrib(P, 'size')
 end
 
 --- does a path exist?
 -- @string P A file path
 -- @return the file path if it exists (either as file, directory, socket, etc), nil otherwise
 function M.exists(P)
-  return attrib(P, 'mode') ~= nil and P
+  return M.attrib(P, 'mode') ~= nil and P
 end
 
 --- Return the time of last access as the number of seconds since the epoch.
 -- @string P A file path
 function M.getatime(P)
-  return attrib(P, 'access')
+  return M.attrib(P, 'access')
 end
 
 --- Return the time of last modification as the number of seconds since the epoch.
 -- @string P A file path
 function M.getmtime(P)
-  return attrib(P, 'modification')
+  return M.attrib(P, 'modification')
 end
 
 ---Return the system's ctime as the number of seconds since the epoch.
@@ -212,9 +172,8 @@ function M.splitpath(P)
   end
   if i == 0 then
     return '', P
-  else
-    return sub(P, 1, i - 1), sub(P, i + 1)
   end
+  return sub(P, 1, i - 1), sub(P, i + 1)
 end
 
 --- return an absolute path.
@@ -232,7 +191,7 @@ function M.abspath(P, pwd)
   elseif M.is_windows and not use_pwd and at(P, 2) ~= ':' and at(P, 2) ~= '\\' then
     P = pwd:sub(1, 2) .. P -- attach current drive to path like '\\fred.txt'
   end
-  return M.normpath(P)
+  return vim.fs.normalize(P)
 end
 
 --- given a path, return the root part and the extension part.
@@ -260,9 +219,8 @@ function M.splitext(P)
   end
   if i == 0 then
     return P, ''
-  else
-    return sub(P, 1, i - 1), sub(P, i)
   end
+  return sub(P, 1, i - 1), sub(P, i)
 end
 
 --- get the extension part of a path.

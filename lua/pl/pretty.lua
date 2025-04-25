@@ -13,7 +13,6 @@ local utils = require('pl.utils')
 local lexer = require('pl.lexer')
 local debug = require('debug')
 local quote_string = vim.inspect
-local assert_arg = utils.assert_arg
 
 local original_tostring = tostring
 
@@ -114,7 +113,6 @@ end
 -- If loading the string failed, return `nil` and error message.
 -- If executing loaded string failed, return `nil` and the error it raised.
 function pretty.read(s)
-  assert_arg(1, s, 'string')
   if s:find('^%s*%-%-') then -- may start with a comment..
     s = s:gsub('%-%-.-\n', '')
   end

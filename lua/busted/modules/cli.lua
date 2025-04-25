@@ -15,6 +15,10 @@ local function append(s1, s2, sep)
   return s1 .. sep .. s2
 end
 
+local function makeList(values)
+  return type(values) == 'table' and values or { values }
+end
+
 return function(options)
   local appName = ''
   options = options or {}
@@ -24,24 +28,18 @@ return function(options)
 
   -- Default cli arg values
   local defaultOutput = options.output or 'utfTerminal'
-  local defaultPattern = '_spec'
-  local defaultSeed = '/dev/urandom or os.time()'
   local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
   local cpathprefix = path.is_windows and './csrc/?.dll;./csrc/?/?.dll;'
     or './csrc/?.so;./csrc/?/?.so;'
 
   local cliArgsParsed = {}
 
-  local function makeList(values)
-    return type(values) == 'table' and values or { values }
-  end
-
   local function fixupList(values, sep)
     sep = sep or ','
     local list = type(values) == 'table' and values or { values }
     local olist = {}
     for _, v in ipairs(list) do
-      utils.insertvalues(olist, utils.split(v, sep))
+      utils.insertvalues(olist, vim.split(v, sep))
     end
     return olist
   end
@@ -61,7 +59,7 @@ return function(options)
 
   local function processArgList(key, value)
     local list = cliArgsParsed[key] or {}
-    utils.insertvalues(list, utils.split(value, ','))
+    utils.insertvalues(list, vim.split(value, ','))
     processArg(key, list)
     return true
   end
@@ -80,7 +78,7 @@ return function(options)
 
   local function processList(key, value, altkey, _opt)
     local list = cliArgsParsed[key] or {}
-    utils.insertvalues(list, utils.split(value, ','))
+    utils.insertvalues(list, vim.split(value, ','))
     processOption(key, list, altkey)
     return true
   end
@@ -106,7 +104,7 @@ return function(options)
   end
 
   local function processDir(key, value, altkey, opt)
-    local dpath = path.normpath(path.join(cliArgsParsed[key] or '', value))
+    local dpath = vim.fs.normalize(path.join(cliArgsParsed[key] or '', value))
     processOption(key, dpath, altkey, opt)
     return true
   end
@@ -136,7 +134,7 @@ return function(options)
     cli:option(
       '-p, --pattern=PATTERN',
       'only run test files matching the Lua pattern',
-      defaultPattern,
+      '_spec',
       processMultiOption
     )
     cli:option(
@@ -211,7 +209,7 @@ return function(options)
   cli:option(
     '--seed=SEED',
     'random seed value to use for shuffling test order',
-    defaultSeed,
+    '/dev/urandom or os.time()',
     processNumber
   )
   cli:option('--lang=LANG', 'language for error messages', 'en', processOption)
@@ -299,7 +297,7 @@ return function(options)
       bustedConfigFilePath = cliArgs.f
     else
       -- try default file
-      bustedConfigFilePath = path.normpath(path.join(cliArgs.directory, '.busted'))
+      bustedConfigFilePath = vim.fs.normalize(vim.fs.joinpath(cliArgs.directory, '.busted'))
       if not path.isfile(bustedConfigFilePath) then
         bustedConfigFilePath = nil -- clear default file, since it doesn't exist
       end

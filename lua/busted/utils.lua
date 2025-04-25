@@ -53,8 +53,6 @@ M.copy_interpreter_args = function(arguments)
   end
 end
 
-M.split = require('pl.utils').split
-
 M.shuffle = function(t, seed)
   if seed then
     math.randomseed(seed)

@@ -8,7 +8,7 @@ return function()
     utils.copy_interpreter_args(options.arguments)
     local success, err = pcall(function()
       if output:match('%.lua$') then
-        handler = dofile(path.normpath(output))
+        handler = dofile(vim.fs.normalize(output))
       else
         handler = require('busted.outputHandlers.' .. output)
       end

@@ -7,7 +7,6 @@
 
 local utils = require('pl.utils')
 local path = require('pl.path')
-local assert_string = utils.assert_string
 
 local exists, isdir = path.exists, path.isdir
 local sep = path.sep
@@ -44,9 +43,6 @@ end
 function M.getfiles(dirname, mask)
   dirname = dirname or '.'
   assert(path.isdir(dirname), 'not a directory')
-  if mask then
-    assert_string(2, mask)
-  end
   local match
   if mask then
     mask = filemask(mask)

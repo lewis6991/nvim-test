@@ -1,5 +1,5 @@
 local pl_path = require('pl.path')
-local pl_utils = require('pl.utils')
+local utils = require('busted.utils')
 
 local fixtures = {}
 
@@ -33,7 +33,7 @@ function fixtures.path(sub_path)
   end
   path = pl_path.abspath(path) -- based on PWD
   path = pl_path.splitpath(path) -- drop filename, keep path only
-  path = pl_path.join(path, sub_path)
+  path = vim.fs.joinpath(path, sub_path)
   return pl_path.normpath(path, sub_path)
 end
 
@@ -51,7 +51,7 @@ function fixtures.read(rel_path, is_bin)
 
   local fname = fixtures.path(rel_path)
 
-  local contents, err = pl_utils.readfile(fname, is_bin)
+  local contents, err = utils.readfile(fname, is_bin)
   if not contents then
     error(("Error reading file '%s': %s"):format(tostring(fname), tostring(err)), 2)
   end
