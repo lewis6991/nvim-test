@@ -8,7 +8,6 @@ Adapted directly from https://github.com/neovim/neovim/tree/master/test
 
 ## Requirements
 
-- [Luarocks]
 - [Lua5.1]
 - MacOS or Linux
 
@@ -102,5 +101,4 @@ See [example](./example) for more details.
 [gitsigns.nvim]: https://github.com/lewis6991/gitsigns.nvim
 [pckr.nvim]: https://github.com/lewis6991/pckr.nvim
 [nvim-treesitter-context]: https://github.com/nvim-treesitter/nvim-treesitter-context
-[Luarocks]: https://luarocks.org/
 [Lua5.1]: https://www.lua.org/versions.html#5.1
