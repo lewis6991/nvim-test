@@ -1,4 +1,4 @@
-local tablex = require('pl.tablex')
+local utils = require('busted.utils')
 
 local function save()
   local g = {}
@@ -8,7 +8,7 @@ local function save()
   return {
     gmt = debug.getmetatable(_G),
     g = g,
-    loaded = tablex.copy(package.loaded),
+    loaded = utils.tbl_copy(package.loaded),
   }
 end
 
@@ -42,9 +42,9 @@ return function()
     local ctx = data
 
     local function unwrap(element, levels)
-      local levels = levels or 1
+      levels = levels or 1
       local parent = element
-      for i = 1, levels do
+      for _ = 1, levels do
         parent = ref.parent(parent)
         if not parent then
           break
@@ -54,7 +54,7 @@ return function()
         element.env = {}
       end
       setmetatable(element.env, {
-        __newindex = function(self, key, value)
+        __newindex = function(_self, key, value)
           if not parent then
             _G[key] = value
           else
@@ -110,9 +110,7 @@ return function()
     end
 
     function ref.attach(child)
-      if not children[ctx] then
-        children[ctx] = {}
-      end
+      children[ctx] = children[ctx] or {}
       parents[child] = ctx
       table.insert(children[ctx], child)
     end

@@ -492,31 +492,6 @@ function M.assert_string(n, val)
   return M.assert_arg(n, val, 'string', nil, nil, 3)
 end
 
---- control the error strategy used by Penlight.
--- This is a global setting that controls how `utils.raise` behaves:
---
--- - 'default': return `nil + error` (this is the default)
--- - 'error': throw a Lua error
--- - 'quit': exit the program
---
--- @param mode either 'default', 'quit'  or 'error'
--- @see utils.raise
-function M.on_error(mode)
-  mode = tostring(mode)
-  if ({ ['default'] = 1, ['quit'] = 2, ['error'] = 3 })[mode] then
-    err_mode = mode
-  else
-    -- fail loudly
-    local err = "Bad argument expected string; 'default', 'quit', or 'error'. Got '"
-      .. tostring(mode)
-      .. "'"
-    if err_mode == 'default' then
-      error(err, 2) -- even in 'default' mode fail loud in this case
-    end
-    raise(err)
-  end
-end
-
 --- used by Penlight functions to return errors. Its global behaviour is controlled
 -- by `utils.on_error`.
 -- To use this function you MUST use it in conjunction with `return`, since it might
@@ -528,13 +503,7 @@ end
 --   return utils.raise("some condition was not met")  -- MUST use 'return'!
 -- end
 function M.raise(err)
-  if err_mode == 'default' then
-    return nil, err
-  elseif err_mode == 'quit' then
-    return M.quit(err)
-  else
-    error(err, 2)
-  end
+  return nil, err
 end
 raise = M.raise
 
@@ -547,18 +516,9 @@ raise = M.raise
 -- @return file contents
 function M.readfile(filename, is_bin)
   local mode = is_bin and 'b' or ''
-  M.assert_string(1, filename)
-  local f, open_err = io.open(filename, 'r' .. mode)
-  if not f then
-    return raise(open_err)
-  end
-  local res, read_err = f:read('*a')
+  local f = assert(io.open(filename, 'r' .. mode))
+  local res = assert(f:read('*a'))
   f:close()
-  if not res then
-    -- Errors in io.open have "filename: " prefix,
-    -- error in file:read don't, add it.
-    return raise(filename .. ': ' .. read_err)
-  end
   return res
 end
 
@@ -571,20 +531,9 @@ end
 -- @raise error if filename or str aren't strings
 function M.writefile(filename, str, is_bin)
   local mode = is_bin and 'b' or ''
-  M.assert_string(1, filename)
-  M.assert_string(2, str)
-  local f, err = io.open(filename, 'w' .. mode)
-  if not f then
-    return raise(err)
-  end
-  local ok, write_err = f:write(str)
+  local f = assert(io.open(filename, 'w' .. mode))
+  assert(f:write(str))
   f:close()
-  if not ok then
-    -- Errors in io.open have "filename: " prefix,
-    -- error in file:write don't, add it.
-    return raise(filename .. ': ' .. write_err)
-  end
-  return true
 end
 
 --- return the contents of a file as a list of lines
@@ -592,11 +541,7 @@ end
 -- @return file contents as a table
 -- @raise error if filename is not a string
 function M.readlines(filename)
-  M.assert_string(1, filename)
-  local f, err = io.open(filename, 'r')
-  if not f then
-    return raise(err)
-  end
+  local f = assert(io.open(filename, 'r'))
   local res = {}
   for line in f:lines() do
     table.insert(res, line)

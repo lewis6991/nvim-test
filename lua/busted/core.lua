@@ -1,4 +1,3 @@
-local unpack = require('busted.compatibility').unpack
 local pretty = require('pl.pretty')
 local uv = vim.uv
 
@@ -24,7 +23,7 @@ local pendingMt = {
 }
 
 local function errortype(obj)
-  local mt = debug.getmetatable(obj)
+  local mt = getmetatable(obj)
   if mt == failureMt or mt == failureMtNoString then
     return 'failure'
   elseif mt == pendingMt then
@@ -34,11 +33,7 @@ local function errortype(obj)
 end
 
 local function hasToString(obj)
-  return type(obj) == 'string' or (debug.getmetatable(obj) or {}).__tostring
-end
-
-local function isCallable(obj)
-  return type(obj) == 'function' or (debug.getmetatable(obj) or {}).__call
+  return type(obj) == 'string' or (getmetatable(obj) or {}).__tostring
 end
 
 return function()
@@ -157,7 +152,7 @@ return function()
 
   function busted.fail(msg, level)
     local rawlevel = (type(level) ~= 'number' or level <= 0) and level
-    local level = level or 1
+    level = level or 1
     local _, emsg = pcall(error, msg, rawlevel or level + 2)
     local e = { message = emsg }
     setmetatable(e, hasToString(msg) and failureMt or failureMtNoString)
@@ -172,16 +167,16 @@ return function()
 
   function busted.bindfenv(callable, var, value)
     local env = {}
-    local f = (debug.getmetatable(callable) or {}).__call or callable
+    local f = (getmetatable(callable) or {}).__call or callable
     setmetatable(env, { __index = getfenv(f) })
     env[var] = value
     setfenv(f, env)
   end
 
   function busted.wrap(callable)
-    if isCallable(callable) then
+    if vim.is_callable(callable) then
       -- prioritize __call if it exists, like in files
-      environment.wrap((debug.getmetatable(callable) or {}).__call or callable)
+      environment.wrap((getmetatable(callable) or {}).__call or callable)
     end
   end
 
@@ -270,7 +265,7 @@ return function()
       executors[alias] = executor
       eattributes[alias] = attributes
     else
-      if executor ~= nil and not isCallable(executor) then
+      if executor ~= nil and not vim.is_callable(executor) then
         attributes = executor
         executor = nil
       end

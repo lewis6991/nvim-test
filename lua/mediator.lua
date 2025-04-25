@@ -158,6 +158,7 @@ end
 
 --- @class Mediator
 --- @field channel mediator.Channel
+--- @operator call: Mediator
 local Mediator = {}
 Mediator.__index = Mediator
 

@@ -2,7 +2,7 @@ local util = {}
 local arglist_mt = {}
 
 -- have pack/unpack both respect the 'n' field
-local _unpack = table.unpack or unpack
+local _unpack = unpack
 local unpack = function(t, i, j)
   return _unpack(t, i or 1, j or t.n or #t)
 end

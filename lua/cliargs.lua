@@ -1,5 +1,5 @@
 local core = require('cliargs.core')()
-local unpack = _G.unpack or table.unpack
+local unpack = _G.unpack
 
 local cli = setmetatable({}, { __index = core })
 

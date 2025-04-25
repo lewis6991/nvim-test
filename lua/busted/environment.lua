@@ -15,11 +15,11 @@ return function(context)
     self.env[key] = value
   end
 
-  local function __index(self, key)
+  local function __index(_self, key)
     return getEnv(context.get(), key)
   end
 
-  local function __newindex(self, key, value)
+  local function __newindex(_self, key, value)
     setEnv(context.get(), key, value)
   end
 

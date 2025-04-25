@@ -1,4 +1,3 @@
-local unpack = require('busted.compatibility').unpack
 local shuffle = require('busted.utils').shuffle
 
 local function sort(elements)

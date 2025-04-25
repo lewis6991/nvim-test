@@ -1,7 +1,6 @@
 local M = {}
 
 M.loadstring = loadstring or load
-M.unpack = table.unpack or unpack
 
 function M.exit(code, force)
   if not force and code ~= 0 then
