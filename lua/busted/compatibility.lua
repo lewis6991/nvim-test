@@ -1,7 +1,5 @@
 local M = {}
 
-M.loadstring = loadstring or load
-
 function M.exit(code, force)
   if not force and code ~= 0 then
     error()

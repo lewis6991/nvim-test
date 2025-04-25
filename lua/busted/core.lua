@@ -249,7 +249,7 @@ return function()
     environment.set(key, value)
   end
 
-  function busted.hide(key, value)
+  function busted.hide(key, _value)
     busted.api[key] = nil
     environment.set(key, nil)
   end
@@ -272,7 +272,7 @@ return function()
       eattributes[descriptor] = attributes
     end
 
-    local publisher = function(name, fn)
+    local function publisher(name, fn)
       if not fn and type(name) == 'function' then
         fn = name
         name = alias
@@ -287,7 +287,7 @@ return function()
         trace = busted.getTrace(ctx, 3, name)
       end
 
-      local publish = function(f)
+      local function publish(f)
         busted.publish({ 'register', descriptor }, name, f, trace, attributes)
       end
 

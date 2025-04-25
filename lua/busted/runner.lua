@@ -1,9 +1,8 @@
 -- Busted command-line runner
 
-local path = require('pl.path')
 local utils = require('busted.utils')
 local exit = require('busted.compatibility').exit
-local loadstring = require('busted.compatibility').loadstring
+local loadstring = loadstring or load
 local loaded = false
 
 local function tbl_update(t1, t2)

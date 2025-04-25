@@ -1,7 +1,7 @@
 local M = {}
 
 -- adds tokens to the current wait list, does not change order/unordered
-M.wait = function(self, ...)
+function M.wait(self, ...)
   local tlist = { ... }
 
   for _, token in ipairs(tlist) do
@@ -13,19 +13,19 @@ M.wait = function(self, ...)
 end
 
 -- set list as unordered, adds tokens to current wait list
-M.wait_unordered = function(self, ...)
+function M.wait_unordered(self, ...)
   self.ordered = false
   self:wait(...)
 end
 
 -- set list as ordered, adds tokens to current wait list
-M.wait_ordered = function(self, ...)
+function M.wait_ordered(self, ...)
   self.ordered = true
   self:wait(...)
 end
 
 -- generates a message listing tokens received/open
-M.tokenlist = function(self)
+function M.tokenlist(self)
   local list
 
   if #self.tokens_done == 0 then
@@ -60,10 +60,11 @@ M.tokenlist = function(self)
 end
 
 -- marks a token as completed, checks for ordered/unordered, checks for completeness
-M.done = function(self, ...)
+function M.done(self, ...)
   self:_done(...)
 end -- extra wrapper for same error level constant as __call method
-M._done = function(self, token)
+
+function M._done(self, token)
   if token then
     if type(token) ~= 'string' then
       error('Wait tokens must be strings. Got ' .. type(token), 3)
@@ -113,7 +114,7 @@ M._done = function(self, token)
 end
 
 -- wraps a done callback into a done-object supporting tokens to sign-off
-M.new = function(done_callback)
+function M.new(done_callback)
   local obj = {
     tokens = {},
     tokens_done = {},
