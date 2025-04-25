@@ -3,16 +3,27 @@ local path = require('pl.path')
 local exit = require('busted.compatibility').exit
 local execute = require('pl.utils').execute
 
+--- @param s1? string
+--- @param s2 string
+--- @param sep? string
+--- @return string
+local function append(s1, s2, sep)
+  sep = sep or ''
+  if not s1 then
+    return s2
+  end
+  return s1 .. sep .. s2
+end
+
 return function(options)
   local appName = ''
-  local options = options or {}
+  options = options or {}
   local cli = require('cliargs.core')()
 
   local configLoader = require('busted.modules.configuration_loader')()
 
   -- Default cli arg values
   local defaultOutput = options.output or 'utfTerminal'
-  local defaultLoaders = 'lua,moonscript'
   local defaultPattern = '_spec'
   local defaultSeed = '/dev/urandom or os.time()'
   local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
@@ -26,16 +37,16 @@ return function(options)
   end
 
   local function fixupList(values, sep)
-    local sep = sep or ','
+    sep = sep or ','
     local list = type(values) == 'table' and values or { values }
     local olist = {}
     for _, v in ipairs(list) do
-      tablex.insertvalues(olist, utils.split(v, sep))
+      utils.insertvalues(olist, utils.split(v, sep))
     end
     return olist
   end
 
-  local function processOption(key, value, altkey, opt)
+  local function processOption(key, value, altkey)
     if altkey then
       cliArgsParsed[altkey] = value
     end
@@ -50,7 +61,7 @@ return function(options)
 
   local function processArgList(key, value)
     local list = cliArgsParsed[key] or {}
-    tablex.insertvalues(list, utils.split(value, ','))
+    utils.insertvalues(list, utils.split(value, ','))
     processArg(key, list)
     return true
   end
@@ -67,10 +78,10 @@ return function(options)
     return true
   end
 
-  local function processList(key, value, altkey, opt)
+  local function processList(key, value, altkey, _opt)
     local list = cliArgsParsed[key] or {}
-    tablex.insertvalues(list, utils.split(value, ','))
-    processOption(key, list, altkey, opt)
+    utils.insertvalues(list, utils.split(value, ','))
+    processOption(key, list, altkey)
     return true
   end
 
@@ -81,13 +92,6 @@ return function(options)
     return true
   end
 
-  local function append(s1, s2, sep)
-    local sep = sep or ''
-    if not s1 then
-      return s2
-    end
-    return s1 .. sep .. s2
-  end
 
   local function processLoaders(key, value, altkey, opt)
     local loaders = append(cliArgsParsed[key], value, ',')
@@ -107,12 +111,12 @@ return function(options)
     return true
   end
 
-  local function processShuffle(key, value, altkey, opt)
+  local function processShuffle(_key, value, _altkey, opt)
     processOption('shuffle-files', value, nil, opt)
     processOption('shuffle-tests', value, nil, opt)
   end
 
-  local function processSort(key, value, altkey, opt)
+  local function processSort(_key, value, _altkey, opt)
     processOption('sort-files', value, nil, opt)
     processOption('sort-tests', value, nil, opt)
   end
@@ -211,7 +215,7 @@ return function(options)
     processNumber
   )
   cli:option('--lang=LANG', 'language for error messages', 'en', processOption)
-  cli:option('--loaders=NAME', 'test file loaders', defaultLoaders, processLoaders)
+  cli:option('--loaders=NAME', 'test file loaders', 'lua', processLoaders)
   cli:option('--helper=PATH', 'A helper script that is run before tests', nil, processOption)
   cli:option(
     '--lua=LUA',
@@ -306,8 +310,8 @@ return function(options)
         return nil, ('failed loading config file `%s`: %s'):format(bustedConfigFilePath, err)
       else
         local ok, config = pcall(function()
-          local conf, err = configLoader(bustedConfigFile(), cliArgsParsed, cliArgs)
-          return conf or error(err, 0)
+          local conf, err2 = configLoader(bustedConfigFile(), cliArgsParsed, cliArgs)
+          return conf or error(err2, 0)
         end)
         if not ok then
           return nil, appName .. ': error: ' .. config
@@ -361,17 +365,17 @@ return function(options)
   end
 
   return {
-    set_name = function(self, name)
+    set_name = function(_self, name)
       appName = name
       return cli:set_name(name)
     end,
 
-    set_silent = function(self, name)
+    set_silent = function(_self, name)
       appName = name
       return cli:set_silent(name)
     end,
 
-    parse = function(self, args)
+    parse = function(_self, args)
       return parse(args)
     end,
   }

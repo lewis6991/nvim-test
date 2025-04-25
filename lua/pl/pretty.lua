@@ -12,7 +12,7 @@ local mtype = math.type
 local utils = require('pl.utils')
 local lexer = require('pl.lexer')
 local debug = require('debug')
-local quote_string = require('pl.stringx').quote_string
+local quote_string = vim.inspect
 local assert_arg = utils.assert_arg
 
 local original_tostring = tostring
