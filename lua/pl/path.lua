@@ -19,7 +19,7 @@ local package = package
 local append, concat, remove = table.insert, table.concat, table.remove
 local utils = require('pl.utils')
 local compat = require('pl.compat')
-local assert_string, raise = utils.assert_string, utils.raise
+local raise = utils.raise
 
 local function link_attrib(path, attr)
   local stat = uv.fs_lstat(path)
@@ -147,21 +147,18 @@ end
 --- is this a directory?
 -- @string P A file path
 function M.isdir(P)
-  assert_string(1, P)
   return attrib(P, 'mode') == 'directory'
 end
 
 --- is this a file?
 -- @string P A file path
 function M.isfile(P)
-  assert_string(1, P)
   return attrib(P, 'mode') == 'file'
 end
 
 -- is this a symbolic link?
 -- @string P A file path
 function M.islink(P)
-  assert_string(1, P)
   if link_attrib then
     return link_attrib(P, 'mode') == 'link'
   else
@@ -172,7 +169,6 @@ end
 --- return size of a file.
 -- @string P A file path
 function M.getsize(P)
-  assert_string(1, P)
   return attrib(P, 'size')
 end
 
@@ -180,33 +176,29 @@ end
 -- @string P A file path
 -- @return the file path if it exists (either as file, directory, socket, etc), nil otherwise
 function M.exists(P)
-  assert_string(1, P)
   return attrib(P, 'mode') ~= nil and P
 end
 
 --- Return the time of last access as the number of seconds since the epoch.
 -- @string P A file path
 function M.getatime(P)
-  assert_string(1, P)
   return attrib(P, 'access')
 end
 
 --- Return the time of last modification as the number of seconds since the epoch.
 -- @string P A file path
 function M.getmtime(P)
-  assert_string(1, P)
   return attrib(P, 'modification')
 end
 
 ---Return the system's ctime as the number of seconds since the epoch.
 -- @string P A file path
 function M.getctime(P)
-  assert_string(1, P)
   return M.attrib(P, 'change')
 end
 
 local function at(s, i)
-  return sub(s, i, i)
+  return s:sub(i, i)
 end
 
 M.is_windows = compat.is_windows
@@ -256,7 +248,6 @@ sep = M.sep
 -- assert(dir == "")
 -- assert(file == "some_dir")
 function M.splitpath(P)
-  assert_string(1, P)
   local i = #P
   local ch = at(P, i)
   while i > 0 and ch ~= sep and ch ~= other_sep do
@@ -274,10 +265,6 @@ end
 -- @string P A file path
 -- @string[opt] pwd optional start path to use (default is current dir)
 function M.abspath(P, pwd)
-  assert_string(1, P)
-  if pwd then
-    assert_string(2, pwd)
-  end
   local use_pwd = pwd ~= nil
   if not use_pwd and not uv.cwd() then
     return P
@@ -306,7 +293,6 @@ end
 -- assert(file_path == "")
 -- assert(ext == "")
 function M.splitext(P)
-  assert_string(1, P)
   local i = #P
   local ch = at(P, i)
   while i > 0 and ch ~= '.' do
@@ -323,32 +309,6 @@ function M.splitext(P)
   end
 end
 
---- return the directory part of a path
--- @string P A file path
--- @treturn string everything before the last dir-separator
--- @see splitpath
--- @usage
--- path.dirname("/some/path/file.txt")   -- "/some/path"
--- path.dirname("file.txt")              -- "" (empty string)
-function M.dirname(P)
-  assert_string(1, P)
-  local p1 = M.splitpath(P)
-  return p1
-end
-
---- return the file part of a path
--- @string P A file path
--- @treturn string
--- @see splitpath
--- @usage
--- path.basename("/some/path/file.txt")  -- "file.txt"
--- path.basename("/some/path/file/")     -- "" (empty string)
-function M.basename(P)
-  assert_string(1, P)
-  local _, p2 = M.splitpath(P)
-  return p2
-end
-
 --- get the extension part of a path.
 -- @string P A file path
 -- @treturn string
@@ -357,7 +317,6 @@ end
 -- path.extension("/some/path/file.txt") -- ".txt"
 -- path.extension("/some/path/file_txt") -- "" (empty string)
 function M.extension(P)
-  assert_string(1, P)
   local _, p2 = M.splitext(P)
   return p2
 end
@@ -373,7 +332,6 @@ end
 -- path.isabs("C:\hello\path") -- true
 -- path.isabs("C:hello\path")  -- false
 function M.isabs(P)
-  assert_string(1, P)
   if M.is_windows and at(P, 2) == ':' then
     return seps[at(P, 3)] ~= nil
   end
@@ -392,13 +350,10 @@ end
 -- path.join("first","second/third")      -- "first/second/third"
 -- path.join("/first","/second","third")  -- "/second/third"
 function M.join(p1, p2, ...)
-  assert_string(1, p1)
-  assert_string(2, p2)
   if select('#', ...) > 0 then
     local p = M.join(p1, p2)
     local args = { ... }
     for i = 1, #args do
-      assert_string(i, args[i])
       p = M.join(p, args[i])
     end
     return p
@@ -423,7 +378,6 @@ end
 -- -- Windows: "\some\path\file.txt"
 -- -- Others : "/Some/Path/File.txt"
 function M.normcase(P)
-  assert_string(1, P)
   if M.is_windows then
     return P:gsub('/', '\\'):lower()
   else
@@ -437,7 +391,6 @@ end
 -- An empty path results in '.'.
 -- @string P a file path
 function M.normpath(P)
-  assert_string(1, P)
   -- Split path into anchor and relative path.
   local anchor = ''
   if M.is_windows then
@@ -490,10 +443,6 @@ end
 -- @string P a path
 -- @string[opt] start optional start point (default current directory)
 function M.relpath(P, start)
-  assert_string(1, P)
-  if start then
-    assert_string(2, start)
-  end
   local split, min, append = utils.split, math.min, table.insert
   P = M.abspath(P, start)
   start = start or uv.cwd()
@@ -541,7 +490,6 @@ end
 -- @treturn[2] nil
 -- @treturn[2] string Error message if the environment variables were unavailable.
 function M.expanduser(P)
-  assert_string(1, P)
   if P:sub(1, 1) ~= '~' then
     return P
   end
@@ -587,8 +535,6 @@ end
 -- @string path2 a file path
 -- @return the common prefix (Windows: separators will be normalized, casing will be original)
 function M.common_prefix(path1, path2)
-  assert_string(1, path1)
-  assert_string(2, path2)
   -- get them in order!
   if #path1 > #path2 then
     path2, path1 = path1, path2
@@ -609,16 +555,15 @@ function M.common_prefix(path1, path2)
     if compare(at(path1, i)) ~= compare(at(path2, i)) then
       local cp = path1:sub(1, i - 1)
       if at(path1, i - 1) ~= sep then
-        cp = M.dirname(cp)
+        cp = vim.fs.dirname(cp)
       end
       return cp
     end
   end
   if at(path2, #path1 + 1) ~= sep then
-    path1 = M.dirname(path1)
+    path1 = vim.fs.dirname(path1)
   end
   return path1
-  --return ''
 end
 
 --- return the full path where a particular Lua module would be found.
@@ -628,7 +573,6 @@ end
 -- @return on success: path of module, lua or binary
 -- @return on error: nil, error string listing paths tried
 function M.package_path(mod)
-  assert_string(1, mod)
   local res, err1, err2
   res, err1 = package.searchpath(mod, package.path)
   if res then

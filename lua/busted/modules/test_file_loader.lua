@@ -21,7 +21,7 @@ return function(busted, loaders)
       fileList = getfiles(rootFile)
 
       fileList = tablex.filter(fileList, function(filename)
-        local basename = path.basename(filename)
+        local basename = vim.fs.basename(filename)
         for _, patt in ipairs(options.excludes) do
           if patt ~= '' and basename:find(patt) then
             return nil

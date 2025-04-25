@@ -34,7 +34,7 @@ local test = {}
 -- Re-define this function to raise an error and/or redirect output
 function test.error_handler(file, line, got_text, needed_text, msg)
   local err = io.stderr
-  err:write(path.basename(file) .. ':' .. line .. ': assertion failed\n')
+  err:write(vim.fs.basename(file) .. ':' .. line .. ': assertion failed\n')
   err:write('got:\t', got_text, '\n')
   err:write('needed:\t', needed_text, '\n')
   utils.quit(1, msg or 'these values were not equal')

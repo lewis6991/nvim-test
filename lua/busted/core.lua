@@ -1,9 +1,5 @@
-local getfenv = require('busted.compatibility').getfenv
-local setfenv = require('busted.compatibility').setfenv
 local unpack = require('busted.compatibility').unpack
-local path = require('pl.path')
 local pretty = require('pl.pretty')
-local throw = error
 local uv = vim.uv
 
 local failureMt = {
@@ -48,6 +44,7 @@ end
 return function()
   local mediator = require('mediator')()
 
+  --- @class busted
   local busted = {}
   busted.version = '2.2.0'
 
@@ -85,12 +82,12 @@ return function()
     end
     level = level or 3
 
-    local thisdir = path.dirname(debug.getinfo(1, 'Sl').source)
+    local thisdir = vim.fs.dirname(debug.getinfo(1, 'Sl').source)
     local info = debug.getinfo(level, 'Sl')
     while
       info.what == 'C'
       or info.short_src:match('luassert[/\\].*%.lua$')
-      or (info.source:sub(1, 1) == '@' and thisdir == path.dirname(info.source))
+      or (info.source:sub(1, 1) == '@' and thisdir == vim.fs.dirname(info.source))
     do
       level = level + 1
       info = debug.getinfo(level, 'Sl')
@@ -161,16 +158,16 @@ return function()
   function busted.fail(msg, level)
     local rawlevel = (type(level) ~= 'number' or level <= 0) and level
     local level = level or 1
-    local _, emsg = pcall(throw, msg, rawlevel or level + 2)
+    local _, emsg = pcall(error, msg, rawlevel or level + 2)
     local e = { message = emsg }
     setmetatable(e, hasToString(msg) and failureMt or failureMtNoString)
-    throw(e, rawlevel or level + 1)
+    error(e, rawlevel or level + 1)
   end
 
   function busted.pending(msg)
     local p = { message = msg }
     setmetatable(p, pendingMt)
-    throw(p)
+    error(p)
   end
 
   function busted.bindfenv(callable, var, value)

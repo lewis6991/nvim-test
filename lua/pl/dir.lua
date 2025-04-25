@@ -173,7 +173,7 @@ local function file_op(is_copy, src, dest, flag)
       return true
     else
       if path.isdir(dest) then
-        dest = path.join(dest, path.basename(src))
+        dest = path.join(dest, vim.fs.basename(src))
       end
       local ret
       if is_copy then

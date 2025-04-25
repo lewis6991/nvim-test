@@ -1,12 +1,17 @@
 -- Busted command-line runner
 
 local path = require('pl.path')
-local tablex = require('pl.tablex')
-local term = require('term')
 local utils = require('busted.utils')
 local exit = require('busted.compatibility').exit
 local loadstring = require('busted.compatibility').loadstring
 local loaded = false
+
+local function tbl_update(t1, t2)
+  for k, v in pairs(t2) do
+    t1[k] = v
+  end
+  return t1
+end
 
 return function(options)
   if loaded then
@@ -15,8 +20,9 @@ return function(options)
     loaded = true
   end
 
-  local isatty = io.type(io.stdout) == 'file' and term.isatty(io.stdout)
-  options = tablex.update(require('busted.options'), options or {})
+  local isatty = io.type(io.stdout) == 'file' and vim.uv.guess_handle(1) == 'tty'
+
+  options = tbl_update(require('busted.options'), options or {})
   options.output = options.output or (isatty and 'utfTerminal' or 'plainTerminal')
 
   local busted = require('busted.core')()
@@ -37,12 +43,13 @@ return function(options)
   local forceExit = fileName == nil
 
   -- Parse the cli arguments
-  local appName = path.basename(fileName or 'busted')
+  local appName = vim.fs.basename(fileName or 'busted')
   cli:set_name(appName)
-  local cliArgs, err = cli:parse(arg)
+  local cliArgs, err0 = cli:parse(arg)
   if not cliArgs then
-    io.stderr:write(err .. '\n')
+    io.stderr:write(err0, '\n')
     exit(1, forceExit)
+    return
   end
 
   if cliArgs.version then
@@ -51,19 +58,22 @@ return function(options)
     exit(0, forceExit)
   end
 
-  -- Load current working directory
-  local _, err = path.chdir(path.normpath(cliArgs.directory))
-  if err then
-    io.stderr:write(appName .. ': error: ' .. err .. '\n')
-    exit(1, forceExit)
+  do -- Load current working directory
+    local _, err = path.chdir(path.normpath(cliArgs.directory))
+    if err then
+      io.stderr:write(appName, ': error: ', err, '\n')
+      exit(1, forceExit)
+      return
+    end
   end
 
-  -- If coverage arg is passed in, load LuaCovsupport
-  if cliArgs.coverage then
-    local ok, err = luacov(cliArgs['coverage-config-file'])
-    if not ok then
-      io.stderr:write(appName .. ': error: ' .. err .. '\n')
-      exit(1, forceExit)
+  do -- If coverage arg is passed in, load LuaCovsupport
+    if cliArgs.coverage then
+      local ok, err = luacov(cliArgs['coverage-config-file'])
+      if not ok then
+        io.stderr:write(appName, ': error: ', err, '\n')
+        exit(1, forceExit)
+      end
     end
   end
 
@@ -99,27 +109,27 @@ return function(options)
   local errors = 0
   local quitOnError = not cliArgs['keep-going']
 
-  busted.subscribe({ 'error', 'output' }, function(element, parent, message)
+  busted.subscribe({ 'error', 'output' }, function(element, _parent, message)
     io.stderr:write(
       appName .. ': error: Cannot load output library: ' .. element.name .. '\n' .. message .. '\n'
     )
     return nil, true
   end)
 
-  busted.subscribe({ 'error', 'helper' }, function(element, parent, message)
+  busted.subscribe({ 'error', 'helper' }, function(element, _parent, message)
     io.stderr:write(
       appName .. ': error: Cannot load helper script: ' .. element.name .. '\n' .. message .. '\n'
     )
     return nil, true
   end)
 
-  busted.subscribe({ 'error' }, function(element, parent, message)
+  busted.subscribe({ 'error' }, function(_element, _parent, _message)
     errors = errors + 1
     busted.skipAll = quitOnError
     return nil, true
   end)
 
-  busted.subscribe({ 'failure' }, function(element, parent, message)
+  busted.subscribe({ 'failure' }, function(element, _parent, _message)
     if element.descriptor == 'it' then
       failures = failures + 1
     else
@@ -182,7 +192,7 @@ return function(options)
 
   if cliArgs['log-success'] then
     local logFile = assert(io.open(cliArgs['log-success'], 'a'))
-    busted.subscribe({ 'test', 'end' }, function(test, parent, status)
+    busted.subscribe({ 'test', 'end' }, function(_test, _parent, status)
       if status == 'success' then
         logFile:write(getFullName() .. '\n')
       end

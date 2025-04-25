@@ -2,7 +2,7 @@ local utils = require('busted.utils')
 local path = require('pl.path')
 local tablex = require('pl.tablex')
 local exit = require('busted.compatibility').exit
-local execute = require('busted.compatibility').execute
+local execute = require('pl.utils').execute
 
 return function(options)
   local appName = ''

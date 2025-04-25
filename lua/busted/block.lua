@@ -1,4 +1,3 @@
-local getfenv = require('busted.compatibility').getfenv
 local unpack = require('busted.compatibility').unpack
 local shuffle = require('busted.utils').shuffle
 
