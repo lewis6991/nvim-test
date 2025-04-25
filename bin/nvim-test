@@ -148,7 +148,8 @@ if [ $INIT_ONLY ]; then
   exit
 fi
 
-export LUA_PATH="$NVIM_TEST_HOME/lua/?.lua;$NVIM_TEST_HOME/lua/?/init.lua;"
+export LUA_PATH="$NVIM_TEST_HOME/lua/?.lua;$NVIM_TEST_HOME/lua/?/init.lua;./?.lua;./?/init.lua"
+export LUA_CPATH='./?.so'
 
 export NVIM_PRG=$NVIM_TEST/bin/nvim
 export NVIM_TEST_HOME
