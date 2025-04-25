@@ -14,28 +14,6 @@ for k, v in pairs(compat) do
   M[k] = v
 end
 
---- Some standard patterns
--- @table patterns
-M.patterns = {
-  FLOAT = '[%+%-%d]%d*%.?%d*[eE]?[%+%-]?%d*', -- floating point number
-  INTEGER = '[+%-%d]%d*', -- integer number
-  IDEN = '[%a_][%w_]*', -- identifier
-  FILE = '[%a%.\\][:%][%w%._%-\\]*', -- file
-}
-
---- Standard meta-tables as used by other Penlight modules
--- @table stdmt
--- @field List the List metatable
--- @field Map the Map metatable
--- @field Set the Set metatable
--- @field MultiMap the MultiMap metatable
-M.stdmt = {
-  List = { _name = 'List' },
-  Map = { _name = 'Map' },
-  Set = { _name = 'Set' },
-  MultiMap = { _name = 'MultiMap' },
-}
-
 --- pack an argument list into a table.
 -- @param ... any arguments
 -- @return a table with field `n` set to the length
