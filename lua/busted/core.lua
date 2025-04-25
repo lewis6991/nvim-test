@@ -3,8 +3,8 @@ local setfenv = require('busted.compatibility').setfenv
 local unpack = require('busted.compatibility').unpack
 local path = require('pl.path')
 local pretty = require('pl.pretty')
-local system = require('system')
 local throw = error
+local uv = vim.uv
 
 local failureMt = {
   __index = {},
@@ -61,9 +61,20 @@ return function()
   local executors = {}
   local eattributes = {}
 
-  busted.gettime = system.gettime
-  busted.monotime = system.monotime
-  busted.sleep = system.sleep
+  function busted.monotime()
+    uv.update_time()
+    return uv.now() * 1e-3
+  end
+
+  function busted.gettime()
+    local sec, usec = uv.gettimeofday()
+    return sec + usec * 1e-6
+  end
+
+  function busted.sleep(sec)
+    uv.sleep(sec * 1e3)
+  end
+
   busted.status = require('busted.status')
 
   function busted.getTrace(element, level, msg)

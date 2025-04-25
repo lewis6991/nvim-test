@@ -387,19 +387,6 @@ function pretty.write(tbl, space, not_clever)
   return concat(lines, #space > 0 and '\n' or '')
 end
 
---- Dump a Lua table out to a file or stdout.
--- @tab t The table to write to a file or stdout.
--- @string[opt] filename File name to write too. Defaults to writing
--- to stdout.
-function pretty.dump(t, filename)
-  if not filename then
-    print(pretty.write(t))
-    return true
-  else
-    return utils.writefile(filename, pretty.write(t))
-  end
-end
-
 --- Dump a series of arguments to stdout for debug purposes.
 -- This function is attached to the module table `__call` method, to make it
 -- extra easy to access. So the full:
@@ -426,7 +413,7 @@ end
 --     bye = "world"
 --   }
 -- }
-function pretty.debug(...)
+local function pretty_debug(...)
   local n = select('#', ...)
   local t = { ... }
   for i = 1, n do
@@ -442,57 +429,8 @@ function pretty.debug(...)
   return true
 end
 
-local memp, nump = { 'B', 'KiB', 'MiB', 'GiB' }, { '', 'K', 'M', 'B' }
-
-local function comma(val)
-  local thou = math.floor(val / 1000)
-  if thou > 0 then
-    return comma(thou) .. ',' .. tostring(val % 1000)
-  else
-    return tostring(val)
-  end
-end
-
---- Format large numbers nicely for human consumption.
--- @number num a number.
--- @string[opt] kind one of `'M'` (memory in `KiB`, `MiB`, etc.),
--- `'N'` (postfixes are `'K'`, `'M'` and `'B'`),
--- or `'T'` (use commas as thousands separator), `'N'` by default.
--- @int[opt] prec number of digits to use for `'M'` and `'N'`, `1` by default.
-function pretty.number(num, kind, prec)
-  local fmt = '%.' .. (prec or 1) .. 'f%s'
-  if kind == 'T' then
-    return comma(num)
-  else
-    local postfixes, fact
-    if kind == 'M' then
-      fact = 1024
-      postfixes = memp
-    else
-      fact = 1000
-      postfixes = nump
-    end
-    local div = fact
-    local k = 1
-    while num >= div and k <= #postfixes do
-      div = div * fact
-      k = k + 1
-    end
-    div = div / fact
-    if k > #postfixes then
-      k = k - 1
-      div = div / fact
-    end
-    if k > 1 then
-      return fmt:format(num / div, postfixes[k] or 'duh')
-    else
-      return num .. postfixes[1]
-    end
-  end
-end
-
 return setmetatable(pretty, {
-  __call = function(self, ...)
-    return self.debug(...)
+  __call = function(_, ...)
+    return pretty_debug(...)
   end,
 })
