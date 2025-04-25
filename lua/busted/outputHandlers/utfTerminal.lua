@@ -1,5 +1,4 @@
 local s = require('say')
-local pretty = require('pl.pretty')
 local luassert = require('luassert')
 local io = io
 local type = type
@@ -78,7 +77,7 @@ return function(options)
     if type(pending.message) == 'string' then
       string = string .. '\n' .. pending.message
     elseif pending.message ~= nil then
-      string = string .. '\n' .. pretty.write(pending.message)
+      string = string .. '\n' .. vim.inspect(pending.message)
     end
 
     return string
@@ -91,7 +90,7 @@ return function(options)
     elseif failure.message == nil then
       string = string .. 'Nil error'
     else
-      string = string .. pretty.write(failure.message)
+      string = string .. vim.inspect(failure.message)
     end
 
     return string

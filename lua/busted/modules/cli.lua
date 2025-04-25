@@ -1,7 +1,6 @@
 local utils = require('busted.utils')
 local path = require('pl.path')
 local exit = require('busted.compatibility').exit
-local execute = require('pl.utils').execute
 
 --- @param s1? string
 --- @param s2 string
@@ -19,6 +18,16 @@ local function makeList(values)
   return type(values) == 'table' and values or { values }
 end
 
+local function fixupList(values, sep)
+  sep = sep or ','
+  local list = type(values) == 'table' and values or { values }
+  local olist = {}
+  for _, v in ipairs(list) do
+    utils.insertvalues(olist, vim.split(v, sep))
+  end
+  return olist
+end
+
 return function(options)
   local appName = ''
   options = options or {}
@@ -33,16 +42,6 @@ return function(options)
     or './csrc/?.so;./csrc/?/?.so;'
 
   local cliArgsParsed = {}
-
-  local function fixupList(values, sep)
-    sep = sep or ','
-    local list = type(values) == 'table' and values or { values }
-    local olist = {}
-    for _, v in ipairs(list) do
-      utils.insertvalues(olist, vim.split(v, sep))
-    end
-    return olist
-  end
 
   local function processOption(key, value, altkey)
     if altkey then
@@ -325,7 +324,7 @@ return function(options)
     -- handles executeable lua files.
     if cliArgs['lua'] and not cliArgs['ignore-lua'] then
       local _, code =
-        execute(cliArgs['lua'] .. ' ' .. args[0] .. ' --ignore-lua ' .. table.concat(args, ' '))
+        os.execute(cliArgs['lua'] .. ' ' .. args[0] .. ' --ignore-lua ' .. table.concat(args, ' '))
       exit(code)
     end
 

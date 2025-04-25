@@ -1,4 +1,3 @@
-local pretty = require('pl.pretty')
 local uv = vim.uv
 
 local failureMt = {
@@ -98,7 +97,7 @@ return function()
   function busted.rewriteMessage(element, message, trace)
     local file = busted.getFile(element)
     local msg = hasToString(message) and tostring(message)
-    msg = msg or (message ~= nil and pretty.write(message) or 'Nil error')
+    msg = msg or (message ~= nil and vim.inspect(message) or 'Nil error')
     msg = (file and file.rewriteMessage and file.rewriteMessage(file.name, msg) or msg)
 
     local hasFileLine = msg:match('^[^\n]-:%d+: .*')

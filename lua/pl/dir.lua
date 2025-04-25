@@ -1,11 +1,7 @@
 --- Listing files in directories and creating/removing directory paths.
 --
--- Dependencies: `pl.utils`, `pl.path`
---
--- Soft Dependencies: ``ffi` (either are used on Windows for copying/moving files)
 -- @module pl.dir
 
-local utils = require('pl.utils')
 local path = require('pl.path')
 
 local exists, isdir = path.exists, path.isdir
@@ -13,8 +9,14 @@ local sep = path.sep
 
 local M = {}
 
+--- escape any Lua 'magic' characters in a string
+-- @param s The input string
+local function escape(s)
+  return (s:gsub('[%-%.%+%[%]%(%)%$%^%%%?%*]', '%%%1'))
+end
+
 local function filemask(mask)
-  mask = utils.escape(path.normcase(mask))
+  mask = escape(path.normcase(mask))
   return '^' .. mask:gsub('%%%*', '.*'):gsub('%%%?', '.') .. '$'
 end
 

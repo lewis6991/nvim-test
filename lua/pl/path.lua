@@ -8,14 +8,12 @@
 -- is Windows paths to allow both forward and backward slashes (since Lua
 -- also accepts those)
 --
--- Dependencies: `pl.utils`
 -- @module pl.path
 
 local uv = vim.uv
 local sub = string.sub
 local getenv = os.getenv
 local tmpnam = os.tmpname
-local compat = require('pl.compat')
 
 local M = {}
 
@@ -117,7 +115,13 @@ local function at(s, i)
   return s:sub(i, i)
 end
 
-M.is_windows = compat.is_windows
+--- the directory separator character for the current platform.
+-- @field dir_separator
+local dir_separator = _G.package.config:sub(1, 1)
+
+--- boolean flag this is a Windows platform.
+-- @field is_windows
+M.is_windows = dir_separator == '\\'
 
 local sep, other_sep, seps
 -- constant sep is the directory separator for this platform.

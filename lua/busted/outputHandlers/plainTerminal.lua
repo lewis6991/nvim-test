@@ -1,5 +1,4 @@
 local s = require('say')
-local pretty = require('pl.pretty')
 local io = io
 local type = type
 local string_format = string.format
@@ -31,7 +30,7 @@ return function(options)
     if type(pending.message) == 'string' then
       string = string .. '\n' .. pending.message
     elseif pending.message ~= nil then
-      string = string .. '\n' .. pretty.write(pending.message)
+      string = string .. '\n' .. vim.inspect(pending.message)
     end
 
     return string
