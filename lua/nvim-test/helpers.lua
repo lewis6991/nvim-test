@@ -87,11 +87,13 @@ function M.pcall_err(fn, ...)
   end
 
   --- @cast err string
-  return (err
-    :gsub('^%.%.%./helpers%.lua:0: ', '')
-    :gsub('^Error executing lua:- ', '')
-    :gsub('^%[string "<nvim>"%]:0: ', '')
-    :gsub('\n%s*stack traceback:.*', ''))
+  return (
+    err
+      :gsub('^%.%.%./helpers%.lua:0: ', '')
+      :gsub('^Error executing lua:- ', '')
+      :gsub('^%[string "<nvim>"%]:0: ', '')
+      :gsub('\n%s*stack traceback:.*', '')
+  )
 end
 
 --- @param str string
@@ -369,7 +371,7 @@ function M.clear(init_lua_path)
       vim.api.nvim_create_autocmd('VimLeave', {
         callback = function()
           luacov.shutdown()
-        end
+        end,
       })
     end)
   end
@@ -386,13 +388,16 @@ function M.insert(...)
 end
 
 function M.exc_exec(cmd)
-  M.api.nvim_command(string.format([[
+  M.api.nvim_command(string.format(
+    [[
     try
       execute "%s"
     catch
       let g:__exception = v:exception
     endtry
-  ]], cmd:gsub('\n', '\\n'):gsub('[\\"]', '\\%0')))
+  ]],
+    cmd:gsub('\n', '\\n'):gsub('[\\"]', '\\%0')
+  ))
   local ret = M.api.nvim_eval('get(g:, "__exception", 0)')
   M.api.nvim_command('unlet! g:__exception')
   return ret

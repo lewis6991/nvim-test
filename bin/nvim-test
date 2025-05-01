@@ -3,8 +3,8 @@
 set -euo pipefail
 
 NVIM_TEST_HOME=$(dirname "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)")
-NVIM_RUNNER_VERSION=${NVIM_RUNNER_VERSION:-v0.9.5}
-NVIM_TEST_VERSION=${NVIM_TEST_VERSION:-v0.9.5}
+NVIM_RUNNER_VERSION=${NVIM_RUNNER_VERSION:-v0.11.0}
+NVIM_TEST_VERSION=${NVIM_TEST_VERSION:-v0.11.0}
 INIT_ONLY=
 LUACOV_ENABLED=
 
@@ -30,11 +30,11 @@ function help() {
 function parse_args() {
   local finished=
   while [[ $# -gt 0 ]]; do
-    case $1 in
-      -c|--coverage)
-        LUACOV_ENABLED=1
-        ;;
-    esac
+    # case $1 in
+    #   -c|--coverage)
+    #     LUACOV_ENABLED=1
+    #     ;;
+    # esac
     if [[ $finished ]]; then
       ARGS+=("$1") # save positional arg
     else
@@ -144,30 +144,12 @@ if [ ! -d "$NVIM_RUNNER" ]; then
   fetch_nvim "$NVIM_RUNNER_VERSION" "$NVIM_RUNNER"
 fi
 
-LUAROCKS="luarocks --lua-version=5.1 --tree $DATA/luarocks"
-
-if [ ! -f "$DATA/luarocks/bin/busted" ]; then
-  echo "Installing Busted"
-  $LUAROCKS install busted
-fi
-
-if [ $LUACOV_ENABLED ]; then
-  if [ ! -f "$DATA/luarocks/bin/luacov" ]; then
-    echo "Installing LuaCov"
-    $LUAROCKS install luacov
-    # Add some more reporters
-    $LUAROCKS install luacov-console
-    # TODO(lewis6991): html will be built in to the next version of luacov
-    # after 0.15
-    $LUAROCKS install luacov-html
-  fi
-fi
-
 if [ $INIT_ONLY ]; then
   exit
 fi
 
-eval "$($LUAROCKS path)"
+export LUA_PATH="$NVIM_TEST_HOME/lua/?.lua;$NVIM_TEST_HOME/lua/?/init.lua;./?.lua;./?/init.lua"
+export LUA_CPATH='./?.so'
 
 export NVIM_PRG=$NVIM_TEST/bin/nvim
 export NVIM_TEST_HOME
@@ -178,4 +160,3 @@ exec "$NVIM_RUNNER"/bin/nvim -ll \
   --lpath="$NVIM_TEST_HOME/lua/?.lua" \
   --output nvim-test.busted.output_handler \
   "${ARGS[@]}"
-

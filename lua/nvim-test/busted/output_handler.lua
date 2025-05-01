@@ -2,7 +2,6 @@ return function(options)
   local busted = require('busted')
   local handler = require('busted.outputHandlers.base')()
   local colors = require('term.colors')
-  local pretty = require('pl.pretty')
 
   --- @type table<string,fun(s:string): string>
   local c = {
@@ -90,7 +89,7 @@ return function(options)
     if type(pending.message) == 'string' then
       s = s .. pending.message .. '\n'
     elseif pending.message ~= nil then
-      s = s .. pretty.write(pending.message) .. '\n'
+      s = s .. vim.inspect(pending.message) .. '\n'
     end
 
     return s
@@ -103,7 +102,7 @@ return function(options)
     elseif failure.message == nil then
       s = s .. 'Nil error'
     else
-      s = s .. pretty.write(failure.message)
+      s = s .. vim.inspect(failure.message)
     end
 
     s = s .. '\n'
