@@ -1,6 +1,3 @@
-local pl_path = require('pl.path')
-local utils = require('busted.utils')
-
 local fixtures = {}
 
 -- returns an absolute path to where the current test file is located.
@@ -17,7 +14,7 @@ function fixtures.path(sub_path)
   local info = debug.getinfo(1)
   local myname = info.source -- path to this code file
 
-  local path
+  local path --- @type string
   local level = 1
   repeat
     -- other functions in this module call this one as well, so traverse up the
@@ -31,10 +28,9 @@ function fixtures.path(sub_path)
   if path:sub(1, 1) == '@' then
     path = path:sub(2, -1)
   end
-  path = pl_path.abspath(path) -- based on PWD
-  path = pl_path.splitpath(path) -- drop filename, keep path only
-  path = vim.fs.joinpath(path, sub_path)
-  return pl_path.normpath(path, sub_path)
+  path = vim.fs.abspath(path) -- based on PWD
+  path = vim.fs.dirname(path) -- drop filename, keep path only
+  return vim.fs.normalize(vim.fs.joinpath(path, sub_path))
 end
 
 -- reads a file relative from the current test file.
@@ -51,7 +47,15 @@ function fixtures.read(rel_path, is_bin)
 
   local fname = fixtures.path(rel_path)
 
-  local contents, err = utils.readfile(fname, is_bin)
+  local mode = is_bin and 'b' or ''
+  local f, err = io.open(fname, 'r' .. mode)
+  if not f then
+    error(("Error reading file '%s': %s"):format(tostring(fname), tostring(err)), 2)
+  end
+
+  local contents = f:read('*a')
+  f:close()
+
   if not contents then
     error(("Error reading file '%s': %s"):format(tostring(fname), tostring(err)), 2)
   end

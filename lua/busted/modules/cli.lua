@@ -1,31 +1,71 @@
-local utils = require('busted.utils')
-local path = require('pl.path')
+local ntutils = require('nvim-test.utils')
 local exit = require('busted.compatibility').exit
+
+--- @class nvim-test.Loader
 
 --- @param s1? string
 --- @param s2 string
---- @param sep? string
+--- @param sep string
 --- @return string
 local function append(s1, s2, sep)
-  sep = sep or ''
   if not s1 then
     return s2
   end
   return s1 .. sep .. s2
 end
 
+--- @param values string|string[]
+--- @return string[]
 local function makeList(values)
   return type(values) == 'table' and values or { values }
 end
 
-local function fixupList(values, sep)
-  sep = sep or ','
-  local list = type(values) == 'table' and values or { values }
+--- @param values string|string[]
+local function fixupList(values)
+  local list = makeList(values)
   local olist = {}
   for _, v in ipairs(list) do
-    utils.insertvalues(olist, vim.split(v, sep))
+    for e in vim.gsplit(v, ',') do
+      table.insert(olist, e)
+    end
   end
   return olist
+end
+
+--- @class nvim-test.Config
+--- @field run? string
+
+-- Function to load the .busted configuration file if available
+--- @param configFile table<string,nvim-test.Config>?
+--- @param config nvim-test.Config
+--- @param defaults? nvim-test.Config
+--- @return nvim-test.Config?
+--- @return string? err
+local function configLoader(configFile, config, defaults)
+  if type(configFile) ~= 'table' then
+    return nil, '.busted file does not return a table.'
+  end
+
+  defaults = defaults or {}
+  local run = config.run or defaults.run
+
+  if run and run ~= '' then
+    local runConfig = configFile[run]
+    if type(runConfig) ~= 'table' then
+      return nil, ('Task `%s` not found, or not a table.'):format(run)
+    end
+    config = vim.tbl_deep_extend('force', runConfig, config)
+  elseif type(configFile.default) == 'table' then
+    config = vim.tbl_deep_extend('force', configFile.default, config)
+  end
+
+  if type(configFile._all) == 'table' then
+    config = vim.tbl_deep_extend('force', configFile._all, config)
+  end
+
+  config = vim.tbl_deep_extend('force', defaults, config)
+
+  return config
 end
 
 return function(options)
@@ -33,12 +73,10 @@ return function(options)
   options = options or {}
   local cli = require('cliargs.core')()
 
-  local configLoader = require('busted.modules.configuration_loader')()
-
   -- Default cli arg values
   local defaultOutput = options.output or 'utfTerminal'
   local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
-  local cpathprefix = path.is_windows and './csrc/?.dll;./csrc/?/?.dll;'
+  local cpathprefix = ntutils.is_windows and './csrc/?.dll;./csrc/?/?.dll;'
     or './csrc/?.so;./csrc/?/?.so;'
 
   local cliArgsParsed = {}
@@ -58,7 +96,9 @@ return function(options)
 
   local function processArgList(key, value)
     local list = cliArgsParsed[key] or {}
-    utils.insertvalues(list, vim.split(value, ','))
+    for e in vim.gsplit(value, ',') do
+      table.insert(list, e)
+    end
     processArg(key, list)
     return true
   end
@@ -75,47 +115,48 @@ return function(options)
     return true
   end
 
-  local function processList(key, value, altkey, _opt)
+  local function processList(key, value, altkey)
     local list = cliArgsParsed[key] or {}
-    utils.insertvalues(list, vim.split(value, ','))
+    for e in vim.gsplit(value, ',') do
+      table.insert(list, e)
+    end
     processOption(key, list, altkey)
     return true
   end
 
-  local function processMultiOption(key, value, altkey, opt)
+  local function processMultiOption(key, value, altkey)
     local list = cliArgsParsed[key] or {}
     table.insert(list, value)
-    processOption(key, list, altkey, opt)
+    processOption(key, list, altkey)
     return true
   end
 
-
-  local function processLoaders(key, value, altkey, opt)
+  local function processLoaders(key, value, altkey)
     local loaders = append(cliArgsParsed[key], value, ',')
-    processOption(key, loaders, altkey, opt)
+    processOption(key, loaders, altkey)
     return true
   end
 
-  local function processPath(key, value, altkey, opt)
+  local function processPath(key, value, altkey)
     local lpath = append(cliArgsParsed[key], value, ';')
-    processOption(key, lpath, altkey, opt)
+    processOption(key, lpath, altkey)
     return true
   end
 
-  local function processDir(key, value, altkey, opt)
+  local function processDir(key, value, altkey)
     local dpath = vim.fs.normalize(vim.fs.joinpath(cliArgsParsed[key] or '', value))
-    processOption(key, dpath, altkey, opt)
+    processOption(key, dpath, altkey)
     return true
   end
 
-  local function processShuffle(_key, value, _altkey, opt)
-    processOption('shuffle-files', value, nil, opt)
-    processOption('shuffle-tests', value, nil, opt)
+  local function processShuffle(_key, value)
+    processOption('shuffle-files', value)
+    processOption('shuffle-tests', value)
   end
 
-  local function processSort(_key, value, _altkey, opt)
-    processOption('sort-files', value, nil, opt)
-    processOption('sort-tests', value, nil, opt)
+  local function processSort(_key, value)
+    processOption('sort-files', value)
+    processOption('sort-tests', value)
   end
 
   -- Load up the command-line interface options
@@ -290,14 +331,15 @@ return function(options)
     local bustedConfigFilePath
     if cliArgs.f then
       -- if the file is given, then we require it to exist
-      if not path.isfile(cliArgs.f) then
+      if not ntutils.isfile(cliArgs.f) then
         return nil, ("specified config file '%s' not found"):format(cliArgs.f)
       end
-      bustedConfigFilePath = cliArgs.f
+      bustedConfigFilePath = cliArgs.f --[[@as string]]
     else
       -- try default file
-      bustedConfigFilePath = vim.fs.normalize(vim.fs.joinpath(cliArgs.directory, '.busted'))
-      if not path.isfile(bustedConfigFilePath) then
+      local dir = cliArgs.directory --[[@as string]]
+      bustedConfigFilePath = vim.fs.normalize(vim.fs.joinpath(dir, '.busted'))
+      if not ntutils.isfile(bustedConfigFilePath) then
         bustedConfigFilePath = nil -- clear default file, since it doesn't exist
       end
     end

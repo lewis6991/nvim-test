@@ -1,6 +1,5 @@
 local shuffle = require('busted.utils').shuffle
-local urandom = require('busted.utils').urandom
-local utils = require('busted.utils')
+local utils = require('nvim-test.utils')
 
 local function sort(elements)
   table.sort(elements, function(t1, t2)
@@ -35,7 +34,7 @@ return function(busted)
         busted.context.attach(child)
       end
 
-      busted.randomseed = tonumber(options.seed) or urandom() or os.time()
+      busted.randomseed = tonumber(options.seed) or utils.urandom() or os.time()
     end
 
     for i = 1, runs do

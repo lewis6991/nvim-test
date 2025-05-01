@@ -1,48 +1,8 @@
+local ntutils = require('nvim-test.utils')
+
 local M = {}
 
---- insert values into a table.
--- similar to `table.insert` but inserts values from given table `values`,
--- not the object itself, into table `t` at position `pos`.
--- @within Copying
--- @array t the list
--- @int[opt] position (default is at end)
--- @array values
-function M.insertvalues(t, ...)
-  local pos, values
-  if select('#', ...) == 1 then
-    pos, values = #t + 1, ...
-  else
-    pos, values = ...
-  end
-  if #values > 0 then
-    for i = #t, pos, -1 do
-      t[i + #values] = t[i]
-    end
-    local offset = 1 - pos
-    for i = pos, pos + #values - 1 do
-      t[i] = values[i + offset]
-    end
-  end
-  return t
-end
-
-function M.readfile(filename, is_bin)
-  local mode = is_bin and 'b' or ''
-  local f = assert(io.open(filename, 'r' .. mode))
-  local res = assert(f:read('*a'))
-  f:close()
-  return res
-end
-
-function M.tbl_copy(t)
-  local res = {}
-  for k, v in pairs(t) do
-    res[k] = v
-  end
-  return res
-end
-
-M.copy_interpreter_args = function(arguments)
+function M.copy_interpreter_args(arguments)
   -- copy non-positive command-line args auto-inserted by Lua interpreter
   if arguments and _G.arg then
     local i = 0
@@ -53,7 +13,7 @@ M.copy_interpreter_args = function(arguments)
   end
 end
 
-M.shuffle = function(t, seed)
+function M.shuffle(t, seed)
   if seed then
     math.randomseed(seed)
   end
@@ -66,154 +26,20 @@ M.shuffle = function(t, seed)
   return t
 end
 
-M.urandom = function()
-  local f = io.open('/dev/urandom', 'rb')
-  if not f then
-    return nil
-  end
-  local s = f:read(4)
-  f:close()
-  local bytes = { s:byte(1, 4) }
-  local value = 0
-  for _, v in ipairs(bytes) do
-    value = value * 256 + v
-  end
-  return value
-end
-
-local path = require('pl.path')
-
---- escape any Lua 'magic' characters in a string
--- @param s The input string
-local function escape(s)
-  return (s:gsub('[%-%.%+%[%]%(%)%$%^%%%?%*]', '%%%1'))
-end
-
---- normalize the case of a pathname. On Unix, this returns the path unchanged,
--- for Windows it converts;
---
--- * the path to lowercase
--- * forward slashes to backward slashes
--- @string P A file path
--- @usage path.normcase("/Some/Path/File.txt")
--- -- Windows: "\some\path\file.txt"
--- -- Others : "/Some/Path/File.txt"
-local function normcase(P)
-  if M.is_windows then
-    return P:gsub('/', '\\'):lower()
-  end
-  return P
-end
-
-local function filemask(mask)
-  mask = escape(normcase(mask))
-  return '^' .. mask:gsub('%%%*', '.*'):gsub('%%%?', '.') .. '$'
-end
-
-local function listfiles(dirname, filemode, match)
-  local res = {}
-  local check = filemode and path.isfile or path.isdir
-  if not dirname then
-    dirname = '.'
-  end
-  for f in path.dir(dirname) do
-    if f ~= '.' and f ~= '..' then
-      local p = vim.fs.joinpath(dirname, f)
-      if check(p) and (not match or match(f)) then
-        table.insert(res, p)
-      end
-    end
-  end
-  return res
-end
-
 --- return a list of all files in a directory which match a shell pattern.
--- @string[opt='.'] dirname A directory.
--- @string[opt] mask A shell pattern (see `fnmatch`). If not given, all files are returned.
--- @treturn {string} list of files
--- @raise dirname and mask must be strings
-function M.getfiles(dirname, mask)
+--- @param dirname? string A directory.
+--- @param recursive? boolean If true, the function will search recursively in subdirectories.
+--- @return string[] list of files
+function M.getfiles(dirname, recursive)
   dirname = dirname or '.'
-  assert(path.isdir(dirname), 'not a directory')
-  local match
-  if mask then
-    mask = filemask(mask)
-    match = function(f)
-      return normcase(f):find(mask)
-    end
-  end
-  return listfiles(dirname, true, match)
-end
-
--- each entry of the stack is an array with three items:
--- 1. the name of the directory
--- 2. the lfs iterator function
--- 3. the lfs iterator userdata
-local function treeiter(iterstack)
-  local diriter = iterstack[#iterstack]
-  if not diriter then
-    return -- done
-  end
-
-  local dirname = diriter[1]
-  local entry = diriter[2](diriter[3])
-  if not entry then
-    table.remove(iterstack)
-    return treeiter(iterstack) -- tail-call to try next
-  end
-
-  if entry ~= '.' and entry ~= '..' then
-    entry = dirname .. path.sep .. entry
-    if path.exists(entry) then -- Just in case a symlink is broken.
-      local is_dir = path.isdir(entry)
-      if is_dir then
-        table.insert(iterstack, { entry, path.dir(entry) })
-      end
-      return entry, is_dir
-    end
-  end
-
-  return treeiter(iterstack) -- tail-call to try next
-end
-
---- return an iterator over all entries in a directory tree
--- @string d a directory
--- @return an iterator giving pathname and mode (true for dir, false otherwise)
--- @raise d must be a non-empty string
-local function dirtree(d)
-  assert(d and d ~= '', 'directory parameter is missing or empty')
-
-  local last = d:sub(-1)
-  if last == path.sep or last == '/' then
-    d = d:sub(1, -2)
-  end
-
-  local iterstack = { { d, path.dir(d) } }
-
-  return treeiter, iterstack
-end
-
---- Recursively returns all the file starting at 'path'. It can optionally take a shell pattern and
--- only returns files that match 'shell_pattern'. If a pattern is given it will do a case insensitive search.
--- @string[opt='.'] start_path  A directory.
--- @string[opt='*'] shell_pattern A shell pattern (see `fnmatch`).
--- @treturn List(string) containing all the files found recursively starting at 'path' and filtered by 'shell_pattern'.
--- @raise start_path must be a directory
-function M.getallfiles(start_path, shell_pattern)
-  start_path = start_path or '.'
-  assert(path.isdir(start_path), 'not a directory')
-  shell_pattern = shell_pattern or '*'
+  assert(ntutils.isdir(dirname), 'not a directory')
 
   local files = {} --- @type string[]
-  for filename, mode in dirtree(start_path) do
-    if not mode then
-      local mask = filemask(shell_pattern)
-      if normcase(filename):find(mask) then
-        files[#files + 1] = filename
-      end
+  for f, ty in vim.fs.dir(dirname, { depth = recursive and math.huge or nil }) do
+    if ty == 'file' then
+      files[#files + 1] = vim.fs.joinpath(dirname, f)
     end
   end
-
   return files
 end
 

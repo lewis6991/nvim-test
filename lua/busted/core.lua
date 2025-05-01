@@ -328,9 +328,7 @@ return function()
   end
 
   function busted.execute(current)
-    if not current then
-      current = busted.context.get()
-    end
+    current = current or busted.context.get()
     for _, v in pairs(busted.context.children(current)) do
       local executor = executors[v.descriptor]
       if executor and not busted.skipAll then

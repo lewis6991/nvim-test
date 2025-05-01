@@ -1,4 +1,4 @@
-local utils = require('busted.utils')
+local utils = require('nvim-test.utils')
 
 local function save()
   local g = {}

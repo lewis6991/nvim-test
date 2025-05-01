@@ -1,6 +1,6 @@
 -- Busted command-line runner
 
-local utils = require('busted.utils')
+local ntutils = require('nvim-test.utils')
 local exit = require('busted.compatibility').exit
 local loadstring = loadstring or load
 local loaded = false
@@ -15,9 +15,8 @@ end
 return function(options)
   if loaded then
     return function() end
-  else
-    loaded = true
   end
+  loaded = true
 
   local isatty = io.type(io.stdout) == 'file' and vim.uv.guess_handle(1) == 'tty'
 
@@ -27,9 +26,9 @@ return function(options)
   local busted = require('busted.core')()
 
   local cli = require('busted.modules.cli')(options)
-  local filterLoader = require('busted.modules.filter_loader')()
-  local helperLoader = require('busted.modules.helper_loader')()
-  local outputHandlerLoader = require('busted.modules.output_handler_loader')()
+  local filterLoader = require('busted.modules.filter_loader')
+  local helperLoader = require('busted.modules.helper_loader')
+  local outputHandlerLoader = require('busted.modules.output_handler_loader')
 
   local luacov = require('busted.modules.luacov')()
 
@@ -141,7 +140,7 @@ return function(options)
   -- Set up randomization options
   busted.sort = cliArgs['sort-tests']
   busted.randomize = cliArgs['shuffle-tests']
-  busted.randomseed = tonumber(cliArgs.seed) or utils.urandom() or os.time()
+  busted.randomseed = tonumber(cliArgs.seed) or ntutils.urandom() or os.time()
 
   -- Set up output handler to listen to events
   outputHandlerLoader(busted, cliArgs.output, {
@@ -213,18 +212,16 @@ return function(options)
 
   if cliArgs.ROOT then
     -- Load test directories/files
-    local rootFiles = cliArgs.ROOT
-    local patterns = cliArgs.pattern
     local testFileLoader = require('busted.modules.test_file_loader')(busted, cliArgs.loaders)
-    testFileLoader(rootFiles, patterns, {
+    testFileLoader(cliArgs.ROOT, cliArgs.pattern, {
       excludes = cliArgs['exclude-pattern'],
       verbose = cliArgs.verbose,
       recursive = cliArgs['recursive'],
     })
   else
     -- Running standalone, use standalone loader
-    local testFileLoader = require('busted.modules.standalone_loader')(busted)
-    testFileLoader(info, { verbose = cliArgs.verbose })
+    local testFileLoader = require('busted.modules.standalone_loader')
+    testFileLoader(busted, info, { verbose = cliArgs.verbose })
   end
 
   local runs = cliArgs['repeat']
