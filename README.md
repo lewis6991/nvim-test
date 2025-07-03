@@ -20,10 +20,12 @@ ARGUMENTS:
   BUSTED_ARGS                     Arguments passed directly to busted.
 
 OPTIONS:
-  --runner_version [NVIM_VERSION] Which version of Nvim to run as the test runner
-                                  (Default 0.9.5)
+  --runner_version [NVIM_VERSION] Which version of Nvim to run as the test runner.
+                                  Accepts version format "0.x.x" or "nightly".
+                                  (Default 0.11.2)
   --target_version [NVIM_VERSION] Which version of Nvim to run tests under
-                                  (Default 0.9.5)
+                                  Accepts version format "0.x.x" or "nightly".
+                                  (Default 0.11.2)
   --clean                         Redownload test collateral.
   --init                          Initialize nvim-test. Do not run tests.
 ```
