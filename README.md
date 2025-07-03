@@ -39,7 +39,10 @@ Create a `Makefile` with the contents:
 
 ```make
 nvim-test:
-	git clone https://github.com/lewis6991/nvim-test
+	git clone \
+	  --depth 1 \
+	  --branch v1.2.0 \
+          https://github.com/lewis6991/nvim-test $@
 	nvim-test/bin/nvim-test --init
 
 .PHONY: test
@@ -47,7 +50,6 @@ test: nvim-test
 	nvim-test/bin/nvim-test test \
 		--lpath=$(PWD)/lua/?.lua
 ```
-
 
 Add a test file `test/mytest_spec.lua` with the format:
 
@@ -92,7 +94,6 @@ PASSED   1 test.
 ```
 
 See [example](./example) for more details.
-
 
 ## Projects Using Nvim-Test
 
