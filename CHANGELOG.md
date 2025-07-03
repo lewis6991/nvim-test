@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/lewis6991/nvim-test/compare/v1.1.1...v1.2.0) (2025-07-03)
+
+
+### Features
+
+* always fetch latest nightly ([24faa6f](https://github.com/lewis6991/nvim-test/commit/24faa6fcddda007957a94f2d83c1cb0ab88a5c25))
+* update default nvim version ([a525aa7](https://github.com/lewis6991/nvim-test/commit/a525aa7d21fbaa7c49378cdc4d7b82e7025ca43b))
+
 ## [1.1.1](https://github.com/lewis6991/nvim-test/compare/v1.1.0...v1.1.1) (2025-02-14)
 
 
