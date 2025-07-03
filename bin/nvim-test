@@ -134,9 +134,31 @@ function fetch_nvim() {
   mv "$asset" "$dst"
 }
 
+function is_dir_older_than_24h() {
+  local dir=$1
+  if [ ! -d "$dir" ]; then
+    return 0
+  fi
+  local dir_mtime=$(stat -c %Y "$dir")
+  local now=$(date +%s)
+  [ $((now - dir_mtime)) -gt 86400 ]
+}
+
+if [ "$NVIM_TEST_VERSION" = "nightly" ] \
+    && is_dir_older_than_24h "$NVIM_TEST"; then
+  echo "Deleting old Nvim nightly (test)"
+  rm -rf "$NVIM_TEST"
+fi
+
 if [ ! -d "$NVIM_TEST" ]; then
   echo "Download Nvim $NVIM_TEST_VERSION as test target"
   fetch_nvim "$NVIM_TEST_VERSION" "$NVIM_TEST"
+fi
+
+if [ "$NVIM_RUNNER_VERSION" = "nightly" ] \
+    && is_dir_older_than_24h "$NVIM_RUNNER"; then
+  echo "Deleting old Nvim nightly (runner)"
+  rm -rf "$NVIM_RUNNER"
 fi
 
 if [ ! -d "$NVIM_RUNNER" ]; then
