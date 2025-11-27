@@ -1,0 +1,168 @@
+---@meta
+
+--- Mark a test as placeholder.
+---
+--- This will not fail or pass, it will simply be marked as "pending".
+--- @param name string
+--- @param block fun()
+function pending(name, block) end
+
+--- Used to define a set of tests. Can be nested to define sub-tests.
+---
+--- ## Example
+--- ```
+--- describe("Test Item Class", function()
+---     it("Creates an item", function()
+---         --...
+---     end)
+---     describe("Test Tags", function()
+---         it("Creates a tag", function()
+---             --...
+---         end)
+---     end)
+--- end)
+--- ```
+--- @param name string
+--- @param block fun()
+function describe(name, block) end
+
+--- Define a test that will pass, fail, or error.
+---
+--- You can also use `spec()` and `test()` as aliases.
+---
+--- ## Example
+--- ```
+--- describe("Test something", function()
+---     it("Runs a test", function()
+---         assert.is.True(10 == 10)
+---     end)
+--- end)
+--- ```
+--- @param name string
+--- @param block fun()
+function it(name, block) end
+
+--- Define a function to run before each child test, this includes tests nested
+--- in a child describe block.
+---
+--- ## Example
+--- ```
+--- describe("Test Array Class", function()
+---     local a
+---     local b
+---
+---     before_each(function()
+---         a = Array.new(1, 2, 3, 4)
+---         b = Array.new(11, 12, 13, 14)
+---     end)
+---
+---     it("Assures instance is an Array", function()
+---         assert.True(Array.isArray(a))
+---         assert.True(Array.isArray(b))
+---     end)
+---
+---     describe("Nested tests", function()
+---         it("Also runs before_each", function()
+---             assert.are.same(
+---                 { 1, 2, 3, 4, 11, 12, 13, 14 },
+---                 a:concat(b))
+---         end)
+---     end)
+--- end)
+--- ```
+--- @param block fun()
+function before_each(block) end
+
+--- Define a function to run after each child test, this includes tests nested
+--- in a child describe block.
+---
+--- ## Example
+--- ```
+--- describe("Test saving", function()
+---     local game
+---
+---     after_each(function()
+---         game.save.reset()
+---     end)
+---
+---     it("Creates game", function()
+---         game = game.new()
+---         game.save.save()
+---     end)
+---
+---     describe("Saves metadata", function()
+---         it("Saves objects", function()
+---             game = game.new()
+---             game.save.save()
+---             assert.is_not.Nil(game.save.objects)
+---         end)
+---     end)
+--- end)
+--- ```
+--- @param block fun()
+function after_each(block) end
+
+--- Runs first in a context block before any tests.
+---
+--- Will always run even if there are no child tests to run. If you don't want
+--- them to run regardless, you can use `lazy_setup()` or use the `--lazy` flag
+--- when running.
+---
+--- ## Example
+--- ```
+--- describe("Test something", function()
+---     local helper
+---
+---     setup(function()
+---          helper = require("helper")
+---     end)
+---
+---     it("Can use helper", function()
+---         assert.is_not.Nil(helper)
+---     end)
+--- end)
+--- ```
+--- @param block fun()
+function setup(block) end
+
+--- Runs last in a context block after all tests.
+---
+--- Will run ever if no tests were run in this context. If you don't want this
+--- to run regardless, you can use `lazy_teardown()` or use the `--lazy` flag
+--- when running.
+---
+--- ## Example
+--- ```
+--- describe("Remove persistent value", function()
+---     local persist
+---
+---     it("Sets a persistent value", function()
+---         persist = "hello"
+---     end)
+---
+---     teardown(function()
+---          persist = nil
+---     end)
+---
+--- end)
+--- ```
+--- @param block fun()
+function teardown(block) end
+
+--- Runs last in a context block regardless of test outcome
+---
+--- ## Example
+--- ```
+--- it("Read File Contents",function()
+---     local f = io.open("file", "r")
+---
+---     -- always close file after test
+---     finally(function()
+---         f:close()
+---     end)
+---
+---     -- do stuff with f
+--- end)
+--- ```
+--- @param block fun()
+function finally(block) end
