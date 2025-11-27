@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/lewis6991/nvim-test/compare/v1.2.0...v1.3.0) (2025-11-27)
+
+
+### Features
+
+* add busted meta ([54c4c09](https://github.com/lewis6991/nvim-test/commit/54c4c09922e4abad23d69e2e0f09a9bec1da9dc2))
+
 ## [1.2.0](https://github.com/lewis6991/nvim-test/compare/v1.1.1...v1.2.0) (2025-07-03)
 
 
