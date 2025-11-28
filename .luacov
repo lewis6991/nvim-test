@@ -1,13 +1,16 @@
+local uv = vim.uv or vim.loop
+local cwd = uv and uv.cwd() or '.'
+
 return {
-  statsfile = 'luacov.stats.out',
-  reportfile = 'luacov.report.out',
+  statsfile = cwd .. '/luacov.stats.out',
+  reportfile = cwd .. '/luacov.report.out',
   include = {
     'lua/.*',
   },
   exclude = {
     'luacov/',
-    'test/',
-    'example/',
+    '^test/',
+    '^example/',
   },
   runreport = true,
 }

@@ -44,6 +44,18 @@ local function write_lines(path, lines)
   fh:close()
 end
 
+local function trim(str)
+   return (str:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function split_whitespace(str)
+   local parts = {}
+   for token in str:gmatch("%S+") do
+      table.insert(parts, token)
+   end
+   return parts
+end
+
 ---@class luacov.file_stats
 ---@field max integer
 ---@field max_hits integer
@@ -92,7 +104,7 @@ function stats.load(statsfile)
       }
       data[filename] = filedata
 
-      local entries = vim.split(vim.trim(hits_line), '%s+', { trimempty = true })
+      local entries = split_whitespace(trim(hits_line))
       for line_nr = 1, max do
          local hits = tonumber(entries[line_nr]) or 0
          if hits > 0 then

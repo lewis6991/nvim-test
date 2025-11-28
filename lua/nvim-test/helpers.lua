@@ -146,6 +146,8 @@ local nvim_set = table.concat({
 local session --- @type test.Session?
 local loop_running = false
 local last_error --- @type string?
+local exec_lua
+local flush_coverage = function() end
 
 function M.get_session()
   return session
@@ -290,6 +292,7 @@ local function check_close()
   if not session then
     return
   end
+  flush_coverage()
   local start_time = uv.now()
   session:close()
   uv.update_time() -- Update cached value of luv.now() (libuv: uv_now()).
@@ -307,7 +310,39 @@ local function check_close()
   session = nil
 end
 
-local exec_lua = M.exec_lua
+exec_lua = M.exec_lua
+
+local function coverage_enabled()
+  return package.loaded['luacov.runner'] ~= nil
+end
+
+flush_coverage = function()
+  if not (coverage_enabled() and session) then
+    return
+  end
+
+  io.stderr:write('luacov: flushing coverage\n')
+  local ok, success, detail = pcall(exec_lua, function()
+    local ok_luacov, luacov = pcall(require, 'luacov')
+    if not ok_luacov or type(luacov) ~= 'table' or not luacov.shutdown then
+      return false, luacov
+    end
+    local shutdown_ok, shutdown_err = pcall(luacov.shutdown)
+    if not shutdown_ok then
+      return false, shutdown_err
+    end
+    return true
+  end)
+
+  if not ok then
+    io.stderr:write('luacov: failed to request shutdown: ' .. tostring(success) .. '\n')
+    return
+  end
+
+  if not success then
+    io.stderr:write('luacov: shutdown failed: ' .. tostring(detail) .. '\n')
+  end
+end
 
 --- Starts a new global Nvim session.
 --- @param init_lua_path? string
@@ -362,19 +397,21 @@ function M.clear(init_lua_path)
     end
   end, channel)
 
-  --- @type table?
-  local enable_cov = package.loaded['luacov.runner']
-
-  if enable_cov then
+  if coverage_enabled() then
     exec_lua(function()
-      local luacov = require('luacov')
-      table.insert(luacov.configuration.exclude, 'vim/.*')
+      local ok, luacov = pcall(require, 'luacov')
+      if not ok or not luacov or not luacov.configuration then
+        return
+      end
 
-      vim.api.nvim_create_autocmd('VimLeave', {
-        callback = function()
-          luacov.shutdown()
-        end,
-      })
+      local exclude = luacov.configuration.exclude
+      local pattern = 'vim/.*'
+      for _, existing in ipairs(exclude) do
+        if existing == pattern then
+          return
+        end
+      end
+      table.insert(exclude, pattern)
     end)
   end
 end

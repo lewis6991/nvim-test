@@ -6,6 +6,7 @@ local fs = vim.fs
 
 local util = require('luacov.util')
 local stats = require('luacov.stats')
+local runner = require('luacov.runner')
 
 local function tmp_dir()
   local template = fs.joinpath(uv.os_tmpdir(), 'luacov-spec-XXXXXX')
@@ -60,10 +61,67 @@ describe('luacov.stats', function()
     }
 
     stats.save(statsfile, payload)
+
+    local old_vim = _G.vim
+    _G.vim = nil
     local loaded = stats.load(statsfile)
+    _G.vim = old_vim
+
     eq(payload['lua/foo.lua'].max, loaded['lua/foo.lua'].max)
     eq(payload['lua/foo.lua'].max_hits, loaded['lua/foo.lua'].max_hits)
     eq(payload['lua/foo.lua'][1], loaded['lua/foo.lua'][1])
     eq(payload['lua/foo.lua'][3], loaded['lua/foo.lua'][3])
+  end)
+end)
+
+describe('luacov.runner helpers', function()
+  it('applies include/exclude rules', function()
+    runner.configuration = {
+      include = { 'lua/src' },
+      exclude = { 'lua/src/excluded' },
+    }
+    assert.is_true(runner.file_included('lua/src/module.lua'))
+    assert.is_false(runner.file_included('lua/src/excluded/module.lua'))
+  end)
+
+end)
+
+describe('project .luacov configuration', function()
+  local project_runner
+
+  local function load_project_config()
+    local config = dofile('.luacov')
+    project_runner.load_config(config)
+  end
+
+  before_each(function()
+    project_runner = dofile('lua/luacov/runner.lua')
+  end)
+
+  after_each(function()
+    project_runner = nil
+  end)
+
+  it('keeps stats and reports in the project root', function()
+    load_project_config()
+    eq(
+      fs.normalize(fs.joinpath(uv.cwd(), 'luacov.stats.out')),
+      project_runner.configuration.statsfile
+    )
+    eq(
+      fs.normalize(fs.joinpath(uv.cwd(), 'luacov.report.out')),
+      project_runner.configuration.reportfile
+    )
+  end)
+
+  it('includes nvim-test sources for coverage', function()
+    load_project_config()
+    assert.is_true(project_runner.file_included('lua/nvim-test/helpers.lua'))
+  end)
+
+  it('excludes tests and examples from coverage', function()
+    load_project_config()
+    assert.is_false(project_runner.file_included('test/helpers_spec.lua'))
+    assert.is_false(project_runner.file_included('example/lua/example.lua'))
   end)
 end)

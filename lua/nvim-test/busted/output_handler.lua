@@ -1,8 +1,8 @@
 return function(options)
   local busted = require('busted')
   local handler = require('busted.outputHandlers.base')()
-  local colors = require('term.colors')
-  local pretty = require('pl.pretty')
+  local colors = require('nvim-test.util.colors')
+  local pretty = require('nvim-test.util.pretty')
 
   --- @type table<string,fun(s:string): string>
   local c = {

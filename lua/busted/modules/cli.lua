@@ -5,22 +5,116 @@ local uv = vim.uv or vim.loop
 local fs = vim.fs
 local is_windows = uv.os_uname().sysname:match('Windows')
 
+local HELP_TEMPLATE = [=[
+Usage: %s [OPTIONS] [--] [ROOT-1 [ROOT-2 [...]]]
+
+ARGUMENTS:
+  ROOT                        test script file/folder. Folders will be
+                              traversed for any file that matches the
+                              --pattern option. (optional, default:
+                              nil)
+
+OPTIONS:
+  --version                   prints the program version and exits
+  -p, --pattern=PATTERN       only run test files matching the Lua
+                              pattern (default: _spec)
+  --exclude-pattern=PATTERN   do not run test files matching the Lua
+                              pattern, takes precedence over --pattern
+  -e STATEMENT                execute statement STATEMENT
+  -o, --output=LIBRARY        output library to load (default:
+                              nvim-test.busted.output_handler)
+  -C, --directory=DIR         change to directory DIR before running
+                              tests. If multiple options are specified,
+                              each is interpreted relative to the
+                              previous one. (default: ./)
+  -f, --config-file=FILE      load configuration options from FILE
+  --coverage-config-file=FILE load luacov configuration options from
+                              FILE
+  -t, --tags=TAGS             only run tests with these #tags (default:
+                              [])
+  --exclude-tags=TAGS         do not run tests with these #tags, takes
+                              precedence over --tags (default: [])
+  --filter=PATTERN            only run test names matching the Lua
+                              pattern (default: [])
+  --name=NAME                 run test with the given full name
+                              (default: [])
+  --filter-out=PATTERN        do not run test names matching the Lua
+                              pattern, takes precedence over --filter
+                              (default: [])
+  --exclude-names-file=FILE   do not run the tests with names listed in
+                              the given file, takes precedence over
+                              --filter
+  --log-success=FILE          append the name of each successful test
+                              to the given file
+  -m, --lpath=PATH            optional path to be prefixed to the Lua
+                              module search path (default:
+                              ./src/?.lua;./src/?/?.lua;./src/?/init.lua)
+  --cpath=PATH                optional path to be prefixed to the Lua C
+                              module search path (default:
+                              ./csrc/?.so;./csrc/?/?.so;)
+  -r, --run=RUN               config to run from .busted file
+  --repeat=COUNT              run the tests repeatedly (default: 1)
+  --seed=SEED                 random seed value to use for shuffling
+                              test order (default: /dev/urandom or
+                              os.time())
+  --loaders=NAME              test file loaders (default: lua)
+  --helper=PATH               A helper script that is run before tests
+  --lua=LUA                   The path to the lua interpreter busted
+                              should run under
+  -Xoutput OPTION             pass `OPTION` as an option to the output
+                              handler. If `OPTION` contains commas, it
+                              is split into multiple options at the
+                              commas. (default: [])
+  -Xhelper OPTION             pass `OPTION` as an option to the helper
+                              script. If `OPTION` contains commas, it
+                              is split into multiple options at the
+                              commas. (default: [])
+  -c, --[no-]coverage         do code coverage analysis (requires
+                              `LuaCov` to be installed) (default: off)
+  -v, --[no-]verbose          verbose output of errors (default: off)
+  -l, --list                  list the names of all tests instead of
+                              running them
+  --ignore-lua                Whether or not to ignore the lua
+                              directive
+  --[no-]lazy                 use lazy setup/teardown as the default
+                              (default: off)
+  --[no-]auto-insulate        enable file insulation (default: on)
+  -k, --[no-]keep-going       continue as much as possible after an
+                              error or failure (default: on)
+  -R, --[no-]recursive        recurse into subdirectories (default: on)
+  --[no-]shuffle              randomize file and test order, takes
+                              precedence over --sort (--shuffle-test
+                              and --shuffle-files) (default: off)
+  --[no-]shuffle-files        randomize file execution order, takes
+                              precedence over --sort-files (default:
+                              off)
+  --[no-]shuffle-tests        randomize test order within a file, takes
+                              precedence over --sort-tests (default:
+                              off)
+  --[no-]sort                 sort file and test order (--sort-tests
+                              and --sort-files) (default: off)
+  --[no-]sort-files           sort file execution order (default: off)
+  --[no-]sort-tests           sort test order within a file (default:
+                              off)
+  --[no-]suppress-pending     suppress `pending` test output (default:
+                              off)
+  --[no-]defer-print          defer print to when test suite is
+                              complete (default: off)
+]=]
+
 return function(options)
   local appName = ''
-  local options = options or {}
-  local cli = require('cliargs.core')()
+  options = options or {}
+  local allow_roots = not options.standalone
 
   local configLoader = require('busted.modules.configuration_loader')()
 
-  -- Default cli arg values
   local defaultOutput = options.output or 'nvim-test.busted.output_handler'
   local defaultLoaders = 'lua'
   local defaultPattern = '_spec'
   local defaultSeed = '/dev/urandom or os.time()'
   local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
   local cpathprefix = is_windows and './csrc/?.dll;./csrc/?/?.dll;' or './csrc/?.so;./csrc/?/?.so;'
-
-  local cliArgsParsed = {}
 
   local function normalize(pathname)
     if not pathname or pathname == '' then
@@ -67,267 +161,434 @@ return function(options)
     return olist
   end
 
-  local function processOption(key, value, altkey, _opt)
+  local function make_defaults()
+    local pattern = { defaultPattern }
+    local tags = {}
+    local roots = { 'spec' }
+    return {
+      ROOT = roots,
+      pattern = pattern,
+      p = pattern,
+      ['exclude-pattern'] = {},
+      e = {},
+      directory = './',
+      C = './',
+      lpath = lpathprefix,
+      m = lpathprefix,
+      cpath = cpathprefix,
+      output = defaultOutput,
+      o = defaultOutput,
+      tags = tags,
+      t = tags,
+      name = {},
+      filter = {},
+      ['filter-out'] = {},
+      ['exclude-tags'] = {},
+      loaders = { defaultLoaders },
+      helper = nil,
+      lua = nil,
+      run = nil,
+      f = nil,
+      ['config-file'] = nil,
+      ['coverage-config-file'] = nil,
+      ['log-success'] = nil,
+      ['exclude-names-file'] = nil,
+      Xoutput = {},
+      Xhelper = {},
+      ['repeat'] = 1,
+      seed = defaultSeed,
+      coverage = false,
+      c = false,
+      verbose = false,
+      v = false,
+      list = false,
+      l = false,
+      lazy = false,
+      ['auto-insulate'] = true,
+      ['keep-going'] = true,
+      k = true,
+      recursive = true,
+      R = true,
+      ['ignore-lua'] = false,
+      ['suppress-pending'] = false,
+      ['defer-print'] = false,
+      version = false,
+    }
+  end
+
+  local function new_state()
+    return {
+      args = make_defaults(),
+      overrides = {},
+    }
+  end
+
+  local function assign(state, key, value, altkey)
+    state.args[key] = value
+    state.overrides[key] = value
     if altkey then
-      cliArgsParsed[altkey] = value
+      state.args[altkey] = value
+      state.overrides[altkey] = value
     end
-    cliArgsParsed[key] = value
+  end
+
+  local function processOption(state, key, value, altkey)
+    assign(state, key, value, altkey)
     return true
   end
 
-  local function processArg(key, value)
-    cliArgsParsed[key] = value
-    return true
-  end
-
-  local function processArgList(key, value)
-    local list = cliArgsParsed[key] or {}
+  local function processArgList(state, key, value)
+    local list = state.overrides[key]
+    if not list then
+      list = {}
+    end
     vim.list_extend(list, utils.split(value, ','))
-    processArg(key, list)
+    assign(state, key, list)
     return true
   end
 
-  local function processNumber(key, value, altkey, opt)
+  local function processNumber(state, key, value, altkey, opt)
     local number = tonumber(value)
     if not number then
-      return nil, 'argument to ' .. opt:gsub('=.*', '') .. ' must be a number'
+      return nil, 'argument to ' .. opt .. ' must be a number'
     end
-    if altkey then
-      cliArgsParsed[altkey] = number
-    end
-    cliArgsParsed[key] = number
+    assign(state, key, number, altkey)
     return true
   end
 
-  local function processList(key, value, altkey, opt)
-    local list = cliArgsParsed[key] or {}
+  local function processList(state, key, value, altkey)
+    local list = state.overrides[key] or {}
     vim.list_extend(list, utils.split(value, ','))
-    processOption(key, list, altkey, opt)
+    assign(state, key, list, altkey)
     return true
   end
 
-  local function processMultiOption(key, value, altkey, opt)
-    local list = cliArgsParsed[key] or {}
+  local function processMultiOption(state, key, value, altkey)
+    local list = state.overrides[key] or {}
     table.insert(list, value)
-    processOption(key, list, altkey, opt)
+    assign(state, key, list, altkey)
     return true
   end
 
-  local function append(s1, s2, sep)
-    sep = sep or ''
-    if not s1 then
-      return s2
+  local function append_value(current, value, sep)
+    if not current or current == '' then
+      return value
     end
-    return s1 .. sep .. s2
+    return current .. sep .. value
   end
 
-  local function processLoaders(key, value, altkey, opt)
-    local loaders = append(cliArgsParsed[key], value, ',')
-    processOption(key, loaders, altkey, opt)
+  local function processLoaders(state, key, value, altkey)
+    local combined = append_value(state.overrides[key], value, ',')
+    assign(state, key, combined, altkey)
     return true
   end
 
-  local function processPath(key, value, altkey, opt)
-    local lpath = append(cliArgsParsed[key], value, ';')
-    processOption(key, lpath, altkey, opt)
+  local function processPath(state, key, value, altkey)
+    local combined = append_value(state.overrides[key], value, ';')
+    assign(state, key, combined, altkey)
     return true
   end
 
-  local function processDir(key, value, altkey, opt)
-    local dpath = join(cliArgsParsed[key] or '', value)
-    processOption(key, dpath, altkey, opt)
+  local function processDir(state, key, value, altkey)
+    local base = state.overrides[key] or ''
+    local dpath = join(base, value)
+    assign(state, key, dpath, altkey)
     return true
   end
 
-  local function processShuffle(_key, value, _altkey, opt)
-    processOption('shuffle-files', value, nil, opt)
-    processOption('shuffle-tests', value, nil, opt)
+  local function processShuffle(state, _, value)
+    assign(state, 'shuffle-files', value)
+    assign(state, 'shuffle-tests', value)
+    return true
   end
 
-  local function processSort(_key, value, _altkey, opt)
-    processOption('sort-files', value, nil, opt)
-    processOption('sort-tests', value, nil, opt)
+  local function processSort(state, _, value)
+    assign(state, 'sort-files', value)
+    assign(state, 'sort-tests', value)
+    return true
   end
 
-  -- Load up the command-line interface options
-  cli:flag('--version', 'prints the program version and exits', false, processOption)
-
-  if not options.standalone then
-    cli:splat(
-      'ROOT',
-      'test script file/folder. Folders will be traversed for any file that matches the --pattern option.',
-      'spec',
-      999,
-      processArgList
-    )
-
-    cli:option(
-      '-p, --pattern=PATTERN',
-      'only run test files matching the Lua pattern',
-      defaultPattern,
-      processMultiOption
-    )
-    cli:option(
-      '--exclude-pattern=PATTERN',
-      'do not run test files matching the Lua pattern, takes precedence over --pattern',
-      nil,
-      processMultiOption
-    )
+  local option_handlers = {}
+  local function register_option(names, spec)
+    for _, name in ipairs(names) do
+      option_handlers[name] = spec
+    end
   end
 
-  cli:option('-e STATEMENT', 'execute statement STATEMENT', nil, processMultiOption)
-  cli:option('-o, --output=LIBRARY', 'output library to load', defaultOutput, processOption)
-  cli:option(
-    '-C, --directory=DIR',
-    'change to directory DIR before running tests. If multiple options are specified, each is interpreted relative to the previous one.',
-    './',
-    processDir
-  )
-  cli:option('-f, --config-file=FILE', 'load configuration options from FILE', nil, processOption)
-  cli:option(
-    '--coverage-config-file=FILE',
-    'load luacov configuration options from FILE',
-    nil,
-    processOption
-  )
-  cli:option('-t, --tags=TAGS', 'only run tests with these #tags', {}, processList)
-  cli:option(
-    '--exclude-tags=TAGS',
-    'do not run tests with these #tags, takes precedence over --tags',
-    {},
-    processList
-  )
-  cli:option(
-    '--filter=PATTERN',
-    'only run test names matching the Lua pattern',
-    {},
-    processMultiOption
-  )
-  cli:option('--name=NAME', 'run test with the given full name', {}, processMultiOption)
-  cli:option(
-    '--filter-out=PATTERN',
-    'do not run test names matching the Lua pattern, takes precedence over --filter',
-    {},
-    processMultiOption
-  )
-  cli:option(
-    '--exclude-names-file=FILE',
-    'do not run the tests with names listed in the given file, takes precedence over --filter',
-    nil,
-    processOption
-  )
-  cli:option(
-    '--log-success=FILE',
-    'append the name of each successful test to the given file',
-    nil,
-    processOption
-  )
-  cli:option(
-    '-m, --lpath=PATH',
-    'optional path to be prefixed to the Lua module search path',
-    lpathprefix,
-    processPath
-  )
-  cli:option(
-    '--cpath=PATH',
-    'optional path to be prefixed to the Lua C module search path',
-    cpathprefix,
-    processPath
-  )
-  cli:option('-r, --run=RUN', 'config to run from .busted file', nil, processOption)
-  cli:option('--repeat=COUNT', 'run the tests repeatedly', '1', processNumber)
-  cli:option(
-    '--seed=SEED',
-    'random seed value to use for shuffling test order',
-    defaultSeed,
-    processNumber
-  )
-  cli:option('--loaders=NAME', 'test file loaders', defaultLoaders, processLoaders)
-  cli:option('--helper=PATH', 'A helper script that is run before tests', nil, processOption)
-  cli:option(
-    '--lua=LUA',
-    'The path to the lua interpreter busted should run under',
-    nil,
-    processOption
-  )
+  local function simple_flag(display, key, value, altkey)
+    return {
+      takes_value = false,
+      display = display,
+      handler = function(state)
+        return processOption(state, key, value, altkey)
+      end,
+    }
+  end
 
-  cli:option(
-    '-Xoutput OPTION',
-    'pass `OPTION` as an option to the output handler. If `OPTION` contains commas, it is split into multiple options at the commas.',
-    {},
-    processList
-  )
-  cli:option(
-    '-Xhelper OPTION',
-    'pass `OPTION` as an option to the helper script. If `OPTION` contains commas, it is split into multiple options at the commas.',
-    {},
-    processList
-  )
+  local function value_option(display, handler)
+    return {
+      takes_value = true,
+      display = display,
+      handler = handler,
+    }
+  end
 
-  cli:flag(
-    '-c, --[no-]coverage',
-    'do code coverage analysis (requires `LuaCov` to be installed)',
-    false,
-    processOption
-  )
-  cli:flag('-v, --[no-]verbose', 'verbose output of errors', false, processOption)
-  cli:flag(
-    '-l, --list',
-    'list the names of all tests instead of running them',
-    false,
-    processOption
-  )
-  cli:flag('--ignore-lua', 'Whether or not to ignore the lua directive', false, processOption)
-  cli:flag('--[no-]lazy', 'use lazy setup/teardown as the default', false, processOption)
-  cli:flag('--[no-]auto-insulate', 'enable file insulation', true, processOption)
-  cli:flag(
-    '-k, --[no-]keep-going',
-    'continue as much as possible after an error or failure',
-    true,
-    processOption
-  )
-  cli:flag('-R, --[no-]recursive', 'recurse into subdirectories', true, processOption)
-  cli:flag(
-    '--[no-]shuffle',
-    'randomize file and test order, takes precedence over --sort (--shuffle-test and --shuffle-files)',
-    processShuffle
-  )
-  cli:flag(
-    '--[no-]shuffle-files',
-    'randomize file execution order, takes precedence over --sort-files',
-    processOption
-  )
-  cli:flag(
-    '--[no-]shuffle-tests',
-    'randomize test order within a file, takes precedence over --sort-tests',
-    processOption
-  )
-  cli:flag('--[no-]sort', 'sort file and test order (--sort-tests and --sort-files)', processSort)
-  cli:flag('--[no-]sort-files', 'sort file execution order', processOption)
-  cli:flag('--[no-]sort-tests', 'sort test order within a file', processOption)
-  cli:flag('--[no-]suppress-pending', 'suppress `pending` test output', false, processOption)
-  cli:flag('--[no-]defer-print', 'defer print to when test suite is complete', false, processOption)
+  register_option({ '--version' }, simple_flag('--version', 'version', true))
+
+  if allow_roots then
+    register_option({ '-p', '--pattern' }, value_option('--pattern', function(state, value)
+      return processMultiOption(state, 'pattern', value, 'p')
+    end))
+    register_option({ '--exclude-pattern' }, value_option('--exclude-pattern', function(state, value)
+      return processMultiOption(state, 'exclude-pattern', value)
+    end))
+  end
+  register_option({ '-e' }, value_option('-e', function(state, value)
+    return processMultiOption(state, 'e', value)
+  end))
+  register_option({ '-o', '--output' }, value_option('--output', function(state, value)
+    return processOption(state, 'output', value, 'o')
+  end))
+  register_option({ '-C', '--directory' }, value_option('--directory', function(state, value)
+    return processDir(state, 'directory', value, 'C')
+  end))
+  register_option({ '-f', '--config-file' }, value_option('--config-file', function(state, value)
+    processOption(state, 'config-file', value)
+    return processOption(state, 'f', value)
+  end))
+  register_option({ '--coverage-config-file' }, value_option('--coverage-config-file', function(state, value)
+    return processOption(state, 'coverage-config-file', value)
+  end))
+  register_option({ '-t', '--tags' }, value_option('--tags', function(state, value)
+    return processList(state, 'tags', value, 't')
+  end))
+  register_option({ '--exclude-tags' }, value_option('--exclude-tags', function(state, value)
+    return processList(state, 'exclude-tags', value)
+  end))
+  register_option({ '--filter' }, value_option('--filter', function(state, value)
+    return processMultiOption(state, 'filter', value)
+  end))
+  register_option({ '--name' }, value_option('--name', function(state, value)
+    return processMultiOption(state, 'name', value)
+  end))
+  register_option({ '--filter-out' }, value_option('--filter-out', function(state, value)
+    return processMultiOption(state, 'filter-out', value)
+  end))
+  register_option({ '--exclude-names-file' }, value_option('--exclude-names-file', function(state, value)
+    return processOption(state, 'exclude-names-file', value)
+  end))
+  register_option({ '--log-success' }, value_option('--log-success', function(state, value)
+    return processOption(state, 'log-success', value)
+  end))
+  register_option({ '-m', '--lpath' }, value_option('--lpath', function(state, value)
+    return processPath(state, 'lpath', value, 'm')
+  end))
+  register_option({ '--cpath' }, value_option('--cpath', function(state, value)
+    return processPath(state, 'cpath', value)
+  end))
+  register_option({ '-r', '--run' }, value_option('--run', function(state, value)
+    return processOption(state, 'run', value)
+  end))
+  register_option({ '--repeat' }, value_option('--repeat', function(state, value)
+    return processNumber(state, 'repeat', value, nil, '--repeat')
+  end))
+  register_option({ '--seed' }, value_option('--seed', function(state, value)
+    return processNumber(state, 'seed', value, nil, '--seed')
+  end))
+  register_option({ '--loaders' }, value_option('--loaders', function(state, value)
+    return processLoaders(state, 'loaders', value)
+  end))
+  register_option({ '--helper' }, value_option('--helper', function(state, value)
+    return processOption(state, 'helper', value)
+  end))
+  register_option({ '--lua' }, value_option('--lua', function(state, value)
+    return processOption(state, 'lua', value)
+  end))
+  register_option({ '-Xoutput' }, value_option('-Xoutput', function(state, value)
+    return processList(state, 'Xoutput', value)
+  end))
+  register_option({ '-Xhelper' }, value_option('-Xhelper', function(state, value)
+    return processList(state, 'Xhelper', value)
+  end))
+
+  register_option({ '-c', '--coverage' }, simple_flag('--coverage', 'coverage', true, 'c'))
+  register_option({ '--no-coverage' }, simple_flag('--no-coverage', 'coverage', false, 'c'))
+  register_option({ '-v', '--verbose' }, simple_flag('--verbose', 'verbose', true, 'v'))
+  register_option({ '--no-verbose' }, simple_flag('--no-verbose', 'verbose', false, 'v'))
+  register_option({ '-l', '--list' }, simple_flag('--list', 'list', true, 'l'))
+  register_option({ '--ignore-lua' }, simple_flag('--ignore-lua', 'ignore-lua', true))
+  register_option({ '--lazy' }, simple_flag('--lazy', 'lazy', true))
+  register_option({ '--no-lazy' }, simple_flag('--no-lazy', 'lazy', false))
+  register_option({ '--auto-insulate' }, simple_flag('--auto-insulate', 'auto-insulate', true))
+  register_option({ '--no-auto-insulate' }, simple_flag('--no-auto-insulate', 'auto-insulate', false))
+  register_option({ '-k', '--keep-going' }, simple_flag('--keep-going', 'keep-going', true, 'k'))
+  register_option({ '--no-keep-going' }, simple_flag('--no-keep-going', 'keep-going', false, 'k'))
+  register_option({ '-R', '--recursive' }, simple_flag('--recursive', 'recursive', true, 'R'))
+  register_option({ '--no-recursive' }, simple_flag('--no-recursive', 'recursive', false, 'R'))
+  register_option({ '--shuffle-files' }, simple_flag('--shuffle-files', 'shuffle-files', true))
+  register_option({ '--no-shuffle-files' }, simple_flag('--no-shuffle-files', 'shuffle-files', false))
+  register_option({ '--shuffle-tests' }, simple_flag('--shuffle-tests', 'shuffle-tests', true))
+  register_option({ '--no-shuffle-tests' }, simple_flag('--no-shuffle-tests', 'shuffle-tests', false))
+  register_option({ '--sort-files' }, simple_flag('--sort-files', 'sort-files', true))
+  register_option({ '--no-sort-files' }, simple_flag('--no-sort-files', 'sort-files', false))
+  register_option({ '--sort-tests' }, simple_flag('--sort-tests', 'sort-tests', true))
+  register_option({ '--no-sort-tests' }, simple_flag('--no-sort-tests', 'sort-tests', false))
+  register_option({ '--suppress-pending' }, simple_flag('--suppress-pending', 'suppress-pending', true))
+  register_option({ '--no-suppress-pending' }, simple_flag('--no-suppress-pending', 'suppress-pending', false))
+  register_option({ '--defer-print' }, simple_flag('--defer-print', 'defer-print', true))
+  register_option({ '--no-defer-print' }, simple_flag('--no-defer-print', 'defer-print', false))
+  register_option({ '--shuffle' }, {
+    takes_value = false,
+    display = '--shuffle',
+    handler = function(state)
+      return processShuffle(state, 'shuffle', true)
+    end,
+  })
+  register_option({ '--no-shuffle' }, {
+    takes_value = false,
+    display = '--no-shuffle',
+    handler = function(state)
+      return processShuffle(state, 'shuffle', false)
+    end,
+  })
+  register_option({ '--sort' }, {
+    takes_value = false,
+    display = '--sort',
+    handler = function(state)
+      return processSort(state, 'sort', true)
+    end,
+  })
+  register_option({ '--no-sort' }, {
+    takes_value = false,
+    display = '--no-sort',
+    handler = function(state)
+      return processSort(state, 'sort', false)
+    end,
+  })
+
+  local function parse_cli_args(args)
+    local state = new_state()
+    args = args or {}
+    local i = 1
+    local finished = false
+    while i <= #args do
+      local argument = args[i]
+      if not finished and argument == '--' then
+        finished = true
+      elseif not finished and argument:sub(1, 2) == '--' then
+        if argument == '--help' then
+          return nil, string.format(HELP_TEMPLATE, appName)
+        end
+        local name, attached = argument:match('^(%-%-[^=]+)=(.*)$')
+        local key = name or argument
+        local spec = option_handlers[key]
+        if not spec then
+          return nil, 'Unknown option ' .. key
+        end
+        if spec.takes_value then
+          local value = attached
+          if not value or value == '' then
+            i = i + 1
+            value = args[i]
+            if value == nil then
+              return nil, 'Missing value for ' .. spec.display
+            end
+          end
+          local ok, err = spec.handler(state, value, spec.display)
+          if not ok then
+            return nil, err
+          end
+        else
+          local ok, err = spec.handler(state)
+          if not ok then
+            return nil, err
+          end
+        end
+      elseif not finished and argument:sub(1, 1) == '-' and argument ~= '-' then
+        if argument == '-h' then
+          return nil, string.format(HELP_TEMPLATE, appName)
+        end
+        local spec = option_handlers[argument]
+        if spec then
+          if spec.takes_value then
+            i = i + 1
+            local value = args[i]
+            if value == nil then
+              return nil, 'Missing value for ' .. spec.display
+            end
+            local ok, err = spec.handler(state, value, spec.display)
+            if not ok then
+              return nil, err
+            end
+          else
+            local ok, err = spec.handler(state)
+            if not ok then
+              return nil, err
+            end
+          end
+        else
+          local pos = 2
+          while pos <= #argument do
+            local short = '-' .. argument:sub(pos, pos)
+            local nested = option_handlers[short]
+            if not nested then
+              return nil, 'Unknown option ' .. short
+            end
+            if nested.takes_value then
+              local remainder = argument:sub(pos + 1)
+              local value
+              if remainder ~= '' then
+                value = remainder
+              else
+                i = i + 1
+                value = args[i]
+              end
+              if value == nil then
+                return nil, 'Missing value for ' .. nested.display
+              end
+              local ok, err = nested.handler(state, value, nested.display)
+              if not ok then
+                return nil, err
+              end
+              break
+            else
+              local ok, err = nested.handler(state)
+              if not ok then
+                return nil, err
+              end
+              pos = pos + 1
+            end
+          end
+        end
+      else
+        if allow_roots then
+          processArgList(state, 'ROOT', argument)
+        else
+          return nil, 'Unexpected positional argument ' .. argument
+        end
+      end
+      i = i + 1
+    end
+    return state.args, state.overrides
+  end
 
   local function parse(args)
-    -- Parse the cli arguments
-    local cliArgs, cliErr = cli:parse(args)
+    local cliArgs, cliArgsParsedOrErr = parse_cli_args(args)
     if not cliArgs then
-      return nil, appName .. ': error: ' .. cliErr .. '; re-run with --help for usage.'
+      return nil, appName .. ': error: ' .. cliArgsParsedOrErr .. '; re-run with --help for usage.'
     end
+    local cliArgsParsed = cliArgsParsedOrErr
 
-    -- Load busted config file if available
     local bustedConfigFilePath
     if cliArgs.f then
-      -- if the file is given, then we require it to exist
       if not isfile(cliArgs.f) then
         return nil, ("specified config file '%s' not found"):format(cliArgs.f)
       end
       bustedConfigFilePath = cliArgs.f
     else
-      -- try default file
       bustedConfigFilePath = join(cliArgs.directory, '.busted')
       if not isfile(bustedConfigFilePath) then
-        bustedConfigFilePath = nil -- clear default file, since it doesn't exist
+        bustedConfigFilePath = nil
       end
     end
     if bustedConfigFilePath then
@@ -336,8 +597,8 @@ return function(options)
         return nil, ('failed loading config file `%s`: %s'):format(bustedConfigFilePath, err)
       else
         local ok, config = pcall(function()
-          local conf, err = configLoader(bustedConfigFile(), cliArgsParsed, cliArgs)
-          return conf or error(err, 0)
+          local conf, cerr = configLoader(bustedConfigFile(), cliArgsParsed, cliArgs)
+          return conf or error(cerr, 0)
         end)
         if not ok then
           return nil, appName .. ': error: ' .. config
@@ -349,13 +610,10 @@ return function(options)
       cliArgs = vim.tbl_extend('force', cliArgs or {}, cliArgsParsed or {})
     end
 
-    -- Switch lua, we should rebuild this feature once luarocks changes how it
-    -- handles executeable lua files.
     if cliArgs['lua'] and not cliArgs['ignore-lua'] then
       run_lua_interpreter(cliArgs['lua'], args[0], args)
     end
 
-    -- Ensure multi-options are in a list
     cliArgs.e = makeList(cliArgs.e)
     cliArgs.pattern = makeList(cliArgs.pattern)
     cliArgs.p = cliArgs.pattern
@@ -363,7 +621,6 @@ return function(options)
     cliArgs.filter = makeList(cliArgs.filter)
     cliArgs['filter-out'] = makeList(cliArgs['filter-out'])
 
-    -- Fixup options in case options from config file are not of the right form
     cliArgs.tags = fixupList(cliArgs.tags)
     cliArgs.t = cliArgs.tags
     cliArgs['exclude-tags'] = fixupList(cliArgs['exclude-tags'])
@@ -371,10 +628,6 @@ return function(options)
     cliArgs.Xoutput = fixupList(cliArgs.Xoutput)
     cliArgs.Xhelper = fixupList(cliArgs.Xhelper)
 
-    -- We report an error if the same tag appears in both `options.tags`
-    -- and `options.excluded_tags` because it does not make sense for the
-    -- user to tell Busted to include and exclude the same tests at the
-    -- same time.
     for _, excluded in pairs(cliArgs['exclude-tags']) do
       for _, included in pairs(cliArgs.tags) do
         if excluded == included then
@@ -390,13 +643,13 @@ return function(options)
 
   return {
     set_name = function(self, name)
-      appName = name
-      return cli:set_name(name)
+      appName = name or ''
+      return self
     end,
 
     set_silent = function(self, name)
-      appName = name
-      return cli:set_silent(name)
+      appName = name or ''
+      return self
     end,
 
     parse = function(self, args)

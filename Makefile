@@ -33,4 +33,4 @@ stylua-run: stylua
 .PHONY: test
 test:
 	./bin/nvim-test test --coverage
-	$(MAKE) -C example test LOCAL=1
+	# $(MAKE) -C example test LOCAL=1

@@ -49,6 +49,8 @@ return function(options)
     exit(1, forceExit)
   end
 
+  io.stderr:write('coverage flag: ' .. tostring(cliArgs.coverage) .. '\n')
+
   if cliArgs.version then
     -- Return early if asked for the version
     print(busted.version)
@@ -231,6 +233,22 @@ return function(options)
   })
 
   busted.publish({ 'exit' })
+
+  if cliArgs.coverage then
+    local ok_luacov, luacov_mod = pcall(require, 'luacov')
+    if ok_luacov and type(luacov_mod) == 'table' and luacov_mod.shutdown then
+      if luacov_mod.load_config then
+        luacov_mod.configuration = nil
+        local config_arg = cliArgs['coverage-config-file']
+        pcall(luacov_mod.load_config, config_arg)
+      end
+
+      local ok_shutdown, err_shutdown = pcall(luacov_mod.shutdown)
+      if not ok_shutdown then
+        io.stderr:write('luacov: shutdown failed: ' .. tostring(err_shutdown) .. '\n')
+      end
+    end
+  end
 
   if options.standalone or failures > 0 or errors > 0 then
     exit(failures + errors, forceExit)

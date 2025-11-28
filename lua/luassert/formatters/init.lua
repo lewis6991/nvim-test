@@ -13,6 +13,7 @@ do
     end
   end
 
+  local ansi = require('nvim-test.util.colors')
   colors = setmetatable({
     none = function(c)
       return c
@@ -21,7 +22,10 @@ do
     __index = function(self, key)
       return function(c)
         for token in key:gmatch('[^%.]+') do
-          c = term.colors[token](c)
+          local fn = ansi[token]
+          if fn then
+            c = fn(c)
+          end
         end
         return c
       end
