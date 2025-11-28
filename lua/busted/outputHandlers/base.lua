@@ -1,5 +1,6 @@
 local table_concat = table.concat
 local table_insert = table.insert
+local _ = require('busted.languages.en') -- register English strings up front
 
 return function()
   local busted = require('busted')
@@ -22,12 +23,7 @@ return function()
   end
 
   handler.subscribe = function(handler, options)
-    require('busted.languages.en')
     handler.options = options
-
-    if options.language ~= 'en' then
-      require('busted.languages.' .. options.language)
-    end
 
     busted.subscribe({ 'suite', 'reset' }, handler.baseSuiteReset, { priority = 1 })
     busted.subscribe({ 'suite', 'start' }, handler.baseSuiteStart, { priority = 1 })

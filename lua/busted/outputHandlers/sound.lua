@@ -2,11 +2,11 @@ local app = require('pl.app')
 local io = io
 local io_popen = io.popen
 local math_random = math.random
+local language = require('busted.languages.en')
 
-return function(options)
+return function(_options)
   local busted = require('busted')
   local handler = require('busted.outputHandlers.base')()
-  local language = require('busted.languages.' .. options.language)
 
   handler.suiteEnd = function()
     local system = app.platform()

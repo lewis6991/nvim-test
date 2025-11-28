@@ -140,7 +140,6 @@ return function(options)
     enableSound = cliArgs['enable-sound'],
     verbose = cliArgs.verbose,
     suppressPending = cliArgs['suppress-pending'],
-    language = cliArgs.lang,
     deferPrint = cliArgs['defer-print'],
     arguments = cliArgs.Xoutput,
   })
@@ -152,7 +151,6 @@ return function(options)
   if cliArgs.helper and cliArgs.helper ~= '' then
     local ok, err = helperLoader(busted, cliArgs.helper, {
       verbose = cliArgs.verbose,
-      language = cliArgs.lang,
       arguments = cliArgs.Xhelper,
     })
     if not ok then

@@ -1,7 +1,5 @@
 local s = require('say')
 
-s:set_namespace('en')
-
 -- 'Pending: test.lua @ 12 \n description
 s:set('output.pending', 'Pending')
 s:set('output.failure', 'Failure')

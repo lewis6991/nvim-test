@@ -1,7 +1,5 @@
 local s = require('say')
 
-s:set_namespace('en')
-
 s:set('assertion.same.positive', 'Expected objects to be the same.\nPassed in:\n%s\nExpected:\n%s')
 s:set(
   'assertion.same.negative',

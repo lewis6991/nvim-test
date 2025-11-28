@@ -211,7 +211,6 @@ return function(options)
     defaultSeed,
     processNumber
   )
-  cli:option('--lang=LANG', 'language for error messages', 'en', processOption)
   cli:option('--loaders=NAME', 'test file loaders', defaultLoaders, processLoaders)
   cli:option('--helper=PATH', 'A helper script that is run before tests', nil, processOption)
   cli:option(
