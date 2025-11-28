@@ -1,0 +1,3 @@
+return {
+  greeting = 'hello module',
+}
