@@ -22,7 +22,7 @@ local function main(options)
     end
   end
   options = defaultOptions
-  options.output = options.output or 'nvim-test.busted.output_handler'
+  options.output = options.output or 'busted.outputHandlers.output_handler'
 
   local busted = require('busted.core')()
 

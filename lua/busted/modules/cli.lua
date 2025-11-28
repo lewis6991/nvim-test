@@ -22,7 +22,7 @@ OPTIONS:
                               pattern, takes precedence over --pattern
   -e STATEMENT                execute statement STATEMENT
   -o, --output=LIBRARY        output library to load (default:
-                              nvim-test.busted.output_handler)
+                              busted.outputHandlers.output_handler)
   -C, --directory=DIR         change to directory DIR before running
                               tests. If multiple options are specified,
                               each is interpreted relative to the
@@ -97,7 +97,7 @@ return function(options)
 
   local configLoader = require('busted.modules.configuration_loader')()
 
-  local defaultOutput = options.output or 'nvim-test.busted.output_handler'
+  local defaultOutput = options.output or 'busted.outputHandlers.output_handler'
   local defaultLoaders = 'lua'
   local defaultPattern = '_spec'
   local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'

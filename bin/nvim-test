@@ -189,5 +189,5 @@ exec "$NVIM_RUNNER"/bin/nvim -ll \
   "$NVIM_TEST_HOME/lua/busted/runner.lua" \
   --helper="$NVIM_TEST_HOME/lua/nvim-test/preload.lua" \
   --lpath="$NVIM_TEST_HOME/lua/?.lua" \
-  --output nvim-test.busted.output_handler \
+  --output busted.outputHandlers.output_handler \
   "${ARGS[@]}"
