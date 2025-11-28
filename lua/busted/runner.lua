@@ -1,7 +1,6 @@
 -- Busted command-line runner
 
 local path = require('pl.path')
-local tablex = require('pl.tablex')
 local utils = require('busted.utils')
 local exit = require('busted.compatibility').exit
 local loadstring = require('busted.compatibility').loadstring
@@ -14,7 +13,13 @@ return function(options)
     loaded = true
   end
 
-  options = tablex.update(require('busted.options'), options or {})
+  local defaultOptions = require('busted.options')
+  if options then
+    for k, v in pairs(options) do
+      defaultOptions[k] = v
+    end
+  end
+  options = defaultOptions
   options.output = options.output or 'nvim-test.busted.output_handler'
 
   local busted = require('busted.core')()

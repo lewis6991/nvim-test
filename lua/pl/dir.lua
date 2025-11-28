@@ -12,12 +12,6 @@ local assert_arg, assert_string = utils.assert_arg, utils.assert_string
 
 local M = {}
 
---- @param l any
---- @return any
-local function makelist(l)
-  return setmetatable(l, require('pl.List'))
-end
-
 --- @param n any
 --- @param val any
 --- @return any
@@ -62,7 +56,7 @@ function M.filter(filenames, pattern)
       table.insert(res, f)
     end
   end
-  return makelist(res)
+  return res
 end
 
 --- @param dirname any
@@ -83,7 +77,7 @@ local function _listfiles(dirname, filemode, match)
       end
     end
   end
-  return makelist(res)
+  return res
 end
 
 --- return a list of all files in a directory which match a shell pattern.
@@ -285,7 +279,7 @@ local function _dirfiles(dirname, attrib)
       end
     end
   end
-  return makelist(dirs), makelist(files)
+  return dirs, files
 end
 
 --- return an iterator which walks through a directory tree starting at root.
@@ -559,7 +553,7 @@ function M.getallfiles(start_path, shell_pattern)
     end
   end
 
-  return makelist(files)
+  return files
 end
 
 return M

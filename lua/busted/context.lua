@@ -1,4 +1,10 @@
-local tablex = require('pl.tablex')
+local function shallow_copy(tbl)
+  local copy = {}
+  for k, v in pairs(tbl) do
+    copy[k] = v
+  end
+  return copy
+end
 
 local function save()
   local g = {}
@@ -8,7 +14,7 @@ local function save()
   return {
     gmt = debug.getmetatable(_G),
     g = g,
-    loaded = tablex.copy(package.loaded),
+    loaded = shallow_copy(package.loaded),
   }
 end
 

@@ -1,4 +1,6 @@
-local tablex = require('pl.tablex')
+local function merge_tables(base, overrides)
+  return vim.deep_extend('force', base or {}, overrides or {})
+end
 
 return function()
   -- Function to load the .busted configuration file if available
@@ -14,19 +16,19 @@ return function()
       local runConfig = configFile[run]
 
       if type(runConfig) == 'table' then
-        config = tablex.merge(runConfig, config, true)
+        config = merge_tables(runConfig, config)
       else
         return nil, 'Task `' .. run .. '` not found, or not a table.'
       end
     elseif type(configFile.default) == 'table' then
-      config = tablex.merge(configFile.default, config, true)
+      config = merge_tables(configFile.default, config)
     end
 
     if type(configFile._all) == 'table' then
-      config = tablex.merge(configFile._all, config, true)
+      config = merge_tables(configFile._all, config)
     end
 
-    config = tablex.merge(defaults, config, true)
+    config = merge_tables(defaults, config)
 
     return config
   end

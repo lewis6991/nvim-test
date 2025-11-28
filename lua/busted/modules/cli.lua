@@ -1,6 +1,5 @@
 local utils = require('busted.utils')
 local path = require('pl.path')
-local tablex = require('pl.tablex')
 local exit = require('busted.compatibility').exit
 local execute = require('busted.compatibility').execute
 
@@ -27,16 +26,16 @@ return function(options)
   end
 
   local function fixupList(values, sep)
-    local sep = sep or ','
+    sep = sep or ','
     local list = type(values) == 'table' and values or { values }
     local olist = {}
     for _, v in ipairs(list) do
-      tablex.insertvalues(olist, utils.split(v, sep))
+      vim.list_extend(olist, utils.split(v, sep))
     end
     return olist
   end
 
-  local function processOption(key, value, altkey, opt)
+  local function processOption(key, value, altkey, _opt)
     if altkey then
       cliArgsParsed[altkey] = value
     end
@@ -51,7 +50,7 @@ return function(options)
 
   local function processArgList(key, value)
     local list = cliArgsParsed[key] or {}
-    tablex.insertvalues(list, utils.split(value, ','))
+    vim.list_extend(list, utils.split(value, ','))
     processArg(key, list)
     return true
   end
@@ -70,7 +69,7 @@ return function(options)
 
   local function processList(key, value, altkey, opt)
     local list = cliArgsParsed[key] or {}
-    tablex.insertvalues(list, utils.split(value, ','))
+    vim.list_extend(list, utils.split(value, ','))
     processOption(key, list, altkey, opt)
     return true
   end
@@ -83,7 +82,7 @@ return function(options)
   end
 
   local function append(s1, s2, sep)
-    local sep = sep or ''
+    sep = sep or ''
     if not s1 then
       return s2
     end
@@ -108,12 +107,12 @@ return function(options)
     return true
   end
 
-  local function processShuffle(key, value, altkey, opt)
+  local function processShuffle(_key, value, _altkey, opt)
     processOption('shuffle-files', value, nil, opt)
     processOption('shuffle-tests', value, nil, opt)
   end
 
-  local function processSort(key, value, altkey, opt)
+  local function processSort(_key, value, _altkey, opt)
     processOption('sort-files', value, nil, opt)
     processOption('sort-tests', value, nil, opt)
   end
@@ -315,7 +314,7 @@ return function(options)
         end
       end
     else
-      cliArgs = tablex.merge(cliArgs, cliArgsParsed, true)
+      cliArgs = vim.tbl_extend('force', cliArgs or {}, cliArgsParsed or {})
     end
 
     -- Switch lua, we should rebuild this feature once luarocks changes how it

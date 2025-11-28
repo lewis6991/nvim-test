@@ -1,9 +1,13 @@
 local s = require('say')
 
+local function filter(list, predicate)
+  return vim.tbl_filter(predicate, list)
+end
+
 return function(busted, loaders)
   local path = require('pl.path')
   local dir = require('pl.dir')
-  local tablex = require('pl.tablex')
+
   local fileLoaders = {}
 
   for _, v in pairs(loaders) do
@@ -20,7 +24,7 @@ return function(busted, loaders)
       local getfiles = options.recursive and dir.getallfiles or dir.getfiles
       fileList = getfiles(rootFile)
 
-      fileList = tablex.filter(fileList, function(filename)
+      fileList = filter(fileList, function(filename)
         local basename = path.basename(filename)
         for _, patt in ipairs(options.excludes) do
           if patt ~= '' and basename:find(patt) then
@@ -35,7 +39,7 @@ return function(busted, loaders)
         return #patterns == 0
       end)
 
-      fileList = tablex.filter(fileList, function(filename)
+      fileList = filter(fileList, function(filename)
         if path.is_windows then
           return not filename:find('%\\%.%w+.%w+', #rootFile)
         else
@@ -54,7 +58,7 @@ return function(busted, loaders)
   local getAllTestFiles = function(rootFiles, patterns, options)
     local fileList = {}
     for _, root in ipairs(rootFiles) do
-      tablex.insertvalues(fileList, getTestFiles(root, patterns, options))
+      vim.list_extend(fileList, getTestFiles(root, patterns, options))
     end
     return fileList
   end

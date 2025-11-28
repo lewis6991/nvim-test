@@ -1,6 +1,5 @@
 local shuffle = require('busted.utils').shuffle
 local urandom = require('busted.utils').urandom
-local tablex = require('pl.tablex')
 
 local function sort(elements)
   table.sort(elements, function(t1, t2)
@@ -17,7 +16,7 @@ return function(busted)
 
   local function execute(runs, options)
     local root = busted.context.get()
-    local children = tablex.copy(busted.context.children(root))
+    local children = { unpack(busted.context.children(root)) }
 
     local function suite_reset()
       local oldctx = busted.context.get()

@@ -2,7 +2,7 @@
 -- Also provides a sandboxed Lua table reader and
 -- a function to present large numbers in human-friendly format.
 --
--- Dependencies: `pl.utils`, `pl.lexer`, `pl.stringx`, `debug`
+-- Dependencies: `pl.utils`, `pl.lexer`, `debug`
 --- @module pl.pretty
 
 local append = table.insert
@@ -12,7 +12,9 @@ local mtype = math.type
 local utils = require('pl.utils')
 local lexer = require('pl.lexer')
 local debug = require('debug')
-local quote_string = require('pl.stringx').quote_string
+local function quote_string(str)
+  return string.format('%q', str)
+end
 local assert_arg = utils.assert_arg
 
 local original_tostring = tostring
