@@ -3,18 +3,7 @@
 --
 -- This module assumes a Lua 5.1 or LuaJIT runtime and inlines the few compatibility
 -- helpers that Penlight used to import from `pl.compat`.
---
---- @module pl.utils
-local format = string.format
-local stdout = io.stdout
-local append = table.insert
-local concat = table.concat
-local find = string.find
-local sub = string.sub
-local next = next
-local floor = math.floor
-local setfenv = _G.setfenv
-local getfenv = _G.getfenv
+
 local loadstring = _G.loadstring or load
 
 local dir_separator = package.config:sub(1, 1)
@@ -24,6 +13,7 @@ local has_jit = type(jit) == 'table'
 local jit52 = has_jit and (not loadstring('local goto = 1'))
 
 if not table.pack then
+  ---@vararg any
   function table.pack(...) -- luacheck: ignore
     return { n = select('#', ...), ... }
   end
@@ -33,9 +23,13 @@ if not table.unpack then
   table.unpack = unpack -- luacheck: ignore
 end
 
-local _unpack = table.unpack
-
 if not package.searchpath then
+  ---@param name string module name to resolve
+  ---@param path string search template such as `package.path`
+  ---@param sep? string separator to replace (defaults to `.`)
+  ---@param rep? string replacement for the separator (defaults to the system separator)
+  ---@return string? resolved path
+  ---@return string? error listing the attempted paths
   function package.searchpath(name, path, sep, rep) -- luacheck: ignore
     if type(name) ~= 'string' then
       error(("bad argument #1 to 'searchpath' (string expected, got %s)"):format(type(path)), 2)
@@ -72,6 +66,8 @@ end
 
 if not rawget(_G, 'warn') then
   local enabled = false
+  ---@param arg1 any
+  ---@vararg any
   local function warn_override(arg1, ...)
     if type(arg1) == 'string' and arg1:sub(1, 1) == '@' then
       if arg1 == '@on' then
@@ -89,6 +85,10 @@ if not rawget(_G, 'warn') then
   rawset(_G, 'warn', warn_override)
 end
 
+---@param cmd any
+---@param cmd string
+---@return boolean success
+---@return integer code
 local function compat_execute(cmd)
   local res1, res2, res3 = os.execute(cmd)
   if res2 == 'No error' and res3 == 0 and is_windows then
@@ -140,7 +140,7 @@ local raise
 local operators
 local _function_factories = {}
 
-local utils = {
+local M = {
   _VERSION = '1.14.0',
   lua51 = lua51,
   jit = has_jit,
@@ -153,101 +153,79 @@ local utils = {
   getfenv = getfenv,
 }
 
---- Some standard patterns
---- @table patterns
-utils.patterns = {
+---@class pl.utils.Patterns
+---@field FLOAT string
+---@field INTEGER string
+---@field IDEN string
+---@field FILE string
+---@type pl.utils.Patterns
+M.patterns = {
   FLOAT = '[%+%-%d]%d*%.?%d*[eE]?[%+%-]?%d*', -- floating point number
   INTEGER = '[+%-%d]%d*', -- integer number
   IDEN = '[%a_][%w_]*', -- identifier
   FILE = '[%a%.\\][:%][%w%._%-\\]*', -- file
 }
 
---- Standard meta-tables as used by other Penlight modules
---- @table stdmt
---- @field List the List metatable
---- @field Map the Map metatable
---- @field Set the Set metatable
---- @field MultiMap the MultiMap metatable
-utils.stdmt = {
+---@class pl.utils.StdMetaTables
+---@field List table
+---@field Map table
+---@field Set table
+---@field MultiMap table
+---@type pl.utils.StdMetaTables
+M.stdmt = {
   List = { _name = 'List' },
   Map = { _name = 'Map' },
   Set = { _name = 'Set' },
   MultiMap = { _name = 'MultiMap' },
 }
 
---- pack an argument list into a table.
---- @param ... any arguments
---- @return a table with field `n` set to the length
---- @function utils.pack
---- @see table.pack
---- @see utils.npairs
---- @see utils.unpack
-utils.pack = table.pack -- added here to be symmetrical with unpack
+--- Pack an argument list into a table.
+---@type fun(...: any): table
+M.pack = table.pack -- added here to be symmetrical with unpack
 
 --- unpack a table and return its contents.
 --
 -- NOTE: this implementation differs from the Lua implementation in the way
 -- that this one DOES honor the `n` field in the table `t`, such that it is 'nil-safe'.
---- @param t table to unpack
---- @param[opt] i index from which to start unpacking, defaults to 1
-
---- @return multiple return values from the table
---- @function utils.unpack
---- @see table.unpack
---- @see utils.pack
---- @see utils.npairs
---- @usage
--- local t = table.pack(nil, nil, nil, 4)
--- local a, b, c, d = table.unpack(t)   -- this `unpack` is NOT nil-safe, so d == nil
---
--- local a, b, c, d = utils.unpack(t)   -- this is nil-safe, so d == 4
-
---- @param j any
-function utils.unpack(t, i, j)
-  return _unpack(t, i or 1, j or t.n or #t)
+---@param t any
+---@param i any
+---@param j any
+function M.unpack(t, i, j)
+  return unpack(t, i or 1, j or t.n or #t)
 end
 
 --- print an arbitrary number of arguments using a format.
 -- Output will be sent to `stdout`.
---- @param fmt The format (see `string.format`)
---- @param ... Extra arguments for format
---- @return any
-function utils.printf(fmt, ...)
-  utils.assert_string(1, fmt)
-  utils.fprintf(stdout, fmt, ...)
+---@param fmt any
+---@vararg any
+function M.printf(fmt, ...)
+  M.assert_string(1, fmt)
+  M.fprintf(io.stdout, fmt, ...)
 end
-
---- write an arbitrary number of arguments to a file using a format.
---- @param f File handle to write to.
---- @param fmt The format (see `string.format`).
---- @param ... Extra arguments for format
---- @return any
-function utils.fprintf(f, fmt, ...)
-  utils.assert_string(2, fmt)
-  f:write(format(fmt, ...))
+---@param f any
+---@param fmt any
+---@vararg any
+function M.fprintf(f, fmt, ...)
+  M.assert_string(2, fmt)
+  f:write(fmt:format(...))
 end
 
 do
-  --- @param T any
-
-  --- @return any
-  --- @param k any
-  --- @param v any
-  --- @param libname any
+  ---@param T any
+  ---@param k any
+  ---@param v any
+  ---@param libname any
   local function import_symbol(T, k, v, libname)
     local key = rawget(T, k)
     -- warn about collisions!
     if key and k ~= '_M' and k ~= '_NAME' and k ~= '_PACKAGE' and k ~= '_VERSION' then
-      utils.fprintf(io.stderr, "warning: '%s.%s' will not override existing symbol\n", libname, k)
+      M.fprintf(io.stderr, "warning: '%s.%s' will not override existing symbol\n", libname, k)
       return
     end
     rawset(T, k, v)
   end
-
-  --- @param T any
-
-  --- @return any
-  --- @param t any
+  ---@param T any
+  ---@param t any
   local function lookup_lib(T, t)
     for k, v in pairs(T) do
       if v == t then
@@ -258,14 +236,11 @@ do
   end
 
   local already_imported = {}
-
-  --- take a table and 'inject' it into the local namespace.
-  --- @param t The table (table), or module name (string), defaults to this `utils` module table
-  --- @param T An optional destination table (defaults to callers environment)
-  --- @return any
-  function utils.import(t, T)
+  ---@param t any
+  ---@param T any
+  function M.import(t, T)
     T = T or _G
-    t = t or utils
+    t = t or M
     if type(t) == 'string' then
       t = require(t)
     end
@@ -279,27 +254,22 @@ do
     end
   end
 end
-
---- return either of two values, depending on a condition.
---- @param cond A condition
---- @param value1 Value returned if cond is truthy
-
---- @param value2 any
---- @return any
-function utils.choose(cond, value1, value2)
+---@param cond any condition tested for truthiness
+---@param value1 any value returned when `cond` is truthy
+---@param value2 any value returned when `cond` is falsy
+---@return any
+function M.choose(cond, value1, value2)
   if cond then
     return value1
   else
     return value2
   end
 end
-
---- convert an array of values to strings.
---- @param t a list-like table
---- @param[opt] temp (table) buffer to use, otherwise allocate
---- @param[opt] tostr custom tostring function, called with (value,index). Defaults to `tostring`.
---- @return the converted buffer
-function utils.array_tostring(t, temp, tostr)
+---@param t table list-like table
+---@param temp? table reusable buffer
+---@param tostr? fun(value:any,index:integer):string converter (defaults to `tostring`)
+---@return table buffer filled with converted values
+function M.array_tostring(t, temp, tostr)
   temp, tostr = temp or {}, tostr or tostring
   for i = 1, #t do
     temp[i] = tostr(t[i], i)
@@ -309,16 +279,17 @@ end
 
 --- is the object of the specified type?
 -- If the type is a string, then use type, otherwise compare with metatable
---- @param obj An object to check
---- @param tp String of what type it should be
---- @return boolean
---- @usage utils.is_type("hello world", "string")   --> true
+--- obj any An object to check
+--- tp string of what type it should be
+---@return boolean
+--- Usage: utils.is_type("hello world", "string")   --> true
 -- -- or check metatable
 -- local my_mt = {}
 -- local my_obj = setmetatable(my_obj, my_mt)
 -- utils.is_type(my_obj, my_mt)  --> true
-
-function utils.is_type(obj, tp)
+---@param obj any object to check
+---@param tp string|table expected Lua type name or metatable
+function M.is_type(obj, tp)
   if type(tp) == 'string' then
     return type(obj) == tp
   end
@@ -329,15 +300,9 @@ end
 --- an iterator with indices, similar to `ipairs`, but with a range.
 -- This is a nil-safe index based iterator that will return `nil` when there
 -- is a hole in a list. To be safe ensure that table `t.n` contains the length.
---- @tparam table t the table to iterate over
---- @tparam[opt=1] integer i_start start index
---- @tparam[opt=t.n or #t] integer i_end end index
---- @tparam[opt=1] integer step step size
---- @treturn integer index
---- @treturn any value at index (which can be `nil`!)
---- @see utils.pack
---- @see utils.unpack
---- @usage
+--- See utils.pack
+--- See utils.unpack
+--- Usage:
 -- local t = utils.pack(nil, 123, nil)  -- adds an `n` field when packing
 --
 -- for i, v in utils.npairs(t, 2) do  -- start at index 2
@@ -345,10 +310,11 @@ end
 -- end
 --
 -- -- t = { n = 3, [2] = "123", [3] = "nil" }
-
---- @param i_end any
-
-function utils.npairs(t, i_start, i_end, step)
+---@param t table
+---@param i_start? integer
+---@param i_end? integer
+---@param step? integer
+function M.npairs(t, i_start, i_end, step)
   step = step or 1
   if step == 0 then
     error('iterator step-size cannot be 0', 2)
@@ -381,10 +347,10 @@ end
 --
 -- This uses `pairs` under the hood, so any value that is iterable using `pairs`
 -- will work with this function.
---- @tparam table t the table to iterate over
---- @treturn key
---- @treturn value
---- @usage
+--- t table the table to iterate over
+---@return key
+---@return value
+--- Usage:
 -- local t = {
 --   "hello",
 --   "world",
@@ -399,14 +365,14 @@ end
 -- -- output;
 -- -- German: hallo
 -- -- German: Welt
-
-function utils.kpairs(t)
+---@param t any
+function M.kpairs(t)
   local index
   return function()
     local value
     while true do
       index, value = next(t, index)
-      if type(index) ~= 'number' or floor(index) ~= index then
+      if type(index) ~= 'number' or math.floor(index) ~= index then
         break
       end
     end
@@ -415,25 +381,28 @@ function utils.kpairs(t)
 end
 
 --- Error handling
---- @section Error-handling
+--- Error-handling
 
 --- assert that the given argument is in fact of the correct type.
---- @param n argument index
---- @param val the value
+--- n any argument index
+--- val any the value
 
---- @param verify an optional verification function
+--- verify any an optional verification function
 
---- @param lev optional stack position for trace, default 2
---- @return the validated value
---- @raise if `val` is not the correct type
---- @usage
+--- lev any optional stack position for trace, default 2
+---@return any the validated value
+--- if `val` is not the correct type
+--- Usage:
 -- local param1 = assert_arg(1,"hello",'table')  --> error: argument 1 expected a 'table', got a 'string'
 -- local param4 = assert_arg(4,'!@#$%^&*','string',path.isdir,'not a directory')
 --      --> error: argument 4: '!@#$%^&*' not a directory
-
---- @param tp any
---- @param msg any
-function utils.assert_arg(n, val, tp, verify, msg, lev)
+---@param n any
+---@param val any
+---@param tp any
+---@param verify any
+---@param msg any
+---@param lev any
+function M.assert_arg(n, val, tp, verify, msg, lev)
   if type(val) ~= tp then
     error(("argument %d expected a '%s', got a '%s'"):format(n, tp, type(val)), lev or 2)
   end
@@ -452,11 +421,11 @@ end
 --
 -- When calling with varargs or an array the values will be equal to the keys.
 -- The enum object is read-only.
---- @tparam table|vararg ... the input for the Enum. If varargs or an array then the
+--- ... table|vararg the input for the Enum. If varargs or an array then the
 -- values in the Enum will be equal to the names (must be strings), if a hash-table
 -- then values remain (any type), and the keys must be strings.
---- @return Enum object (read-only table/object)
---- @usage -- Enum access at runtime
+---@return any Enum object (read-only table/object)
+--- Usage: -- Enum access at runtime
 -- local obj = {}
 -- obj.MOVEMENT = utils.enum("FORWARD", "REVERSE", "LEFT", "RIGHT")
 --
@@ -468,7 +437,7 @@ end
 --   -- "'REVERES' is not a valid value (expected one of: 'FORWARD', 'REVERSE', 'LEFT', 'RIGHT')"
 --
 -- end
---- @usage -- standardized error codes
+--- Usage: -- standardized error codes
 -- local obj = {
 --   ERR = utils.enum {
 --     NOT_FOUND = "the item was not found",
@@ -490,7 +459,7 @@ end
 --     return nil, "error: "..err  -- "error: the index is outside the allowed range"
 --   end
 -- end
---- @usage -- validating/converting user-input
+--- Usage: -- validating/converting user-input
 -- local color = "purple"
 -- local ansi_colors = utils.enum {
 --   black     = 30,
@@ -503,22 +472,22 @@ end
 --   -- "bad 'color', 'purple' is not a valid value (expected one of: 'black', 'red', 'green')"
 --   os.exit(1)
 -- end
-
-function utils.enum(...)
+---@vararg any
+function M.enum(...)
   local first = select(1, ...)
   local enum = {}
   local lst
 
   if type(first) ~= 'table' then
     -- vararg with strings
-    lst = utils.pack(...)
-    for i, value in utils.npairs(lst) do
-      utils.assert_arg(i, value, 'string')
+    lst = M.pack(...)
+    for i, value in M.npairs(lst) do
+      M.assert_arg(i, value, 'string')
       enum[value] = value
     end
   else
     -- table/array with values
-    utils.assert_arg(1, first, 'table')
+    M.assert_arg(1, first, 'table')
     lst = {}
     -- first add array part
     for i, value in ipairs(first) do
@@ -529,7 +498,7 @@ function utils.enum(...)
       enum[value] = value
     end
     -- add key-ed part
-    for key, value in utils.kpairs(first) do
+    for key, value in M.kpairs(first) do
       if type(key) ~= 'string' then
         error(("expected key to be 'string' but got '%s'"):format(type(key)), 2)
       end
@@ -545,7 +514,7 @@ function utils.enum(...)
     error('expected at least 1 entry', 2)
   end
 
-  local valid = "(expected one of: '" .. concat(lst, "', '") .. "')"
+  local valid = "(expected one of: '" .. table.concat(lst, "', '") .. "')"
   setmetatable(enum, {
     __index = function(self, key)
       error(("'%s' is not a valid value %s"):format(tostring(key), valid), 2)
@@ -572,13 +541,11 @@ end
 -- Something that is callable, or an operator string as defined by <code>pl.operator</code>,
 -- such as '>' or '#'. If a function factory has been registered for the type, it will
 -- be called to get the function.
---- @param idx argument index
---- @param f a function, operator string, or callable object
---- @param msg optional error message
---- @return a callable
---- @raise if idx is not a number or if f is not callable
-function utils.function_arg(idx, f, msg)
-  utils.assert_arg(1, idx, 'number')
+---@param idx any
+---@param f any
+---@param msg any
+function M.function_arg(idx, f, msg)
+  M.assert_arg(1, idx, 'number')
   local tp = type(f)
   if tp == 'function' then
     return f
@@ -592,7 +559,7 @@ function utils.function_arg(idx, f, msg)
     if fn then
       return fn
     end
-    local fn, err = utils.string_lambda(f)
+    local fn, err = M.string_lambda(f)
     if not fn then
       error(err .. ': ' .. f)
     end
@@ -623,16 +590,17 @@ function utils.function_arg(idx, f, msg)
 end
 
 --- assert the common case that the argument is a string.
---- @param n argument index
---- @param val a value that must be a string
---- @return the validated value
---- @raise val must be a string
---- @usage
+--- n any argument index
+--- val any a value that must be a string
+---@return any the validated value
+--- val must be a string
+--- Usage:
 -- local val = 42
 -- local param2 = utils.assert_string(2, val) --> error: argument 2 expected a 'string', got a 'number'
-
-function utils.assert_string(n, val)
-  return utils.assert_arg(n, val, 'string', nil, nil, 3)
+---@param n any
+---@param val any
+function M.assert_string(n, val)
+  return M.assert_arg(n, val, 'string', nil, nil, 3)
 end
 
 --- control the error strategy used by Penlight.
@@ -642,10 +610,8 @@ end
 -- - 'error': throw a Lua error
 -- - 'quit': exit the program
 --
---- @param mode either 'default', 'quit'  or 'error'
---- @see utils.raise
---- @return any
-function utils.on_error(mode)
+---@param mode any
+function M.on_error(mode)
   mode = tostring(mode)
   if ({ ['default'] = 1, ['quit'] = 2, ['error'] = 3 })[mode] then
     err_mode = mode
@@ -665,34 +631,27 @@ end
 -- by `utils.on_error`.
 -- To use this function you MUST use it in conjunction with `return`, since it might
 -- return `nil + error`.
---- @param err the error string.
---- @see utils.on_error
---- @usage
+--- err any the error string.
+--- See utils.on_error
+--- Usage:
 -- if some_condition then
 --   return utils.raise("some condition was not met")  -- MUST use 'return'!
 -- end
-
---- @return any
-function utils.raise(err)
+---@param err any
+function M.raise(err)
   if err_mode == 'default' then
     return nil, err
   elseif err_mode == 'quit' then
-    return utils.quit(err)
+    return M.quit(err)
   end
   error(err, 2)
 end
-raise = utils.raise
-
---- File handling
---- @section files
-
---- return the contents of a file as a string
---- @param filename The file path
---- @param is_bin open in binary mode
---- @return file contents
-function utils.readfile(filename, is_bin)
+raise = M.raise
+---@param filename any
+---@param is_bin any
+function M.readfile(filename, is_bin)
   local mode = is_bin and 'b' or ''
-  utils.assert_string(1, filename)
+  M.assert_string(1, filename)
   local f, open_err = io.open(filename, 'r' .. mode)
   if not f then
     return raise(open_err)
@@ -706,19 +665,13 @@ function utils.readfile(filename, is_bin)
   end
   return res
 end
-
---- write a string to a file
---- @param filename The file path
-
---- @param is_bin open in binary mode
---- @return true or nil
---- @return error message
---- @raise error if filename or str aren't strings
---- @param str any
-function utils.writefile(filename, str, is_bin)
+---@param filename any
+---@param str any
+---@param is_bin any
+function M.writefile(filename, str, is_bin)
   local mode = is_bin and 'b' or ''
-  utils.assert_string(1, filename)
-  utils.assert_string(2, str)
+  M.assert_string(1, filename)
+  M.assert_string(2, str)
   local f, err = io.open(filename, 'w' .. mode)
   if not f then
     return raise(err)
@@ -732,37 +685,29 @@ function utils.writefile(filename, str, is_bin)
   end
   return true
 end
-
---- return the contents of a file as a list of lines
---- @param filename The file path
---- @return file contents as a table
---- @raise error if filename is not a string
-function utils.readlines(filename)
-  utils.assert_string(1, filename)
+---@param filename any
+function M.readlines(filename)
+  M.assert_string(1, filename)
   local f, err = io.open(filename, 'r')
   if not f then
     return raise(err)
   end
   local res = {}
   for line in f:lines() do
-    append(res, line)
+    table.insert(res, line)
   end
   f:close()
   return res
 end
 
 --- OS functions
---- @section OS-functions
+--- OS-functions
 
 --- execute a shell command and return the output.
 -- This function redirects the output to tempfiles and returns the content of those files.
---- @param cmd a shell command
---- @param bin boolean, if true, read output as binary file
---- @return true if successful
---- @return actual return code
---- @return stdout output (string)
---- @return errout output (string)
-function utils.executeex(cmd, bin)
+---@param cmd any
+---@param bin any
+function M.executeex(cmd, bin)
   local outfile = os.tmpname()
   local errfile = os.tmpname()
 
@@ -770,11 +715,11 @@ function utils.executeex(cmd, bin)
     outfile = os.getenv('TEMP') .. outfile
     errfile = os.getenv('TEMP') .. errfile
   end
-  cmd = cmd .. ' > ' .. utils.quote_arg(outfile) .. ' 2> ' .. utils.quote_arg(errfile)
+  cmd = cmd .. ' > ' .. M.quote_arg(outfile) .. ' 2> ' .. M.quote_arg(errfile)
 
-  local success, retcode = utils.execute(cmd)
-  local outcontent = utils.readfile(outfile, bin)
-  local errcontent = utils.readfile(errfile, bin)
+  local success, retcode = M.execute(cmd)
+  local outcontent = M.readfile(outfile, bin)
+  local errcontent = M.readfile(errfile, bin)
   os.remove(outfile)
   os.remove(errfile)
   return success, retcode, (outcontent or ''), (errcontent or '')
@@ -783,26 +728,26 @@ end
 --- Quote and escape an argument of a command.
 -- Quotes a single (or list of) argument(s) of a command to be passed
 -- to `os.execute`, `pl.utils.execute` or `pl.utils.executeex`.
---- @param argument (string or table/list) the argument to quote. If a list then
+--- argument any (string or table/list) the argument to quote. If a list then
 -- all arguments in the list will be returned as a single string quoted.
---- @return quoted and escaped argument.
---- @usage
+---@return any quoted and escaped argument.
+--- Usage:
 -- local options = utils.quote_arg {
 --     "-lluacov",
 --     "-e",
 --     "utils = print(require('pl.utils')._VERSION",
 -- }
 -- -- returns: -lluacov -e 'utils = print(require('\''pl.utils'\'')._VERSION'
-
-function utils.quote_arg(argument)
+---@param argument any
+function M.quote_arg(argument)
   if type(argument) == 'table' then
     -- encode an entire table
     local r = {}
     for i, arg in ipairs(argument) do
-      r[i] = utils.quote_arg(arg)
+      r[i] = M.quote_arg(arg)
     end
 
-    return concat(r, ' ')
+    return table.concat(r, ' ')
   end
   -- only a single argument
   if is_windows then
@@ -831,50 +776,38 @@ function utils.quote_arg(argument)
 end
 
 --- error out of this program gracefully.
---- @param[opt] code The exit code, defaults to -`1` if omitted
+--- code any|nil The exit code, defaults to -`1` if omitted
 
---- @param ... extra arguments for message's format'
---- @see utils.fprintf
---- @usage utils.quit(-1, "Error '%s' happened", "42")
+--- ... any extra arguments for message's format'
+--- See utils.fprintf
+--- Usage: utils.quit(-1, "Error '%s' happened", "42")
 -- -- is equivalent to
 -- utils.quit("Error '%s' happened", "42")  --> Error '42' happened
-
---- @return any
---- @param msg any
-function utils.quit(code, msg, ...)
+---@param code any
+---@param msg any
+---@vararg any
+function M.quit(code, msg, ...)
   if type(code) == 'string' then
-    utils.fprintf(io.stderr, code, msg, ...)
+    M.fprintf(io.stderr, code, msg, ...)
     io.stderr:write('\n')
     code = -1 -- TODO: this is odd, see the test. Which returns 255 as exit code
   elseif msg then
-    utils.fprintf(io.stderr, msg, ...)
+    M.fprintf(io.stderr, msg, ...)
     io.stderr:write('\n')
   end
   os.exit(code, true)
 end
-
---- String functions
---- @section string-functions
-
---- escape any Lua 'magic' characters in a string
---- @param s The input string
---- @return any
-function utils.escape(s)
-  utils.assert_string(1, s)
+---@param s any
+function M.escape(s)
+  M.assert_string(1, s)
   return (s:gsub('[%-%.%+%[%]%(%)%$%^%%%?%*]', '%%%1'))
 end
-
---- split a string into a list of strings separated by a delimiter.
---- @param s The input string
---- @param re optional A Lua string pattern; defaults to '%s+'
-
---- @return a list-like table
---- @raise error if s is not a string
---- @see splitv
---- @param plain any
---- @param n any
-function utils.split(s, re, plain, n)
-  utils.assert_string(1, s)
+---@param s any
+---@param re any
+---@param plain any
+---@param n any
+function M.split(s, re, plain, n)
+  M.assert_string(1, s)
   local i1, ls = 1, {}
   if not re then
     re = '%s+'
@@ -883,11 +816,11 @@ function utils.split(s, re, plain, n)
     return { s }
   end
   while true do
-    local i2, i3 = find(s, re, i1, plain)
+    local i2, i3 = s:find(re, i1, plain)
     if not i2 then
-      local last = sub(s, i1)
+      local last = s:sub(i1)
       if last ~= '' then
-        append(ls, last)
+        table.insert(ls, last)
       end
       if #ls == 1 and ls[1] == '' then
         return {}
@@ -895,9 +828,9 @@ function utils.split(s, re, plain, n)
         return ls
       end
     end
-    append(ls, sub(s, i1, i2 - 1))
+    table.insert(ls, s:sub(i1, i2 - 1))
     if n and #ls == n then
-      ls[#ls] = sub(s, i1)
+      ls[#ls] = s:sub(i1)
       return ls
     end
     i1 = i3 + 1
@@ -907,29 +840,31 @@ end
 --- split a string into a number of return values.
 -- Identical to `split` but returns multiple sub-strings instead of
 -- a single list of sub-strings.
---- @param s the string
---- @param re A Lua string pattern; defaults to '%s+'
---- @param plain don't use Lua patterns
---- @param n optional maximum number of splits
---- @return n values
---- @usage first,next = splitv('user=jane=doe','=', false, 2)
+--- s any the string
+--- re any A Lua string pattern; defaults to '%s+'
+--- plain any don't use Lua patterns
+--- n any optional maximum number of splits
+---@return any n values
+--- Usage: first,next = splitv('user=jane=doe','=', false, 2)
 -- assert(first == "user")
 -- assert(next == "jane=doe")
---- @see split
-function utils.splitv(s, re, plain, n)
-  return _unpack(utils.split(s, re, plain, n))
+---@param s any
+---@param re any
+---@param plain any
+---@param n any
+function M.splitv(s, re, plain, n)
+  return unpack(M.split(s, re, plain, n))
 end
 
 --- Functional
---- @section functional
+--- functional
 
 --- 'memoize' a function (cache returned value for next call).
 -- This is useful if you have a function which is relatively expensive,
 -- but you don't know in advance what values will be required, so
 -- building a table upfront is wasteful/impossible.
---- @param func a function that takes exactly one argument (which later serves as the cache key) and returns a single value
---- @return a function taking one argument and returning a single value either from the cache or by running the original input function
-function utils.memoize(func)
+---@param func any
+function M.memoize(func)
   local cache = {}
   return function(k)
     local res = cache[k]
@@ -944,17 +879,12 @@ end
 --- associate a function factory with a type.
 -- A function factory takes an object of the given type and
 -- returns a function for evaluating it
---- @tab mt metatable
---- @func fun a callable that returns a function
---- @param mt any
---- @param fun any
---- @return any
-function utils.add_function_factory(mt, fun)
+---@param mt any
+---@param fun any
+function M.add_function_factory(mt, fun)
   _function_factories[mt] = fun
 end
-
---- @param f any
---- @return any
+---@param f any
 local function _string_lambda(f)
   if f:find('^|') or f:find('_') then
     local args, body = f:match('|([^|]*)|(.+)')
@@ -967,7 +897,7 @@ local function _string_lambda(f)
       end
     end
     local fstr = 'return function(' .. args .. ') return ' .. body .. ' end'
-    local fn, err = utils.load(fstr)
+    local fn, err = M.load(fstr)
     if not fn then
       return raise(err)
     end
@@ -980,21 +910,19 @@ end
 
 --- an anonymous function as a string. This string is either of the form
 -- '|args| expression' or is a function of one argument, '_'
---- @param lf function as a string
---- @return a function
---- @function utils.string_lambda
---- @usage
+--- lf fun as a string
+--- utils.string_lambda fun
+--- Usage:
 -- string_lambda '|x|x+1' (2) == 3
 -- string_lambda '_+1' (2) == 3
-utils.string_lambda = utils.memoize(_string_lambda)
+M.string_lambda = M.memoize(_string_lambda)
 
 --- bind the first argument of the function to a value.
---- @param fn a function of at least two values (may be an operator string)
+--- fn any a function of at least two values (may be an operator string)
 
---- @return a function such that f(x) is fn(p,x)
---- @raise same as @{function_arg}
---- @see func.bind1
---- @usage local function f(msg, name)
+--- same as @{function_arg}
+--- See func.bind1
+--- Usage: local function f(msg, name)
 --   print(msg .. " " .. name)
 -- end
 --
@@ -1002,21 +930,22 @@ utils.string_lambda = utils.memoize(_string_lambda)
 --
 -- print(hello("world"))     --> "Hello world"
 -- print(hello("sunshine"))  --> "Hello sunshine"
-
---- @param p any
-function utils.bind1(fn, p)
-  fn = utils.function_arg(1, fn)
+---@param fn any
+---@param p any
+---@return any a function such that f(x) is fn(p,x)
+function M.bind1(fn, p)
+  fn = M.function_arg(1, fn)
   return function(...)
     return fn(p, ...)
   end
 end
 
 --- bind the second argument of the function to a value.
---- @param fn a function of at least two values (may be an operator string)
+--- fn any a function of at least two values (may be an operator string)
 
---- @return a function such that f(x) is fn(x,p)
---- @raise same as @{function_arg}
---- @usage local function f(a, b, c)
+---@return any a function such that f(x) is fn(x,p)
+--- same as @{function_arg}
+--- Usage: local function f(a, b, c)
 --   print(a .. " " .. b .. " " .. c)
 -- end
 --
@@ -1024,17 +953,17 @@ end
 --
 -- print(hello("Hello", "!"))  --> "Hello world !"
 -- print(hello("Bye", "?"))    --> "Bye world ?"
-
---- @param p any
-function utils.bind2(fn, p)
-  fn = utils.function_arg(1, fn)
+---@param fn any
+---@param p any
+function M.bind2(fn, p)
+  fn = M.function_arg(1, fn)
   return function(x, ...)
     return fn(x, p, ...)
   end
 end
 
 --- Deprecation
---- @section deprecation
+--- deprecation
 
 do
   -- the default implementation
@@ -1054,9 +983,9 @@ do
   -- function from the `compat` module for earlier versions).
   --
   -- Note: only applications should set/change this function, libraries should not.
-  --- @param func a callback with signature: `function(msg, trace)` both arguments are strings, the latter being optional.
-  --- @see utils.raise_deprecation
-  --- @usage
+  --- func any a callback with signature: `function(msg, trace)` both arguments are strings, the latter being optional.
+  --- See utils.raise_deprecation
+  --- Usage:
   -- -- write to the Nginx logs with OpenResty
   -- utils.set_deprecation_func(function(msg, trace)
   --   ngx.log(ngx.WARN, msg, (trace and (" " .. trace) or nil))
@@ -1064,13 +993,12 @@ do
   --
   -- -- disable deprecation warnings
   -- utils.set_deprecation_func()
-
-  --- @return any
-  function utils.set_deprecation_func(func)
+  ---@param func any
+  function M.set_deprecation_func(func)
     if func == nil then
       deprecation_func = function() end
     else
-      utils.assert_arg(1, func, 'function')
+      M.assert_arg(1, func, 'function')
       deprecation_func = func
     end
   end
@@ -1082,9 +1010,9 @@ do
   -- a feature or option was NOT YET deprecated! Because when writing the code it
   -- is quite often not known in what version the code will land. But the last
   -- released version is usually known.
-  --- @param opts options table
-  --- @see utils.set_deprecation_func
-  --- @usage
+  --- opts any options table
+  --- See utils.set_deprecation_func
+  --- Usage:
   -- warn("@on")   -- enable Lua warnings, they are usually off by default
   --
   -- function stringx.islower(str)
@@ -1098,10 +1026,9 @@ do
   --   return stringx.is_lower(str)
   -- end
   -- -- output: "[Penlight 1.9.2] function 'islower' was renamed to 'is_lower' (deprecated after 1.2.3, scheduled for removal in 2.0.0)"
-
-  --- @return any
-  function utils.raise_deprecation(opts)
-    utils.assert_arg(1, opts, 'table')
+  ---@param opts any
+  function M.raise_deprecation(opts)
+    M.assert_arg(1, opts, 'table')
     if type(opts.message) ~= 'string' then
       error("field 'message' of the options table must be a string", 2)
     end
@@ -1138,4 +1065,4 @@ do
   end
 end
 
-return utils
+return M

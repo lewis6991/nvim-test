@@ -43,16 +43,8 @@ local function near(state, arguments, level)
   local expected = tonumber(arguments[1])
   local tolerance = tonumber(arguments[2])
   local numbertype = 'number or object convertible to a number'
-  assert(
-    expected,
-    messages.bad_arg_type(1, 'near', numbertype, format(arguments[1])),
-    level
-  )
-  assert(
-    tolerance,
-    messages.bad_arg_type(2, 'near', numbertype, format(arguments[2])),
-    level
-  )
+  assert(expected, messages.bad_arg_type(1, 'near', numbertype, format(arguments[1])), level)
+  assert(tolerance, messages.bad_arg_type(2, 'near', numbertype, format(arguments[2])), level)
 
   return function(value)
     local actual = tonumber(value)

@@ -3,18 +3,16 @@
 -- a function to present large numbers in human-friendly format.
 --
 -- Dependencies: `pl.utils`, `pl.lexer`, `debug`
---- @module pl.pretty
 
-local append = table.insert
-local concat = table.concat
-local mfloor, mhuge = math.floor, math.huge
-local mtype = math.type
 local utils = require('pl.utils')
 local lexer = require('pl.lexer')
 local debug = require('debug')
+
+---@param str any
 local function quote_string(str)
   return string.format('%q', str)
 end
+
 local assert_arg = utils.assert_arg
 
 local original_tostring = tostring
@@ -34,44 +32,39 @@ while next_cand > 0 and next_cand % 2 == 1 do
   min_int = -next_cand
   next_cand = next_cand * 2 + 1
 end
-
---- @param value any
---- @return any
+---@param value any
 local function is_integer(value)
   if _VERSION == 'Lua 5.3' or _VERSION == 'Lua 5.4' then
-    return mtype(value) == 'integer'
+    return math.type(value) == 'integer'
   end
   if value < min_int or value > max_int then
     return false
   end
   return math.floor(value) == value
 end
-
---- @param value any
---- @return any
+---@param value any
 local function is_float(value)
   if _VERSION == 'Lua 5.3' or _VERSION == 'Lua 5.4' then
-    return mtype(value) == 'float'
+    return math.type(value) == 'float'
   end
   if value < min_int or value > max_int then
     return true
   end
-  return mfloor(value) == value
+  return math.floor(value) == value
 end
 
 -- Patch tostring to format numbers with better precision
 -- and to produce cross-platform results for
 -- infinite values and NaN.
---- @param value any
---- @return any
+---@param value any
 local function tostring(value)
   if type(value) ~= 'number' then
     return original_tostring(value)
   elseif value ~= value then
     return 'NaN'
-  elseif value == mhuge then
+  elseif value == math.huge then
     return 'Inf'
-  elseif value == -mhuge then
+  elseif value == -math.huge then
     return '-Inf'
   elseif is_integer(value) then
     return ('%d'):format(value)
@@ -86,9 +79,7 @@ local function tostring(value)
   end
 end
 
-local pretty = {}
-
---- @return any
+local M = {}
 local function save_global_env()
   local env = {}
   env.hook, env.mask, env.count = debug.gethook()
@@ -102,9 +93,7 @@ local function save_global_env()
   debug.setmetatable('', nil)
   return env
 end
-
---- @param env any
---- @return any
+---@param env any
 local function restore_global_env(env)
   if env then
     debug.setmetatable('', env.string_mt)
@@ -118,15 +107,14 @@ end
 -- This function loads and runs the string as Lua code, but bails out
 -- if it contains a function definition.
 -- Loaded string is executed in an empty environment.
---- @string s string to read in `{...}` format, possibly with some whitespace
+--- s string string to read in `{...}` format, possibly with some whitespace
 -- before or after the curly braces. A single line comment may be present
 -- at the beginning.
---- @return a table in case of success.
+---@return any a table in case of success.
 -- If loading the string failed, return `nil` and error message.
 -- If executing loaded string failed, return `nil` and the error it raised.
---- @param s any
-
-function pretty.read(s)
+---@param s any
+function M.read(s)
   assert_arg(1, s, 'string')
   if s:find('^%s*%-%-') then -- may start with a comment..
     s = s:gsub('%-%-.-\n', '')
@@ -158,17 +146,16 @@ function pretty.read(s)
 end
 
 --- Read a Lua chunk.
---- @string s Lua code.
---- @tab[opt] env environment used to run the code, empty by default.
---- @bool[opt] paranoid abort loading if any looping constructs a found in the code
+--- s string Lua code.
+--- env table|nil environment used to run the code, empty by default.
+--- paranoid boolean|nil abort loading if any looping constructs a found in the code
 -- and disable string methods.
---- @return the environment in case of success or `nil` and syntax or runtime error
+---@return any the environment in case of success or `nil` and syntax or runtime error
 -- if something went wrong.
---- @param s any
-
---- @param env any
---- @param paranoid any
-function pretty.load(s, env, paranoid)
+---@param s any
+---@param env any
+---@param paranoid any
+function M.load(s, env, paranoid)
   env = env or {}
   if paranoid then
     local tok = lexer.lua(s)
@@ -190,9 +177,7 @@ function pretty.load(s, env, paranoid)
   end
   return env
 end
-
---- @param v any
---- @return any
+---@param v any
 local function quote_if_necessary(v)
   if not v then
     return ''
@@ -206,28 +191,21 @@ local function quote_if_necessary(v)
 end
 
 local keywords
-
---- @param s any
---- @return any
+---@param s any
 local function is_identifier(s)
   return type(s) == 'string' and s:find('^[%a_][%w_]*$') and not keywords[s]
 end
-
---- @param s any
---- @return any
+---@param s any
 local function quote(s)
   if type(s) == 'table' then
-    return pretty.write(s, '')
+    return M.write(s, '')
   else
     --AAS
     return quote_string(s) -- ('%q'):format(tostring(s))
   end
 end
-
---- @param numkey any
-
---- @return any
---- @param key any
+---@param numkey any
+---@param key any
 local function index(numkey, key)
   --AAS
   if not numkey then
@@ -248,17 +226,15 @@ end
 -- [serpent](https://github.com/pkulchenko/serpent)
 -- or [inspect](https://github.com/kikito/inspect.lua)
 -- Lua modules for that if you need them.
---- @tab tbl Table to serialize to a string.
---- @string[opt] space The indent to use.
+--- tbl table Table to serialize to a string.
+--- space string|nil The indent to use.
 -- Defaults to two spaces; pass an empty string for no indentation.
---- @bool[opt] not_clever Pass `true` for plain output, e.g `{['key']=1}`.
+--- not_clever boolean|nil Pass `true` for plain output, e.g `{['key']=1}`.
 -- Defaults to `false`.
---- @return a string
---- @return an optional error message
---- @param tbl any
---- @param space any
---- @param not_clever any
-function pretty.write(tbl, space, not_clever)
+---@param tbl any
+---@param space any
+---@param not_clever any
+function M.write(tbl, space, not_clever)
   if type(tbl) ~= 'table' then
     local res = tostring(tbl)
     if type(tbl) == 'string' then
@@ -277,28 +253,22 @@ function pretty.write(tbl, space, not_clever)
   local lines = {}
   local line = ''
   local tables = {}
-
-  --- @param s any
-  --- @return any
+  ---@param s any
   local function put(s)
     if #s > 0 then
       line = line .. s
     end
   end
-
-  --- @param s any
-  --- @return any
+  ---@param s any
   local function putln(s)
     if #line > 0 then
       line = line .. s
-      append(lines, line)
+      table.insert(lines, line)
       line = ''
     else
-      append(lines, s)
+      table.insert(lines, s)
     end
   end
-
-  --- @return any
   local function eat_last_comma()
     local n = #lines
     local lastch = lines[n]:sub(-1, -1)
@@ -380,10 +350,8 @@ function pretty.write(tbl, space, not_clever)
           return type(a) < type(b)
         end
       end)
-      --- @param key any
-
-      --- @return any
-      --- @param val any
+      ---@param key any
+      ---@param val any
       local function write_entry(key, val)
         local tkey = type(key)
         local numkey = tkey == 'number'
@@ -423,23 +391,21 @@ function pretty.write(tbl, space, not_clever)
   end
   writeit(tbl, '', space)
   eat_last_comma()
-  return concat(lines, #space > 0 and '\n' or '')
+  return table.concat(lines, #space > 0 and '\n' or '')
 end
 
 --- Dump a Lua table out to a file or stdout.
---- @tab t The table to write to a file or stdout.
---- @string[opt] filename File name to write too. Defaults to writing
+--- t table The table to write to a file or stdout.
+--- filename string|nil File name to write too. Defaults to writing
 -- to stdout.
---- @param t any
-
---- @return any
---- @param filename any
-function pretty.dump(t, filename)
+---@param t any
+---@param filename any
+function M.dump(t, filename)
   if not filename then
-    print(pretty.write(t))
+    print(M.write(t))
     return true
   else
-    return utils.writefile(filename, pretty.write(t))
+    return utils.writefile(filename, M.write(t))
   end
 end
 
@@ -454,8 +420,8 @@ end
 --     require"pl.pretty" (...)
 --
 -- Any `nil` entries will be printed as `"<nil>"` to make them explicit.
---- @param ... the parameters to dump to stdout.
---- @usage
+--- ... any the parameters to dump to stdout.
+--- Usage:
 -- -- example debug output
 -- require"pl.pretty" ("hello", nil, "world", { bye = "world", true} )
 --
@@ -469,9 +435,8 @@ end
 --     bye = "world"
 --   }
 -- }
-
---- @return any
-function pretty.debug(...)
+---@vararg any
+function M.debug(...)
   local n = select('#', ...)
   local t = { ... }
   for i = 1, n do
@@ -483,14 +448,12 @@ function pretty.debug(...)
     t['arg ' .. i] = value
   end
 
-  print(pretty.write(t))
+  print(M.write(t))
   return true
 end
 
 local memp, nump = { 'B', 'KiB', 'MiB', 'GiB' }, { '', 'K', 'M', 'B' }
-
---- @param val any
---- @return any
+---@param val any
 local function comma(val)
   local thou = math.floor(val / 1000)
   if thou > 0 then
@@ -501,16 +464,14 @@ local function comma(val)
 end
 
 --- Format large numbers nicely for human consumption.
---- @number num a number.
---- @string[opt] kind one of `'M'` (memory in `KiB`, `MiB`, etc.),
+--- num number a number.
+--- kind string|nil one of `'M'` (memory in `KiB`, `MiB`, etc.),
 -- `'N'` (postfixes are `'K'`, `'M'` and `'B'`),
 -- or `'T'` (use commas as thousands separator), `'N'` by default.
---- @int[opt] prec number of digits to use for `'M'` and `'N'`, `1` by default.
---- @param num any
---- @param kind any
---- @param prec any
---- @return any
-function pretty.number(num, kind, prec)
+---@param num any
+---@param kind any
+---@param prec any
+function M.number(num, kind, prec)
   local fmt = '%.' .. (prec or 1) .. 'f%s'
   if kind == 'T' then
     return comma(num)
@@ -542,7 +503,7 @@ function pretty.number(num, kind, prec)
   end
 end
 
-return setmetatable(pretty, {
+return setmetatable(M, {
   __call = function(self, ...)
     return self.debug(...)
   end,

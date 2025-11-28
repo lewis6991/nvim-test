@@ -13,26 +13,26 @@
 local utils = require('pl.utils')
 local assert_string = utils.assert_string
 
---- @class pl.path.Attributes
---- @field dev? integer
---- @field ino? integer
---- @field mode? string
---- @field nlink? integer
---- @field uid? integer
---- @field gid? integer
---- @field rdev? integer
---- @field size? integer
---- @field blocks? integer
---- @field blksize? integer
---- @field flags? integer
---- @field gen? integer
---- @field access? number
---- @field modification? number
---- @field change? number
---- @field permissions? string
---- @field birthtime? number
+---@class pl.path.Attributes
+---@field dev? integer
+---@field ino? integer
+---@field mode? string
+---@field nlink? integer
+---@field uid? integer
+---@field gid? integer
+---@field rdev? integer
+---@field size? integer
+---@field blocks? integer
+---@field blksize? integer
+---@field flags? integer
+---@field gen? integer
+---@field access? number
+---@field modification? number
+---@field change? number
+---@field permissions? string
+---@field birthtime? number
 
---- @alias pl.path.AttributeKey
+---@alias pl.path.AttributeKey
 ---|'dev'
 ---|'ino'
 ---|'mode'
@@ -51,17 +51,14 @@ local assert_string = utils.assert_string
 ---|'permissions'
 ---|'birthtime'
 
---- @alias pl.path.AttributeParam pl.path.AttributeKey|pl.path.Attributes
+---@alias pl.path.AttributeParam pl.path.AttributeKey|pl.path.Attributes
 
---- @alias pl.path.DirIterator fun():string?
+---@alias pl.path.DirIterator fun():string?
 
 local uv = vim.uv
 
 local DEFAULT_DIR_MODE = 511 -- 0777
-
---- @param err any
---- @return string
---- @return string?
+---@param err any
 local function parse_uv_error(err)
   if type(err) ~= 'string' then
     return tostring(err), nil
@@ -69,23 +66,16 @@ local function parse_uv_error(err)
   local code = err:match('^([%u%d_]+)')
   return err, code
 end
-
---- @param ts uv.fs_stat.result.time
---- @return number?
+---@param ts any
 local function timespec_seconds(ts)
   local sec = ts.sec or 0
   local nsec = ts.nsec or 0
   return sec + nsec / 1e9
 end
-
---- @param attr? pl.path.AttributeParam
---- @param stat? uv.fs_stat.result
---- @param err? string
---- @param code? string
---- @return pl.path.Attributes|number|string?
---- @return string?
---- @return string?
---- @param attr any
+---@param attr any
+---@param stat any
+---@param err any
+---@param code any
 local function fs_attributes(attr, stat, err, code)
   if not stat then
     return nil, err, code
@@ -98,18 +88,13 @@ local function fs_attributes(attr, stat, err, code)
   end
   return stat
 end
-
---- @param path string
---- @return pl.path.DirIterator?
---- @return userdata?|string?
---- @return string?
+---@param path any
 local function dir_iter(path)
   local handle, err, code = uv.fs_scandir(path)
   if not handle then
     return nil, err, code
   end
   local dot_state = 0
-  --- @return any
   local function iter()
     if dot_state == 0 then
       dot_state = 1
@@ -123,11 +108,7 @@ local function dir_iter(path)
   end
   return iter, handle
 end
-
---- @param path string
---- @return boolean?
---- @return string? err
---- @return string? code
+---@param path any
 local function chdir(path)
   local ok, err = pcall(uv.chdir, path)
   if not ok then
@@ -136,14 +117,12 @@ local function chdir(path)
   return true
 end
 
---- @class pl.path
+---@class pl.path
 local M = {}
-
---- @param name string
---- @param param any
---- @param code string?
---- @return string
---- @param err any
+---@param name any
+---@param param any
+---@param err any
+---@param code any
 local function err_func(name, param, err, code)
   local ret = ('%s failed'):format(tostring(name))
   if param ~= nil then
@@ -158,11 +137,11 @@ end
 
 --- Lua iterator over the entries of a given directory.
 -- Backed by `vim.uv.fs_scandir`.
---- @function dir
---- @param d string
---- @return pl.path.DirIterator?
---- @return userdata|string?
---- @return string?
+---@param dir fun
+---@param d string
+---@return any pl.path.DirIterator?
+---@return any userdata|string?
+---@return any string?
 M.dir = function(d)
   assert_string(1, d)
   local iter, handle, code = dir_iter(d)
@@ -174,11 +153,7 @@ end
 
 --- Creates a directory.
 -- Backed by `vim.uv.fs_mkdir`.
---- @function mkdir
---- @param d string
---- @return boolean? ok
---- @return string? err
---- @return string? code
+---@param d any
 function M.mkdir(d)
   assert_string(1, d)
   local ok, err, code = uv.fs_mkdir(d, DEFAULT_DIR_MODE)
@@ -190,32 +165,24 @@ end
 
 --- Gets attributes.
 -- Backed by `vim.uv.fs_stat`.
---- @function attrib
---- @param d string
---- @param r? pl.path.AttributeParam
---- @return pl.path.Attributes|number|string?
---- @return string?
---- @return string?
+---@param d any
+---@param r any
 function M.attrib(d, r)
   assert_string(1, d)
   return fs_attributes(r, uv.fs_stat(d))
 end
-
---- Get the working directory.
---- @function currentdir
---- @return string
 function M.currentdir()
   return (assert(uv.cwd()))
 end
 
 --- Gets symlink attributes.
 -- Backed by `vim.uv.fs_lstat`.
---- @function link_attrib
---- @param d string
---- @param r? pl.path.AttributeParam
---- @return pl.path.Attributes|number|string?
---- @return string?
---- @return string?
+---@param link_attrib fun
+---@param d string
+---@param r? any pl.path.AttributeParam
+---@return any pl.path.Attributes|number|string?
+---@return any string?
+---@return any string?
 M.link_attrib = function(d, r)
   assert_string(1, d)
   local ok, err, code = fs_attributes(r, uv.fs_lstat(d))
@@ -229,11 +196,7 @@ end
 -- On Windows, if a drive is specified, it also changes the current drive. If
 -- only specifying the drive, it will only switch drive, but not modify the path.
 -- Backed by `vim.uv.chdir`.
---- @function chdir
---- @param d string
---- @return boolean? ok
---- @return string? err
---- @return string? code
+---@param d any
 function M.chdir(d)
   assert_string(1, d)
   local ok, err, code = chdir(d)
@@ -242,65 +205,44 @@ function M.chdir(d)
   end
   return ok, err, code
 end
-
---- is this a directory?
---- @param path string
---- @return boolean
+---@param path any
 function M.isdir(path)
   local stat = uv.fs_stat(path)
   return stat and stat.type == 'directory' or false
 end
-
---- is this a file?
---- @param path string
---- @return boolean
+---@param path any
 function M.isfile(path)
   local stat = uv.fs_stat(path)
   return stat and stat.type == 'file' or false
 end
 
 -- is this a symbolic link?
---- @param path string
---- @return boolean
+---@param path any
 function M.islink(path)
   local stat = uv.fs_lstat(path)
   return stat and stat.type == 'link' or false
 end
-
---- does a path exist?
---- @param P string
---- @return string? : the file path if it exists (either as file, directory, socket, etc), nil otherwise
+---@param P any
 function M.exists(P)
   return uv.fs_stat(P) and P or nil
 end
-
---- Return the time of last access as the number of seconds since the epoch.
---- @param path string
---- @return number?
+---@param path any
 function M.getatime(path)
   local stat = uv.fs_stat(path)
   return stat and timespec_seconds(stat.atime) or nil
 end
-
---- Return the time of last modification as the number of seconds since the epoch.
---- @param path string
---- @return number?
+---@param path any
 function M.getmtime(path)
   local stat = uv.fs_stat(path)
   return stat and timespec_seconds(stat.mtime) or nil
 end
-
----Return the system's ctime as the number of seconds since the epoch.
---- @param path string
---- @return number?
+---@param path any
 function M.getctime(path)
   local stat = uv.fs_stat(path)
   return stat and timespec_seconds(stat.ctime) or nil
 end
-
---- @param s string
---- @param i integer
---- @return string
+---@param s any
+---@param i any
 local function at(s, i)
   return s:sub(i, i)
 end
@@ -336,9 +278,7 @@ sep = M.sep
 -- local dir, file = path.splitpath("some_dir")
 -- assert(dir == "")
 -- assert(file == "some_dir")
---- @param P string
---- @return string directory part
---- @return string file part
+---@param P any
 function M.splitpath(P)
   assert_string(1, P)
   local i = #P
@@ -352,11 +292,8 @@ function M.splitpath(P)
   end
   return P:sub(1, i - 1), P:sub(i + 1)
 end
-
---- return an absolute path.
---- @param P string
---- @param pwd string?
---- @return string
+---@param P any
+---@param pwd any
 function M.abspath(P, pwd)
   assert_string(1, P)
   if pwd then
@@ -375,20 +312,7 @@ function M.abspath(P, pwd)
   end
   return M.normpath(P)
 end
-
---- given a path, return the root part and the extension part.
---- if there's no extension part, the second value will be empty
---- @usage
---- local file_path, ext = path.splitext("/bonzo/dog_stuff/cat.txt")
---- assert(file_path == "/bonzo/dog_stuff/cat")
---- assert(ext == ".txt")
----
---- local file_path, ext = path.splitext("")
---- assert(file_path == "")
---- assert(ext == "")
---- @param path string file path
---- @return string root part
---- @return string extension part
+---@param path any
 function M.splitext(path)
   assert_string(1, path)
   local i = #path
@@ -406,57 +330,24 @@ function M.splitext(path)
     return path:sub(1, i - 1), path:sub(i)
   end
 end
-
---- return the directory part of a path
---- @see splitpath
---- ```lua
---- path.dirname("/some/path/file.txt")   -- "/some/path"
---- path.dirname("file.txt")              -- "" (empty string)
---- ```
---- @param P string
---- @return string : everything before the last dir-separator
+---@param P any
 function M.dirname(P)
   assert_string(1, P)
   return (M.splitpath(P))
 end
-
---- return the file part of a path
---- @see splitpath
---- @usage
---- path.basename("/some/path/file.txt")  -- "file.txt"
---- path.basename("/some/path/file/")     -- "" (empty string)
---- @param P string
---- @return string
+---@param P any
 function M.basename(P)
   assert_string(1, P)
   local _, p2 = M.splitpath(P)
   return p2
 end
-
---- get the extension part of a path.
---- @see splitext
---- @usage
---- path.extension("/some/path/file.txt") -- ".txt"
---- path.extension("/some/path/file_txt") -- "" (empty string)
---- @param P string
---- @return string
+---@param P any
 function M.extension(P)
   assert_string(1, P)
   local _, p2 = M.splitext(P)
   return p2
 end
-
---- is this an absolute path?
---- @usage
---- path.isabs("hello/path")    -- false
---- path.isabs("/hello/path")   -- true
---- -- Windows;
---- path.isabs("hello\path")    -- false
---- path.isabs("\hello\path")   -- true
---- path.isabs("C:\hello\path") -- true
---- path.isabs("C:hello\path")  -- false
---- @param P string
---- @return boolean
+---@param P any
 function M.isabs(P)
   assert_string(1, P)
   if M.is_windows and at(P, 2) == ':' then
@@ -464,18 +355,9 @@ function M.isabs(P)
   end
   return seps[at(P, 1)] ~= nil
 end
-
---- return the path resulting from combining the individual paths.
---- if the second (or later) path is absolute, we return the last absolute path (joined with any non-absolute paths following).
---- empty elements (except the last) will be ignored.
---- @usage
---- path.join("/first","second","third")   -- "/first/second/third"
---- path.join("first","second/third")      -- "first/second/third"
---- path.join("/first","/second","third")  -- "/second/third"
---- @param p1 string
---- @param p2 string
---- @param ... string
---- @return string : combined path
+---@param p1 any
+---@param p2 any
+---@vararg any
 function M.join(p1, p2, ...)
   assert_string(1, p1)
   assert_string(2, p2)
@@ -503,11 +385,10 @@ end
 ---
 --- * the path to lowercase
 --- * forward slashes to backward slashes
---- @usage path.normcase("/Some/Path/File.txt")
+--- Usage: path.normcase("/Some/Path/File.txt")
 -- -- Windows: "\some\path\file.txt"
 -- -- Others : "/Some/Path/File.txt"
---- @param P string
---- @return string
+---@param P any
 function M.normcase(P)
   assert_string(1, P)
   if M.is_windows then
@@ -521,8 +402,7 @@ end
 -- `A//B`, `A/./B`, and `A/foo/../B` all become `A/B`.
 --
 -- An empty path results in '.'.
---- @param P string
---- @return string
+---@param P any
 function M.normpath(P)
   assert_string(1, P)
   -- Split path into anchor and relative path.
@@ -572,11 +452,8 @@ function M.normpath(P)
   end
   return P
 end
-
---- relative path from current directory or optional start point
---- @param path string
---- @param start any optional start point (default current directory)
---- @return string
+---@param path any
+---@param start any
 function M.relpath(path, start)
   assert_string(1, path)
   if start then
@@ -620,13 +497,7 @@ function M.relpath(path, start)
   end
   return table.concat(rell, sep)
 end
-
---- Replace a starting '~' with the user's home directory. In windows, if HOME
---- isn't set, then USERPROFILE is used in preference to HOMEDRIVE HOMEPATH.
---- This is guaranteed to be writeable on all versions of Windows.
---- @param path string
---- @return string? path with the `~` prefix substituted, or the input path if it had no prefix.
---- @return string? err error message if the environment variables were unavailable.
+---@param path any
 function M.expanduser(path)
   assert_string(1, path)
   if path:sub(1, 1) ~= '~' then
@@ -659,7 +530,6 @@ end
 
 ---Return a suitable full path to a new temporary file name.
 -- unlike os.tmpname(), it always gives you a writeable path (uses TEMP environment variable on Windows)
---- @return string
 function M.tmpname()
   local res = os.tmpname()
   -- On Windows if Lua is compiled using MSVC14 os.tmpname
@@ -670,11 +540,8 @@ function M.tmpname()
   end
   return res
 end
-
---- return the largest common prefix path of two paths.
---- @param path1 string
---- @param path2 string
---- @return string : the common prefix (Windows: separators will be normalized, casing will be original)
+---@param path1 any
+---@param path2 any
 function M.common_prefix(path1, path2)
   assert_string(1, path1)
   assert_string(2, path2)

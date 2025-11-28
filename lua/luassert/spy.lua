@@ -212,13 +212,7 @@ assert:register(
   messages.called_with_positive,
   messages.called_with_negative
 )
-assert:register(
-  'assertion',
-  'called',
-  called,
-  messages.called_positive,
-  messages.called_negative
-)
+assert:register('assertion', 'called', called, messages.called_positive, messages.called_negative)
 assert:register(
   'assertion',
   'called_at_least',

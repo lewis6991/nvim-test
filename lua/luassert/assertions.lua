@@ -58,21 +58,9 @@ local function near(state, arguments, level)
   local actual = tonumber(arguments[2])
   local tolerance = tonumber(arguments[3])
   local numbertype = 'number or object convertible to a number'
-  assert(
-    expected,
-    messages.bad_arg_type(1, 'near', numbertype, format(arguments[1])),
-    level
-  )
-  assert(
-    actual,
-    messages.bad_arg_type(2, 'near', numbertype, format(arguments[2])),
-    level
-  )
-  assert(
-    tolerance,
-    messages.bad_arg_type(3, 'near', numbertype, format(arguments[3])),
-    level
-  )
+  assert(expected, messages.bad_arg_type(1, 'near', numbertype, format(arguments[1])), level)
+  assert(actual, messages.bad_arg_type(2, 'near', numbertype, format(arguments[2])), level)
+  assert(tolerance, messages.bad_arg_type(3, 'near', numbertype, format(arguments[3])), level)
   -- switch arguments for proper output message
   util.tinsert(arguments, 1, util.tremove(arguments, 2))
   arguments[3] = tolerance
@@ -110,11 +98,7 @@ local function matches(state, arguments, level)
     messages.bad_arg_type(1, 'matches', 'string', type(arguments[1])),
     level
   )
-  assert(
-    actual,
-    messages.bad_arg_type(2, 'matches', stringtype, format(arguments[2])),
-    level
-  )
+  assert(actual, messages.bad_arg_type(2, 'matches', stringtype, format(arguments[2])), level)
   assert(
     init == nil or tonumber(init),
     messages.bad_arg_type(init_arg_num, 'matches', 'number', type(arguments[3])),
@@ -380,8 +364,20 @@ assert:register('assertion', 'number', is_number, messages.same_positive, messag
 assert:register('assertion', 'string', is_string, messages.same_positive, messages.same_negative)
 assert:register('assertion', 'table', is_table, messages.same_positive, messages.same_negative)
 assert:register('assertion', 'nil', is_nil, messages.same_positive, messages.same_negative)
-assert:register('assertion', 'userdata', is_userdata, messages.same_positive, messages.same_negative)
-assert:register('assertion', 'function', is_function, messages.same_positive, messages.same_negative)
+assert:register(
+  'assertion',
+  'userdata',
+  is_userdata,
+  messages.same_positive,
+  messages.same_negative
+)
+assert:register(
+  'assertion',
+  'function',
+  is_function,
+  messages.same_positive,
+  messages.same_negative
+)
 assert:register('assertion', 'thread', is_thread, messages.same_positive, messages.same_negative)
 assert:register(
   'assertion',
@@ -399,49 +395,13 @@ assert:register(
   messages.matches_positive,
   messages.matches_negative
 )
-assert:register(
-  'assertion',
-  'match',
-  matches,
-  messages.matches_positive,
-  messages.matches_negative
-)
+assert:register('assertion', 'match', matches, messages.matches_positive, messages.matches_negative)
 assert:register('assertion', 'near', near, messages.near_positive, messages.near_negative)
-assert:register(
-  'assertion',
-  'equals',
-  equals,
-  messages.equals_positive,
-  messages.equals_negative
-)
-assert:register(
-  'assertion',
-  'equal',
-  equals,
-  messages.equals_positive,
-  messages.equals_negative
-)
-assert:register(
-  'assertion',
-  'unique',
-  unique,
-  messages.unique_positive,
-  messages.unique_negative
-)
-assert:register(
-  'assertion',
-  'error',
-  has_error,
-  messages.error_positive,
-  messages.error_negative
-)
-assert:register(
-  'assertion',
-  'errors',
-  has_error,
-  messages.error_positive,
-  messages.error_negative
-)
+assert:register('assertion', 'equals', equals, messages.equals_positive, messages.equals_negative)
+assert:register('assertion', 'equal', equals, messages.equals_positive, messages.equals_negative)
+assert:register('assertion', 'unique', unique, messages.unique_positive, messages.unique_negative)
+assert:register('assertion', 'error', has_error, messages.error_positive, messages.error_negative)
+assert:register('assertion', 'errors', has_error, messages.error_positive, messages.error_negative)
 assert:register(
   'assertion',
   'error_matches',
@@ -470,11 +430,5 @@ assert:register(
   messages.error_positive,
   messages.error_negative
 )
-assert:register(
-  'assertion',
-  'truthy',
-  truthy,
-  messages.truthy_positive,
-  messages.truthy_negative
-)
+assert:register('assertion', 'truthy', truthy, messages.truthy_positive, messages.truthy_negative)
 assert:register('assertion', 'falsy', falsy, messages.falsy_positive, messages.falsy_negative)
