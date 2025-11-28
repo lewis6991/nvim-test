@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/lewis6991/nvim-test/compare/v1.3.0...v1.3.1) (2025-11-28)
+
+
+### Bug Fixes
+
+* remove block from pending() meta ([2518409](https://github.com/lewis6991/nvim-test/commit/25184091d60e093cf534448d23018acfc4cb46ba))
+
 ## [1.3.0](https://github.com/lewis6991/nvim-test/compare/v1.2.0...v1.3.0) (2025-11-27)
 
 
