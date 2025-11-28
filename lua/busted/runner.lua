@@ -2,8 +2,8 @@
 
 local path = require('pl.path')
 local utils = require('busted.utils')
-local exit = require('busted.compatibility').exit
-local loadstring = require('busted.compatibility').loadstring
+local exit = require('busted.exit')
+local loadstring = assert(_G.loadstring or load, 'loadstring not available')
 local loaded = false
 
 return function(options)

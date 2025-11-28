@@ -1,31 +1,157 @@
 --- Generally useful routines.
 -- See  @{01-introduction.md.Generally_useful_functions|the Guide}.
 --
--- Dependencies: `pl.compat`, all exported fields and functions from
--- `pl.compat` are also available in this module.
+-- This module assumes a Lua 5.1 or LuaJIT runtime and inlines the few compatibility
+-- helpers that Penlight used to import from `pl.compat`.
 --
 --- @module pl.utils
 local format = string.format
-local compat = require('pl.compat')
 local stdout = io.stdout
 local append = table.insert
 local concat = table.concat
-local _unpack = table.unpack -- always injected by 'compat'
 local find = string.find
 local sub = string.sub
 local next = next
 local floor = math.floor
+local setfenv = _G.setfenv
+local getfenv = _G.getfenv
+local loadstring = _G.loadstring or load
 
-local is_windows = compat.is_windows
+local dir_separator = package.config:sub(1, 1)
+local is_windows = dir_separator == '\\'
+local lua51 = _VERSION == 'Lua 5.1'
+local has_jit = type(jit) == 'table'
+local jit52 = has_jit and (not loadstring('local goto = 1'))
+
+if not table.pack then
+  function table.pack(...) -- luacheck: ignore
+    return { n = select('#', ...), ... }
+  end
+end
+
+if not table.unpack then
+  table.unpack = unpack -- luacheck: ignore
+end
+
+local _unpack = table.unpack
+
+if not package.searchpath then
+  function package.searchpath(name, path, sep, rep) -- luacheck: ignore
+    if type(name) ~= 'string' then
+      error(("bad argument #1 to 'searchpath' (string expected, got %s)"):format(type(path)), 2)
+    end
+    if type(path) ~= 'string' then
+      error(("bad argument #2 to 'searchpath' (string expected, got %s)"):format(type(path)), 2)
+    end
+    if sep ~= nil and type(sep) ~= 'string' then
+      error(("bad argument #3 to 'searchpath' (string expected, got %s)"):format(type(path)), 2)
+    end
+    if rep ~= nil and type(rep) ~= 'string' then
+      error(("bad argument #4 to 'searchpath' (string expected, got %s)"):format(type(path)), 2)
+    end
+    sep = sep or '.'
+    rep = rep or dir_separator
+    local s, e = name:find(sep, nil, true)
+    while s do
+      name = name:sub(1, s - 1) .. rep .. name:sub(e + 1, -1)
+      s, e = name:find(sep, s + #rep + 1, true)
+    end
+    local tried = {}
+    for m in path:gmatch('[^;]+') do
+      local nm = m:gsub('?', name)
+      tried[#tried + 1] = nm
+      local f = io.open(nm, 'r')
+      if f then
+        f:close()
+        return nm
+      end
+    end
+    return nil, "\tno file '" .. table.concat(tried, "'\n\tno file '") .. "'"
+  end
+end
+
+if not rawget(_G, 'warn') then
+  local enabled = false
+  local function warn_override(arg1, ...)
+    if type(arg1) == 'string' and arg1:sub(1, 1) == '@' then
+      if arg1 == '@on' then
+        enabled = true
+      elseif arg1 == '@off' then
+        enabled = false
+      end
+      return
+    end
+    if enabled then
+      io.stderr:write('Lua warning: ', arg1, ...)
+      io.stderr:write('\n')
+    end
+  end
+  rawset(_G, 'warn', warn_override)
+end
+
+local function compat_execute(cmd)
+  local res1, res2, res3 = os.execute(cmd)
+  if res2 == 'No error' and res3 == 0 and is_windows then
+    res3 = -1
+  end
+  if lua51 and not jit52 then
+    if is_windows then
+      return res1 == 0, res1
+    else
+      res1 = res1 > 255 and res1 / 256 or res1
+      return res1 == 0, res1
+    end
+  else
+    if is_windows then
+      return res3 == 0, res3
+    else
+      return not not res1, res3
+    end
+  end
+end
+
+local function compat_load_wrapper()
+  if lua51 and not has_jit then
+    local lua51_load = load
+    return function(str, src, mode, env)
+      local chunk, err
+      if type(str) == 'string' then
+        if str:byte(1) == 27 and not (mode or 'bt'):find('b') then
+          return nil, 'attempt to load a binary chunk'
+        end
+        chunk, err = loadstring(str, src)
+      else
+        chunk, err = lua51_load(str, src)
+      end
+      if chunk and env then
+        setfenv(chunk, env)
+      end
+      return chunk, err
+    end
+  else
+    return load
+  end
+end
+
+local compat_load = compat_load_wrapper()
+
 local err_mode = 'default'
 local raise
 local operators
 local _function_factories = {}
 
-local utils = { _VERSION = '1.14.0' }
-for k, v in pairs(compat) do
-  utils[k] = v
-end
+local utils = {
+  _VERSION = '1.14.0',
+  lua51 = lua51,
+  jit = has_jit,
+  jit52 = jit52,
+  dir_separator = dir_separator,
+  is_windows = is_windows,
+  execute = compat_execute,
+  load = compat_load,
+  setfenv = setfenv,
+  getfenv = getfenv,
+}
 
 --- Some standard patterns
 --- @table patterns
@@ -53,7 +179,7 @@ utils.stdmt = {
 --- @param ... any arguments
 --- @return a table with field `n` set to the length
 --- @function utils.pack
---- @see compat.pack
+--- @see table.pack
 --- @see utils.npairs
 --- @see utils.unpack
 utils.pack = table.pack -- added here to be symmetrical with unpack
@@ -67,7 +193,7 @@ utils.pack = table.pack -- added here to be symmetrical with unpack
 
 --- @return multiple return values from the table
 --- @function utils.unpack
---- @see compat.unpack
+--- @see table.unpack
 --- @see utils.pack
 --- @see utils.npairs
 --- @usage

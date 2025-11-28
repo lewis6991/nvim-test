@@ -1,5 +1,5 @@
-local getfenv = require('busted.compatibility').getfenv
-local unpack = require('busted.compatibility').unpack
+local getfenv = _G.getfenv
+local unpack = _G.unpack
 local shuffle = require('busted.utils').shuffle
 
 local function sort(elements)

@@ -1,4 +1,4 @@
-local setfenv = require('busted.compatibility').setfenv
+local setfenv = _G.setfenv
 
 return function(context)
   local environment = {}
