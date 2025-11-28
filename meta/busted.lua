@@ -4,8 +4,7 @@
 ---
 --- This will not fail or pass, it will simply be marked as "pending".
 --- @param name string
---- @param block fun()
-function pending(name, block) end
+function pending(name) end
 
 --- Used to define a set of tests. Can be nested to define sub-tests.
 ---
