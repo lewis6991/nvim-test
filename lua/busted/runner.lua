@@ -3,7 +3,7 @@
 local path = require('pl.path')
 local utils = require('busted.utils')
 local exit = require('busted.exit')
-local loadstring = assert(_G.loadstring or load, 'loadstring not available')
+local loadstring = _G.loadstring or load
 local loaded = false
 
 return function(options)
@@ -55,17 +55,17 @@ return function(options)
   end
 
   -- Load current working directory
-  local _, err = path.chdir(path.normpath(cliArgs.directory))
-  if err then
-    io.stderr:write(appName .. ': error: ' .. err .. '\n')
+  local _, err1 = path.chdir(path.normpath(cliArgs.directory))
+  if err1 then
+    io.stderr:write(appName .. ': error: ' .. err1 .. '\n')
     exit(1, forceExit)
   end
 
   -- If coverage arg is passed in, load LuaCovsupport
   if cliArgs.coverage then
-    local ok, err = luacov(cliArgs['coverage-config-file'])
+    local ok, err2 = luacov(cliArgs['coverage-config-file'])
     if not ok then
-      io.stderr:write(appName .. ': error: ' .. err .. '\n')
+      io.stderr:write(appName .. ': error: ' .. err2 .. '\n')
       exit(1, forceExit)
     end
   end
@@ -92,7 +92,7 @@ return function(options)
 
   -- Load and execute commands given on the command-line
   if cliArgs.e then
-    for k, v in ipairs(cliArgs.e) do
+    for _, v in ipairs(cliArgs.e) do
       loadstring(v)()
     end
   end
@@ -102,27 +102,27 @@ return function(options)
   local errors = 0
   local quitOnError = not cliArgs['keep-going']
 
-  busted.subscribe({ 'error', 'output' }, function(element, parent, message)
+  busted.subscribe({ 'error', 'output' }, function(element, _parent, message)
     io.stderr:write(
       appName .. ': error: Cannot load output library: ' .. element.name .. '\n' .. message .. '\n'
     )
     return nil, true
   end)
 
-  busted.subscribe({ 'error', 'helper' }, function(element, parent, message)
+  busted.subscribe({ 'error', 'helper' }, function(element, _parent, message)
     io.stderr:write(
       appName .. ': error: Cannot load helper script: ' .. element.name .. '\n' .. message .. '\n'
     )
     return nil, true
   end)
 
-  busted.subscribe({ 'error' }, function(element, parent, message)
+  busted.subscribe({ 'error' }, function(_element, _parent, _message)
     errors = errors + 1
     busted.skipAll = quitOnError
     return nil, true
   end)
 
-  busted.subscribe({ 'failure' }, function(element, parent, message)
+  busted.subscribe({ 'failure' }, function(element, _parent, _message)
     if element.descriptor == 'it' then
       failures = failures + 1
     else
@@ -151,7 +151,7 @@ return function(options)
 
   -- Set up helper script, must succeed to even start tests
   if cliArgs.helper and cliArgs.helper ~= '' then
-    local ok, err = helperLoader(busted, cliArgs.helper, {
+    local ok, err2 = helperLoader(busted, cliArgs.helper, {
       verbose = cliArgs.verbose,
       arguments = cliArgs.Xhelper,
     })
@@ -161,7 +161,7 @@ return function(options)
           .. ': failed running the specified helper ('
           .. cliArgs.helper
           .. '), error: '
-          .. err
+          .. err2
           .. '\n'
       )
       exit(1, forceExit)
@@ -182,7 +182,7 @@ return function(options)
 
   if cliArgs['log-success'] then
     local logFile = assert(io.open(cliArgs['log-success'], 'a'))
-    busted.subscribe({ 'test', 'end' }, function(test, parent, status)
+    busted.subscribe({ 'test', 'end' }, function(_test, _parent, status)
       if status == 'success' then
         logFile:write(getFullName() .. '\n')
       end

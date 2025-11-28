@@ -48,9 +48,9 @@ return function()
     local ctx = data
 
     local function unwrap(element, levels)
-      local levels = levels or 1
+      levels = levels or 1
       local parent = element
-      for i = 1, levels do
+      for _ = 1, levels do
         parent = ref.parent(parent)
         if not parent then
           break

@@ -3,7 +3,6 @@ local setfenv = _G.setfenv
 local unpack = _G.unpack
 local path = require('pl.path')
 local pretty = require('pl.pretty')
-local system = require('system')
 local throw = error
 
 local failureMt = {
@@ -100,7 +99,7 @@ return function()
 
     local hasFileLine = msg:match('^[^\n]-:%d+: .*')
     if not hasFileLine then
-      local trace = trace or busted.getTrace(element, 3, message)
+      trace = trace or busted.getTrace(element, 3, message)
       local fileline = trace.short_src .. ':' .. trace.currentline .. ': '
       msg = fileline .. msg
     end
@@ -149,7 +148,7 @@ return function()
 
   function busted.fail(msg, level)
     local rawlevel = (type(level) ~= 'number' or level <= 0) and level
-    local level = level or 1
+    level = level or 1
     local _, emsg = pcall(throw, msg, rawlevel or level + 2)
     local e = { message = emsg }
     setmetatable(e, hasToString(msg) and failureMt or failureMtNoString)
@@ -247,7 +246,7 @@ return function()
     environment.set(key, value)
   end
 
-  function busted.hide(key, value)
+  function busted.hide(key, _value)
     busted.api[key] = nil
     environment.set(key, nil)
   end
@@ -300,11 +299,11 @@ return function()
     busted.executors[edescriptor] = publisher
     busted.export(edescriptor, publisher)
 
-    busted.subscribe({ 'register', descriptor }, function(name, fn, trace, attributes)
+    busted.subscribe({ 'register', descriptor }, function(name, fn, trace, attr)
       local ctx = busted.context.get()
       local plugin = {
         descriptor = descriptor,
-        attributes = attributes or {},
+        attributes = attr or {},
         name = name,
         run = fn,
         trace = trace,

@@ -24,8 +24,7 @@ function fixtures.path(sub_path)
     -- stack until we find the first call from outside this module, that's
     -- the file to use as a baseline for our relative search
     level = level + 1
-    info = debug.getinfo(level)
-    path = info.source
+    path = debug.getinfo(level).source
   until path ~= myname
 
   if path:sub(1, 1) == '@' then
@@ -34,7 +33,7 @@ function fixtures.path(sub_path)
   path = pl_path.abspath(path) -- based on PWD
   path = pl_path.splitpath(path) -- drop filename, keep path only
   path = pl_path.join(path, sub_path)
-  return pl_path.normpath(path, sub_path)
+  return pl_path.normpath(path)
 end
 
 -- reads a file relative from the current test file.
@@ -78,9 +77,9 @@ function fixtures.load(rel_path)
     error(("Error loading file '%s': %s"):format(tostring(rel_path), tostring(err)), 2)
   end
 
-  local func, err = (loadstring or load)(code, rel_path)
+  local func, err1 = (loadstring or load)(code, rel_path)
   if not func then
-    error(("Error loading code from '%s': %s"):format(tostring(rel_path), tostring(err)), 2)
+    error(("Error loading code from '%s': %s"):format(tostring(rel_path), tostring(err1)), 2)
   end
 
   return func()
