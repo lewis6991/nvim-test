@@ -10,6 +10,7 @@ local M = {}
 
 M.sleep = uv.sleep
 
+--- @type fun(expected: any, actual: any)
 M.eq = assert.are.same
 M.neq = assert.are_not.same
 

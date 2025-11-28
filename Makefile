@@ -29,3 +29,8 @@ stylua-check: stylua
 .PHONY: stylua-run
 stylua-run: stylua
 	./stylua lua/**/*.lua
+
+.PHONY: test
+test:
+	./bin/nvim-test test
+	$(MAKE) -C example test LOCAL=1
