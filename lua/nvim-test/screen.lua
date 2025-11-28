@@ -1628,7 +1628,7 @@ function M:print_snapshot(attrs, ignore)
       if self._options.ext_linegrid then
         dict = self:_pprint_hlitem(a)
       else
-        dict = '{' .. self:_pprint_attrs(a) .. '}'
+        dict = '{' .. self._pprint_attrs(a) .. '}'
       end
       local keyval = (type(i) == 'number') and '[' .. tostring(i) .. ']' or i
       table.insert(attrstrs, '  ' .. keyval .. ' = ' .. dict .. ';')
@@ -1713,7 +1713,7 @@ function M:linegrid_check_attrs(attrs)
         if #info == #matchinfo then
           local match = false
           if #info == 1 then
-            if self:_equal_info(info[1], matchinfo[1]) then
+            if self._equal_info(info[1], matchinfo[1]) then
               match = true
             end
           else
@@ -1744,23 +1744,23 @@ function M:_pprint_hlitem(item)
   -- print(inspect(item))
   local multi = self._rgb_cterm or self._options.ext_hlstate
   local cterm = (not self._rgb_cterm and not self._options.rgb)
-  local attrdict = '{' .. self:_pprint_attrs(multi and item[1] or item, cterm) .. '}'
+  local attrdict = '{' .. self._pprint_attrs(multi and item[1] or item, cterm) .. '}'
   local attrdict2, hlinfo
   local descdict = ''
   if self._rgb_cterm then
-    attrdict2 = ', {' .. self:_pprint_attrs(item[2], true) .. '}'
+    attrdict2 = ', {' .. self._pprint_attrs(item[2], true) .. '}'
     hlinfo = item[3]
   else
     attrdict2 = ''
     hlinfo = item[2]
   end
   if self._options.ext_hlstate then
-    descdict = ', {' .. self:_pprint_hlinfo(hlinfo) .. '}'
+    descdict = ', {' .. self._pprint_hlinfo(hlinfo) .. '}'
   end
   return (multi and '{' or '') .. attrdict .. attrdict2 .. descdict .. (multi and '}' or '')
 end
 
-function M:_pprint_hlinfo(states)
+function M._pprint_hlinfo(states)
   if #states == 1 then
     local items = {}
     for f, v in pairs(states[1]) do
@@ -1776,7 +1776,7 @@ function M:_pprint_hlinfo(states)
   end
 end
 
-function M:_pprint_attrs(attrs, cterm)
+function M._pprint_attrs(attrs, cterm)
   local items = {}
   for f, v in pairs(attrs) do
     local desc = tostring(v)
@@ -1812,14 +1812,14 @@ function M:_get_attr_id(attr_state, attrs, hl_id)
       return id
     end
     local kind = self._options.rgb and 1 or 2
-    return 'UNEXPECTED ' .. self:_pprint_attrs(self._attr_table[hl_id][kind])
+    return 'UNEXPECTED ' .. self._pprint_attrs(self._attr_table[hl_id][kind])
   else
-    if self:_equal_attrs(attrs, {}) then
+    if self._equal_attrs(attrs, {}) then
       -- ignore this attrs
       return nil
     end
     for id, a in pairs(attr_state.ids) do
-      if self:_equal_attrs(a, attrs) then
+      if self._equal_attrs(a, attrs) then
         return id
       end
     end
@@ -1828,21 +1828,21 @@ function M:_get_attr_id(attr_state, attrs, hl_id)
       attr_state.modified = true
       return #attr_state.ids
     end
-    return 'UNEXPECTED ' .. self:_pprint_attrs(attrs)
+    return 'UNEXPECTED ' .. self._pprint_attrs(attrs)
   end
 end
 
 function M:_equal_attr_def(a, b)
   if self._rgb_cterm then
-    return self:_equal_attrs(a[1], b[1]) and self:_equal_attrs(a[2], b[2])
+    return self._equal_attrs(a[1], b[1]) and self._equal_attrs(a[2], b[2])
   elseif self._options.rgb then
-    return self:_equal_attrs(a, b[1])
+    return self._equal_attrs(a, b[1])
   else
-    return self:_equal_attrs(a, b[2])
+    return self._equal_attrs(a, b[2])
   end
 end
 
-function M:_equal_attrs(a, b)
+function M._equal_attrs(a, b)
   return a.bold == b.bold
     and a.standout == b.standout
     and a.underline == b.underline
@@ -1861,7 +1861,7 @@ function M:_equal_attrs(a, b)
     and a.bg_indexed == b.bg_indexed
 end
 
-function M:_equal_info(a, b)
+function M._equal_info(a, b)
   return a.kind == b.kind and a.hi_name == b.hi_name and a.ui_name == b.ui_name
 end
 
@@ -1870,7 +1870,7 @@ function M:_attr_index(attrs, attr)
     return nil
   end
   for i, a in pairs(attrs) do
-    if self:_equal_attrs(a, attr) then
+    if self._equal_attrs(a, attr) then
       return i
     end
   end
