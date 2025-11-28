@@ -166,18 +166,6 @@ if [ ! -d "$NVIM_RUNNER" ]; then
   fetch_nvim "$NVIM_RUNNER_VERSION" "$NVIM_RUNNER"
 fi
 
-# if [ $LUACOV_ENABLED ]; then
-#   if [ ! -f "$DATA/luarocks/bin/luacov" ]; then
-#     echo "Installing LuaCov"
-#     $LUAROCKS install luacov
-#     # Add some more reporters
-#     $LUAROCKS install luacov-console
-#     # TODO(lewis6991): html will be built in to the next version of luacov
-#     # after 0.15
-#     $LUAROCKS install luacov-html
-#   fi
-# fi
-
 if [ $INIT_ONLY ]; then
   exit
 fi
