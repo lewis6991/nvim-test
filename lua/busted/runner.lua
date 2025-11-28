@@ -7,7 +7,8 @@ local exit = require('busted.exit')
 local loadstring = _G.loadstring or load
 local loaded = false
 
-return function(options)
+local function main(options)
+  local options = { standalone = false }
   if loaded then
     return function() end
   else
@@ -250,3 +251,5 @@ return function(options)
     exit(failures + errors, forceExit)
   end
 end
+
+main({ standalone = false })
