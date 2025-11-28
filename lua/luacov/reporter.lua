@@ -4,7 +4,7 @@
 -- @name luacov.reporter
 local reporter = {}
 
-local uv = vim.uv or vim.loop
+local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
 local LineScanner = require('luacov.linescanner')
 local luacov = require('luacov.runner')
 local util = require('luacov.util')

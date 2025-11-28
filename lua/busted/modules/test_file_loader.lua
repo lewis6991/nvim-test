@@ -1,7 +1,7 @@
 local FILE_NOT_FOUND_MSG = 'Cannot find file or directory: %s'
 local NO_MATCHING_TESTS_MSG = 'No test files found matching Lua pattern: %s'
 
-local uv = vim.uv or vim.loop
+local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
 local fs = vim.fs
 
 local function filter(list, predicate)

@@ -3,7 +3,7 @@
 -- @class module
 -- @name luacov.util
 
-local uv = vim.uv or vim.loop
+local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
 
 local READ_MODE = 'r'
 local DEFAULT_PERMS = 420 -- 0644

@@ -1,7 +1,8 @@
 -- Busted command-line runner
 
-local uv = vim.uv or vim.loop
+local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
 local fs = vim.fs
+local fs_util = require('nvim-test.util.fs')
 local exit = require('busted.exit')
 local loadstring = _G.loadstring or load
 local loaded = false
@@ -183,11 +184,11 @@ return function(options)
     return table.concat(names, ' ')
   end
 
-  if cliArgs['log-success'] then
-    local logFile = assert(io.open(cliArgs['log-success'], 'a'))
+  local log_success = cliArgs['log-success']
+  if log_success then
     busted.subscribe({ 'test', 'end' }, function(_test, _parent, status)
       if status == 'success' then
-        logFile:write(getFullName() .. '\n')
+        fs_util.append_lines(log_success, { getFullName() })
       end
     end)
   end

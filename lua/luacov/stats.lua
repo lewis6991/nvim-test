@@ -1,47 +1,19 @@
 -----------------------------------------------------
--- Serialization helpers for LuaCov statistics.
 -- @class module
 -- @name luacov.stats
 
-local function read_lines(path)
-  if vim and vim.fn and vim.fn.readfile then
-    local ok, lines = pcall(vim.fn.readfile, path)
-    if ok then
-      return lines
-    else
-      return nil
-    end
-  end
+local fs_util = require('nvim-test.util.fs')
 
-  local fh = io.open(path, 'r')
-  if not fh then
+local function read_lines(path)
+  local lines = fs_util.read_lines(path)
+  if not lines then
     return nil
   end
-  local lines = {}
-  for line in fh:lines() do
-    table.insert(lines, line)
-  end
-  fh:close()
   return lines
 end
 
 local function write_lines(path, lines)
-  if vim and vim.fn and vim.fn.writefile then
-    local ok, res = pcall(vim.fn.writefile, lines, path)
-    if not ok then
-      error(res)
-    end
-    if res ~= 0 then
-      error('writefile returned error code ' .. tostring(res))
-    end
-    return
-  end
-
-  local fh = assert(io.open(path, 'w'))
-  for _, line in ipairs(lines) do
-    fh:write(line, '\n')
-  end
-  fh:close()
+  fs_util.write_lines(path, lines)
 end
 
 local function trim(str)

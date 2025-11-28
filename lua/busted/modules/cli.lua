@@ -1,7 +1,7 @@
 local utils = require('busted.utils')
 local exit = require('busted.exit')
 
-local uv = vim.uv or vim.loop
+local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
 local fs = vim.fs
 local is_windows = uv.os_uname().sysname:match('Windows')
 

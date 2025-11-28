@@ -47,7 +47,7 @@ describe('busted output handler loader', function()
 
     loader({ publish = function() end }, tmp, { arguments = {}, defaultOutput = 'does.not.matter' })
 
-    vim.loop.fs_unlink(tmp)
+    vim.uv.fs_unlink(tmp)
   end)
 end)
 

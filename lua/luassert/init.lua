@@ -1,9 +1,9 @@
-local assert = require('luassert.assert')
+local M = require('luassert.assert')
 
-assert._COPYRIGHT = 'Copyright (c) 2018 Olivine Labs, LLC.'
-assert._DESCRIPTION =
+M._COPYRIGHT = 'Copyright (c) 2018 Olivine Labs, LLC.'
+M._DESCRIPTION =
   "Extends Lua's built-in assertions to provide additional tests and the ability to create your own."
-assert._VERSION = 'Luassert 1.8.0'
+M._VERSION = 'Luassert 1.8.0'
 
 -- load basic asserts
 require('luassert.assertions')
@@ -12,4 +12,4 @@ require('luassert.array')
 require('luassert.matchers')
 require('luassert.formatters')
 
-return assert
+return M

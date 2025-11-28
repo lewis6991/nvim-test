@@ -1,4 +1,4 @@
-local uv = vim.uv or vim.loop
+local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
 
 --- @class test.Session
 --- @field private _msgpack_rpc_stream test.MsgpackRpcStream
