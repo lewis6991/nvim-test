@@ -92,18 +92,10 @@ local function init(busted)
   busted.hide('file')
 
   local assert = require('luassert')
-  local spy = require('luassert.spy')
-  local mock = require('luassert.mock')
-  local stub = require('luassert.stub')
-  local match = require('luassert.match')
 
   require('busted.fixtures') -- just load into the environment, not exposing it
 
   busted.export('assert', assert)
-  busted.export('spy', spy)
-  busted.export('mock', mock)
-  busted.export('stub', stub)
-  busted.export('match', match)
 
   busted.exportApi('publish', busted.publish)
   busted.exportApi('subscribe', busted.subscribe)
