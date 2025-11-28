@@ -15,7 +15,6 @@ return function()
     table.insert(luacov.configuration.exclude, 'busted_bootstrap$')
     table.insert(luacov.configuration.exclude, 'busted%.')
     table.insert(luacov.configuration.exclude, 'luassert%.')
-    table.insert(luacov.configuration.exclude, 'say%.')
     table.insert(luacov.configuration.exclude, 'pl%.')
     return true
   end

@@ -1,6 +1,7 @@
 -- module will return spy table, and register its assertions with the main assert engine
 local assert = require('luassert.assert')
 local util = require('luassert.util')
+local messages = require('luassert.messages')
 
 -- Spy metatable
 local spy_mt = {
@@ -201,50 +202,50 @@ assert:register(
   'assertion',
   'returned_with',
   returned_with,
-  'assertion.returned_with.positive',
-  'assertion.returned_with.negative'
+  messages.returned_with_positive,
+  messages.returned_with_negative
 )
 assert:register(
   'assertion',
   'called_with',
   called_with,
-  'assertion.called_with.positive',
-  'assertion.called_with.negative'
+  messages.called_with_positive,
+  messages.called_with_negative
 )
 assert:register(
   'assertion',
   'called',
   called,
-  'assertion.called.positive',
-  'assertion.called.negative'
+  messages.called_positive,
+  messages.called_negative
 )
 assert:register(
   'assertion',
   'called_at_least',
   called_at_least,
-  'assertion.called_at_least.positive',
-  'assertion.called_less_than.positive'
+  messages.called_at_least_positive,
+  messages.called_less_than_positive
 )
 assert:register(
   'assertion',
   'called_at_most',
   called_at_most,
-  'assertion.called_at_most.positive',
-  'assertion.called_more_than.positive'
+  messages.called_at_most_positive,
+  messages.called_more_than_positive
 )
 assert:register(
   'assertion',
   'called_more_than',
   called_more_than,
-  'assertion.called_more_than.positive',
-  'assertion.called_at_most.positive'
+  messages.called_more_than_positive,
+  messages.called_at_most_positive
 )
 assert:register(
   'assertion',
   'called_less_than',
   called_less_than,
-  'assertion.called_less_than.positive',
-  'assertion.called_at_least.positive'
+  messages.called_less_than_positive,
+  messages.called_at_least_positive
 )
 
 return setmetatable(spy, {

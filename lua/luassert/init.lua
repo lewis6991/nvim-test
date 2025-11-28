@@ -12,7 +12,4 @@ require('luassert.array')
 require('luassert.matchers')
 require('luassert.formatters')
 
--- load default language
-require('luassert.languages.en')
-
 return assert

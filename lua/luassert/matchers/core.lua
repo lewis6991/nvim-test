@@ -9,7 +9,7 @@
 local assert = require('luassert.assert')
 local astate = require('luassert.state')
 local util = require('luassert.util')
-local s = require('say')
+local messages = require('luassert.messages')
 
 local function format(val)
   return astate.format_argument(val) or tostring(val)
@@ -39,18 +39,18 @@ end
 local function near(state, arguments, level)
   local level = (level or 1) + 1
   local argcnt = arguments.n
-  assert(argcnt > 1, s('assertion.internal.argtolittle', { 'near', 2, tostring(argcnt) }), level)
+  assert(argcnt > 1, messages.arg_too_little('near', 2, tostring(argcnt)), level)
   local expected = tonumber(arguments[1])
   local tolerance = tonumber(arguments[2])
   local numbertype = 'number or object convertible to a number'
   assert(
     expected,
-    s('assertion.internal.badargtype', { 1, 'near', numbertype, format(arguments[1]) }),
+    messages.bad_arg_type(1, 'near', numbertype, format(arguments[1])),
     level
   )
   assert(
     tolerance,
-    s('assertion.internal.badargtype', { 2, 'near', numbertype, format(arguments[2]) }),
+    messages.bad_arg_type(2, 'near', numbertype, format(arguments[2])),
     level
   )
 
@@ -66,18 +66,18 @@ end
 local function matches(state, arguments, level)
   local level = (level or 1) + 1
   local argcnt = arguments.n
-  assert(argcnt > 0, s('assertion.internal.argtolittle', { 'matches', 1, tostring(argcnt) }), level)
+  assert(argcnt > 0, messages.arg_too_little('matches', 1, tostring(argcnt)), level)
   local pattern = arguments[1]
   local init = arguments[2]
   local plain = arguments[3]
   assert(
     type(pattern) == 'string',
-    s('assertion.internal.badargtype', { 1, 'matches', 'string', type(arguments[1]) }),
+    messages.bad_arg_type(1, 'matches', 'string', type(arguments[1])),
     level
   )
   assert(
     init == nil or tonumber(init),
-    s('assertion.internal.badargtype', { 2, 'matches', 'number', type(arguments[2]) }),
+    messages.bad_arg_type(2, 'matches', 'number', type(arguments[2])),
     level
   )
 
@@ -101,7 +101,7 @@ end
 local function equals(state, arguments, level)
   local level = (level or 1) + 1
   local argcnt = arguments.n
-  assert(argcnt > 0, s('assertion.internal.argtolittle', { 'equals', 1, tostring(argcnt) }), level)
+  assert(argcnt > 0, messages.arg_too_little('equals', 1, tostring(argcnt)), level)
   return function(value)
     return value == arguments[1]
   end
@@ -110,7 +110,7 @@ end
 local function same(state, arguments, level)
   local level = (level or 1) + 1
   local argcnt = arguments.n
-  assert(argcnt > 0, s('assertion.internal.argtolittle', { 'same', 1, tostring(argcnt) }), level)
+  assert(argcnt > 0, messages.arg_too_little('same', 1, tostring(argcnt)), level)
   return function(value)
     if type(value) == 'table' and type(arguments[1]) == 'table' then
       local result = util.deepcompare(value, arguments[1], true)
@@ -130,8 +130,8 @@ local function ref(state, arguments, level)
     or argtype == 'thread'
     or argtype == 'userdata'
   )
-  assert(argcnt > 0, s('assertion.internal.argtolittle', { 'ref', 1, tostring(argcnt) }), level)
-  assert(isobject, s('assertion.internal.badargtype', { 1, 'ref', 'object', argtype }), level)
+  assert(argcnt > 0, messages.arg_too_little('ref', 1, tostring(argcnt)), level)
+  assert(isobject, messages.bad_arg_type(1, 'ref', 'object', argtype), level)
   return function(value)
     return value == arguments[1]
   end

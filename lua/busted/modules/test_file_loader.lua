@@ -1,4 +1,5 @@
-local s = require('say')
+local FILE_NOT_FOUND_MSG = 'Cannot find file or directory: %s'
+local NO_MATCHING_TESTS_MSG = 'No test files found matching Lua pattern: %s'
 
 local function filter(list, predicate)
   return vim.tbl_filter(predicate, list)
@@ -47,7 +48,7 @@ return function(busted, loaders)
         end
       end)
     else
-      busted.publish({ 'error' }, {}, nil, s('output.file_not_found'):format(rootFile), {})
+      busted.publish({ 'error' }, {}, nil, string.format(FILE_NOT_FOUND_MSG, rootFile), {})
       fileList = {}
     end
 
@@ -95,7 +96,7 @@ return function(busted, loaders)
       if #patterns > 1 then
         pattern = '\n\t' .. table.concat(patterns, '\n\t')
       end
-      busted.publish({ 'error' }, {}, nil, s('output.no_test_files_match'):format(pattern), {})
+      busted.publish({ 'error' }, {}, nil, string.format(NO_MATCHING_TESTS_MSG, pattern), {})
     end
 
     return fileList

@@ -1,6 +1,5 @@
 local table_concat = table.concat
 local table_insert = table.insert
-local _ = require('busted.languages.en') -- register English strings up front
 
 return function()
   local busted = require('busted')

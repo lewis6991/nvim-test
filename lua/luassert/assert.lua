@@ -1,9 +1,9 @@
-local s = require('say')
 local astate = require('luassert.state')
 local util = require('luassert.util')
-local unpack = util.unpack
+local list_unpack = util.unpack
 local obj -- the returned module table
 local level_mt = {}
+local raw_unpack = table.unpack or _G.unpack
 
 -- list of namespaces
 local namespace = require('luassert.namespaces')
@@ -14,7 +14,16 @@ local function geterror(assertion_message, failure_message, args)
   elseif failure_message ~= nil then
     failure_message = astate.format_argument(failure_message)
   end
-  local message = s(assertion_message, obj:format(args))
+  local message
+  if assertion_message then
+    local formatted_args = obj:format(args)
+    local count = formatted_args.n or #formatted_args
+    if count > 0 then
+      message = assertion_message:format(raw_unpack(formatted_args, 1, count))
+    else
+      message = assertion_message
+    end
+  end
   if message and failure_message then
     message = failure_message .. '\n' .. message
   end
@@ -52,7 +61,7 @@ local __state_meta = {
       end
 
       if retargs then
-        return unpack(retargs)
+        return list_unpack(retargs)
       end
       return ...
     else

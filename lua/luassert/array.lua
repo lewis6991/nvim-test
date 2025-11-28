@@ -1,5 +1,5 @@
 local assert = require('luassert.assert')
-local say = require('say')
+local messages = require('luassert.messages')
 
 -- Example usage:
 -- local arr = { "one", "two", "three" }
@@ -54,27 +54,13 @@ local function holes(state, args, level)
   return missing ~= nil, { missing } -- assert result + first missing index as return value
 end
 
--- Register the proper assertion messages
-say:set(
-  'assertion.array_holes.positive',
-  [[
-Expected array to have holes, but none was found.
-]]
-)
-say:set(
-  'assertion.array_holes.negative',
-  [[
-Expected array to not have holes, hole found at position: %s
-]]
-)
-
 -- Register the assertion, and the modifier
 assert:register(
   'assertion',
   'holes',
   holes,
-  'assertion.array_holes.positive',
-  'assertion.array_holes.negative'
+  messages.array_holes_positive,
+  messages.array_holes_negative
 )
 
 assert:register('modifier', 'array', array)

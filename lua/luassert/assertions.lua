@@ -9,7 +9,7 @@
 local assert = require('luassert.assert')
 local astate = require('luassert.state')
 local util = require('luassert.util')
-local s = require('say')
+local messages = require('luassert.messages')
 
 local function format(val)
   return astate.format_argument(val) or tostring(val)
@@ -53,24 +53,24 @@ end
 local function near(state, arguments, level)
   local level = (level or 1) + 1
   local argcnt = arguments.n
-  assert(argcnt > 2, s('assertion.internal.argtolittle', { 'near', 3, tostring(argcnt) }), level)
+  assert(argcnt > 2, messages.arg_too_little('near', 3, tostring(argcnt)), level)
   local expected = tonumber(arguments[1])
   local actual = tonumber(arguments[2])
   local tolerance = tonumber(arguments[3])
   local numbertype = 'number or object convertible to a number'
   assert(
     expected,
-    s('assertion.internal.badargtype', { 1, 'near', numbertype, format(arguments[1]) }),
+    messages.bad_arg_type(1, 'near', numbertype, format(arguments[1])),
     level
   )
   assert(
     actual,
-    s('assertion.internal.badargtype', { 2, 'near', numbertype, format(arguments[2]) }),
+    messages.bad_arg_type(2, 'near', numbertype, format(arguments[2])),
     level
   )
   assert(
     tolerance,
-    s('assertion.internal.badargtype', { 3, 'near', numbertype, format(arguments[3]) }),
+    messages.bad_arg_type(3, 'near', numbertype, format(arguments[3])),
     level
   )
   -- switch arguments for proper output message
@@ -85,7 +85,7 @@ end
 local function matches(state, arguments, level)
   local level = (level or 1) + 1
   local argcnt = arguments.n
-  assert(argcnt > 1, s('assertion.internal.argtolittle', { 'matches', 2, tostring(argcnt) }), level)
+  assert(argcnt > 1, messages.arg_too_little('matches', 2, tostring(argcnt)), level)
   local pattern = arguments[1]
   local actual = nil
   if util.hastostring(arguments[2]) or type(arguments[2]) == 'number' then
@@ -107,17 +107,17 @@ local function matches(state, arguments, level)
   local stringtype = 'string or object convertible to a string'
   assert(
     type(pattern) == 'string',
-    s('assertion.internal.badargtype', { 1, 'matches', 'string', type(arguments[1]) }),
+    messages.bad_arg_type(1, 'matches', 'string', type(arguments[1])),
     level
   )
   assert(
     actual,
-    s('assertion.internal.badargtype', { 2, 'matches', stringtype, format(arguments[2]) }),
+    messages.bad_arg_type(2, 'matches', stringtype, format(arguments[2])),
     level
   )
   assert(
     init == nil or tonumber(init),
-    s('assertion.internal.badargtype', { init_arg_num, 'matches', 'number', type(arguments[3]) }),
+    messages.bad_arg_type(init_arg_num, 'matches', 'number', type(arguments[3])),
     level
   )
   -- switch arguments for proper output message
@@ -138,7 +138,7 @@ end
 local function equals(state, arguments, level)
   local level = (level or 1) + 1
   local argcnt = arguments.n
-  assert(argcnt > 1, s('assertion.internal.argtolittle', { 'equals', 2, tostring(argcnt) }), level)
+  assert(argcnt > 1, messages.arg_too_little('equals', 2, tostring(argcnt)), level)
   local result = arguments[1] == arguments[2]
   -- switch arguments for proper output message
   util.tinsert(arguments, 1, util.tremove(arguments, 2))
@@ -149,7 +149,7 @@ end
 local function same(state, arguments, level)
   local level = (level or 1) + 1
   local argcnt = arguments.n
-  assert(argcnt > 1, s('assertion.internal.argtolittle', { 'same', 2, tostring(argcnt) }), level)
+  assert(argcnt > 1, messages.arg_too_little('same', 2, tostring(argcnt)), level)
   if type(arguments[1]) == 'table' and type(arguments[2]) == 'table' then
     local result, crumbs = util.deepcompare(arguments[1], arguments[2], true)
     -- switch arguments for proper output message
@@ -169,14 +169,14 @@ end
 
 local function truthy(state, arguments, level)
   local argcnt = arguments.n
-  assert(argcnt > 0, s('assertion.internal.argtolittle', { 'truthy', 1, tostring(argcnt) }), level)
+  assert(argcnt > 0, messages.arg_too_little('truthy', 1, tostring(argcnt)), level)
   set_failure_message(state, arguments[2])
   return arguments[1] ~= false and arguments[1] ~= nil
 end
 
 local function falsy(state, arguments, level)
   local argcnt = arguments.n
-  assert(argcnt > 0, s('assertion.internal.argtolittle', { 'falsy', 1, tostring(argcnt) }), level)
+  assert(argcnt > 0, messages.arg_too_little('falsy', 1, tostring(argcnt)), level)
   return not truthy(state, arguments, level)
 end
 
@@ -188,7 +188,7 @@ local function has_error(state, arguments, level)
   local failure_message = arguments[3]
   assert(
     util.callable(func),
-    s('assertion.internal.badargtype', { 1, 'error', 'function or callable object', type(func) }),
+    messages.bad_arg_type(1, 'error', 'function or callable object', type(func)),
     level
   )
   local ok, err_actual = pcall(func)
@@ -231,22 +231,15 @@ local function error_matches(state, arguments, level)
   local argcnt = arguments.n
   local func = arguments[1]
   local pattern = arguments[2]
-  assert(
-    argcnt > 1,
-    s('assertion.internal.argtolittle', { 'error_matches', 2, tostring(argcnt) }),
-    level
-  )
+  assert(argcnt > 1, messages.arg_too_little('error_matches', 2, tostring(argcnt)), level)
   assert(
     util.callable(func),
-    s(
-      'assertion.internal.badargtype',
-      { 1, 'error_matches', 'function or callable object', type(func) }
-    ),
+    messages.bad_arg_type(1, 'error_matches', 'function or callable object', type(func)),
     level
   )
   assert(
     pattern == nil or type(pattern) == 'string',
-    s('assertion.internal.badargtype', { 2, 'error', 'string', type(pattern) }),
+    messages.bad_arg_type(2, 'error', 'string', type(pattern)),
     level
   )
 
@@ -265,7 +258,7 @@ local function error_matches(state, arguments, level)
   local plain = arguments[4]
   assert(
     init == nil or tonumber(init),
-    s('assertion.internal.badargtype', { init_arg_num, 'matches', 'number', type(arguments[3]) }),
+    messages.bad_arg_type(init_arg_num, 'matches', 'number', type(arguments[3])),
     level
   )
 
@@ -380,156 +373,108 @@ local function is_thread(state, arguments, level)
 end
 
 assert:register('modifier', 'message', set_message)
-assert:register('assertion', 'true', is_true, 'assertion.same.positive', 'assertion.same.negative')
-assert:register(
-  'assertion',
-  'false',
-  is_false,
-  'assertion.same.positive',
-  'assertion.same.negative'
-)
-assert:register(
-  'assertion',
-  'boolean',
-  is_boolean,
-  'assertion.same.positive',
-  'assertion.same.negative'
-)
-assert:register(
-  'assertion',
-  'number',
-  is_number,
-  'assertion.same.positive',
-  'assertion.same.negative'
-)
-assert:register(
-  'assertion',
-  'string',
-  is_string,
-  'assertion.same.positive',
-  'assertion.same.negative'
-)
-assert:register(
-  'assertion',
-  'table',
-  is_table,
-  'assertion.same.positive',
-  'assertion.same.negative'
-)
-assert:register('assertion', 'nil', is_nil, 'assertion.same.positive', 'assertion.same.negative')
-assert:register(
-  'assertion',
-  'userdata',
-  is_userdata,
-  'assertion.same.positive',
-  'assertion.same.negative'
-)
-assert:register(
-  'assertion',
-  'function',
-  is_function,
-  'assertion.same.positive',
-  'assertion.same.negative'
-)
-assert:register(
-  'assertion',
-  'thread',
-  is_thread,
-  'assertion.same.positive',
-  'assertion.same.negative'
-)
+assert:register('assertion', 'true', is_true, messages.same_positive, messages.same_negative)
+assert:register('assertion', 'false', is_false, messages.same_positive, messages.same_negative)
+assert:register('assertion', 'boolean', is_boolean, messages.same_positive, messages.same_negative)
+assert:register('assertion', 'number', is_number, messages.same_positive, messages.same_negative)
+assert:register('assertion', 'string', is_string, messages.same_positive, messages.same_negative)
+assert:register('assertion', 'table', is_table, messages.same_positive, messages.same_negative)
+assert:register('assertion', 'nil', is_nil, messages.same_positive, messages.same_negative)
+assert:register('assertion', 'userdata', is_userdata, messages.same_positive, messages.same_negative)
+assert:register('assertion', 'function', is_function, messages.same_positive, messages.same_negative)
+assert:register('assertion', 'thread', is_thread, messages.same_positive, messages.same_negative)
 assert:register(
   'assertion',
   'returned_arguments',
   returned_arguments,
-  'assertion.returned_arguments.positive',
-  'assertion.returned_arguments.negative'
+  messages.returned_arguments_positive,
+  messages.returned_arguments_negative
 )
 
-assert:register('assertion', 'same', same, 'assertion.same.positive', 'assertion.same.negative')
+assert:register('assertion', 'same', same, messages.same_positive, messages.same_negative)
 assert:register(
   'assertion',
   'matches',
   matches,
-  'assertion.matches.positive',
-  'assertion.matches.negative'
+  messages.matches_positive,
+  messages.matches_negative
 )
 assert:register(
   'assertion',
   'match',
   matches,
-  'assertion.matches.positive',
-  'assertion.matches.negative'
+  messages.matches_positive,
+  messages.matches_negative
 )
-assert:register('assertion', 'near', near, 'assertion.near.positive', 'assertion.near.negative')
+assert:register('assertion', 'near', near, messages.near_positive, messages.near_negative)
 assert:register(
   'assertion',
   'equals',
   equals,
-  'assertion.equals.positive',
-  'assertion.equals.negative'
+  messages.equals_positive,
+  messages.equals_negative
 )
 assert:register(
   'assertion',
   'equal',
   equals,
-  'assertion.equals.positive',
-  'assertion.equals.negative'
+  messages.equals_positive,
+  messages.equals_negative
 )
 assert:register(
   'assertion',
   'unique',
   unique,
-  'assertion.unique.positive',
-  'assertion.unique.negative'
+  messages.unique_positive,
+  messages.unique_negative
 )
 assert:register(
   'assertion',
   'error',
   has_error,
-  'assertion.error.positive',
-  'assertion.error.negative'
+  messages.error_positive,
+  messages.error_negative
 )
 assert:register(
   'assertion',
   'errors',
   has_error,
-  'assertion.error.positive',
-  'assertion.error.negative'
+  messages.error_positive,
+  messages.error_negative
 )
 assert:register(
   'assertion',
   'error_matches',
   error_matches,
-  'assertion.error.positive',
-  'assertion.error.negative'
+  messages.error_positive,
+  messages.error_negative
 )
 assert:register(
   'assertion',
   'error_match',
   error_matches,
-  'assertion.error.positive',
-  'assertion.error.negative'
+  messages.error_positive,
+  messages.error_negative
 )
 assert:register(
   'assertion',
   'matches_error',
   error_matches,
-  'assertion.error.positive',
-  'assertion.error.negative'
+  messages.error_positive,
+  messages.error_negative
 )
 assert:register(
   'assertion',
   'match_error',
   error_matches,
-  'assertion.error.positive',
-  'assertion.error.negative'
+  messages.error_positive,
+  messages.error_negative
 )
 assert:register(
   'assertion',
   'truthy',
   truthy,
-  'assertion.truthy.positive',
-  'assertion.truthy.negative'
+  messages.truthy_positive,
+  messages.truthy_negative
 )
-assert:register('assertion', 'falsy', falsy, 'assertion.falsy.positive', 'assertion.falsy.negative')
+assert:register('assertion', 'falsy', falsy, messages.falsy_positive, messages.falsy_negative)

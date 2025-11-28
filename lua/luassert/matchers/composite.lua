@@ -1,15 +1,15 @@
 local assert = require('luassert.assert')
 local match = require('luassert.match')
-local s = require('say')
+local messages = require('luassert.messages')
 
 local function none(state, arguments, level)
   local level = (level or 1) + 1
   local argcnt = arguments.n
-  assert(argcnt > 0, s('assertion.internal.argtolittle', { 'none', 1, tostring(argcnt) }), level)
+  assert(argcnt > 0, messages.arg_too_little('none', 1, tostring(argcnt)), level)
   for i = 1, argcnt do
     assert(
       match.is_matcher(arguments[i]),
-      s('assertion.internal.badargtype', { 1, 'none', 'matcher', type(arguments[i]) }),
+      messages.bad_arg_type(1, 'none', 'matcher', type(arguments[i])),
       level
     )
   end
@@ -27,11 +27,11 @@ end
 local function any(state, arguments, level)
   local level = (level or 1) + 1
   local argcnt = arguments.n
-  assert(argcnt > 0, s('assertion.internal.argtolittle', { 'any', 1, tostring(argcnt) }), level)
+  assert(argcnt > 0, messages.arg_too_little('any', 1, tostring(argcnt)), level)
   for i = 1, argcnt do
     assert(
       match.is_matcher(arguments[i]),
-      s('assertion.internal.badargtype', { 1, 'any', 'matcher', type(arguments[i]) }),
+      messages.bad_arg_type(1, 'any', 'matcher', type(arguments[i])),
       level
     )
   end
@@ -49,11 +49,11 @@ end
 local function all(state, arguments, level)
   local level = (level or 1) + 1
   local argcnt = arguments.n
-  assert(argcnt > 0, s('assertion.internal.argtolittle', { 'all', 1, tostring(argcnt) }), level)
+  assert(argcnt > 0, messages.arg_too_little('all', 1, tostring(argcnt)), level)
   for i = 1, argcnt do
     assert(
       match.is_matcher(arguments[i]),
-      s('assertion.internal.badargtype', { 1, 'all', 'matcher', type(arguments[i]) }),
+      messages.bad_arg_type(1, 'all', 'matcher', type(arguments[i])),
       level
     )
   end
