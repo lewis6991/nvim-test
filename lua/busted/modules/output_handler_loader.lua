@@ -1,9 +1,10 @@
-local path = require('pl.path')
 local utils = require('busted.utils')
+
+local fs = vim.fs
 
 local function resolve_handler(output)
   if output:match('%.lua$') then
-    return dofile(path.normpath(output))
+    return dofile(fs.normalize(output))
   end
 
   local ok, handler = pcall(require, output)

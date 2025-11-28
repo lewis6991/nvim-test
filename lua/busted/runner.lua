@@ -1,6 +1,7 @@
 -- Busted command-line runner
 
-local path = require('pl.path')
+local uv = vim.uv or vim.loop
+local fs = vim.fs
 local utils = require('busted.utils')
 local exit = require('busted.exit')
 local loadstring = _G.loadstring or load
@@ -40,7 +41,7 @@ return function(options)
   local forceExit = fileName == nil
 
   -- Parse the cli arguments
-  local appName = path.basename(fileName or 'busted')
+  local appName = fs.basename(fileName or 'busted')
   cli:set_name(appName)
   local cliArgs, err = cli:parse(arg)
   if not cliArgs then
@@ -55,8 +56,9 @@ return function(options)
   end
 
   -- Load current working directory
-  local _, err1 = path.chdir(path.normpath(cliArgs.directory))
-  if err1 then
+  local target_dir = fs.normalize(cliArgs.directory)
+  local ok, err1 = pcall(uv.chdir, target_dir)
+  if not ok then
     io.stderr:write(appName .. ': error: ' .. err1 .. '\n')
     exit(1, forceExit)
   end
@@ -67,6 +69,8 @@ return function(options)
     if not ok then
       io.stderr:write(appName .. ': error: ' .. err2 .. '\n')
       exit(1, forceExit)
+    elseif err2 then
+      io.stderr:write(appName .. ': warning: ' .. err2 .. '\n')
     end
   end
 

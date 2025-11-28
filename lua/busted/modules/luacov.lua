@@ -4,8 +4,7 @@ return function()
     local result, luacov = pcall(require, 'luacov.runner')
 
     if not result then
-      return nil,
-        'LuaCov not found on the system, try running without --coverage option, or install LuaCov first'
+      return true, 'LuaCov not found; skipping coverage setup.'
     end
 
     -- call it to start

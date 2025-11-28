@@ -1,46 +1,68 @@
-local pl_path = require('pl.path')
-local pl_utils = require('pl.utils')
+local uv = vim.uv or vim.loop
+local fs = vim.fs
 
 local fixtures = {}
 
--- returns an absolute path to where the current test file is located.
--- @param sub_path [optional] a relative path to, to be appended
--- @return returns the (normalized) absolute path
+local function normalize(path)
+  if not path or path == '' then
+    return nil
+  end
+  return fs.normalize(path)
+end
+
+local function source_path(level)
+  local info = debug.getinfo(level, 'S')
+  local src = info and info.source or ''
+  if src:sub(1, 1) == '@' then
+    src = src:sub(2)
+  end
+  return normalize(src)
+end
+
+--- returns an absolute path to where the current test file is located.
+--- @param sub_path? string relative path to append
 function fixtures.path(sub_path)
-  if type(sub_path) ~= 'string' and type(sub_path) ~= 'nil' then
+  if type(sub_path) ~= 'string' and sub_path ~= nil then
     error(
       "bad argument to 'path' expected a string (relative filename) or nil, got: " .. type(sub_path),
       2
     )
   end
 
-  local info = debug.getinfo(1)
-  local myname = info.source -- path to this code file
-
-  local path
-  local level = 1
-  repeat
-    -- other functions in this module call this one as well, so traverse up the
-    -- stack until we find the first call from outside this module, that's
-    -- the file to use as a baseline for our relative search
+  local my_source = source_path(1)
+  local level = 2
+  local caller = source_path(level)
+  while caller == my_source do
     level = level + 1
-    path = debug.getinfo(level).source
-  until path ~= myname
-
-  if path:sub(1, 1) == '@' then
-    path = path:sub(2, -1)
+    caller = source_path(level)
   end
-  path = pl_path.abspath(path) -- based on PWD
-  path = pl_path.splitpath(path) -- drop filename, keep path only
-  path = pl_path.join(path, sub_path)
-  return pl_path.normpath(path)
+
+  local base_dir = caller and fs.dirname(caller) or uv.cwd()
+  if sub_path and #sub_path > 0 then
+    base_dir = fs.joinpath(base_dir, sub_path)
+  end
+  return fs.normalize(base_dir)
 end
 
--- reads a file relative from the current test file.
--- @param rel_path (string) the relative path to the file
--- @param is_bin (boolean) whether to load the file as a binary file
--- @return returns the file contents or errors on failure
-function fixtures.read(rel_path, is_bin)
+local function read_file(path)
+  local fd, err = uv.fs_open(path, 'r', 438)
+  if not fd then
+    return nil, err
+  end
+  local stat, stat_err = uv.fs_fstat(fd)
+  if not stat then
+    uv.fs_close(fd)
+    return nil, stat_err
+  end
+  local data, read_err = uv.fs_read(fd, stat.size, 0)
+  uv.fs_close(fd)
+  if not data then
+    return nil, read_err
+  end
+  return data
+end
+
+function fixtures.read(rel_path, _is_bin)
   if type(rel_path) ~= 'string' then
     error(
       "bad argument to 'read' expected a string (relative filename), got: " .. type(rel_path),
@@ -49,8 +71,7 @@ function fixtures.read(rel_path, is_bin)
   end
 
   local fname = fixtures.path(rel_path)
-
-  local contents, err = pl_utils.readfile(fname, is_bin)
+  local contents, err = read_file(fname)
   if not contents then
     error(("Error reading file '%s': %s"):format(tostring(fname), tostring(err)), 2)
   end
@@ -58,9 +79,6 @@ function fixtures.read(rel_path, is_bin)
   return contents
 end
 
--- loads (and executes) a Lua-file relative from the current test file.
--- @param rel_path (string) the relative path to the file
--- @return returns the results of the executed file (similar to a module)
 function fixtures.load(rel_path)
   if type(rel_path) ~= 'string' then
     error(

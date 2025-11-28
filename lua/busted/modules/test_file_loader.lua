@@ -1,14 +1,47 @@
 local FILE_NOT_FOUND_MSG = 'Cannot find file or directory: %s'
 local NO_MATCHING_TESTS_MSG = 'No test files found matching Lua pattern: %s'
 
+local uv = vim.uv or vim.loop
+local fs = vim.fs
+
 local function filter(list, predicate)
   return vim.tbl_filter(predicate, list)
 end
 
-return function(busted, loaders)
-  local path = require('pl.path')
-  local dir = require('pl.dir')
+local function stat_type(target)
+  local stat = uv.fs_stat(target)
+  return stat and stat.type or nil
+end
 
+local function collect_files(root, recursive)
+  local files = {}
+
+  local function walk(dir)
+    local iter = uv.fs_scandir(dir)
+    if not iter then
+      return
+    end
+    while true do
+      local name, type = uv.fs_scandir_next(iter)
+      if not name then
+        break
+      end
+      if name:sub(1, 1) ~= '.' then
+        local full = fs.joinpath(dir, name)
+        if type == 'file' then
+          files[#files + 1] = full
+        elseif type == 'directory' and recursive then
+          walk(full)
+        end
+      end
+    end
+  end
+
+  walk(root)
+  return files
+end
+
+return function(busted, loaders)
   local fileLoaders = {}
 
   for _, v in pairs(loaders) do
@@ -16,18 +49,18 @@ return function(busted, loaders)
     fileLoaders[#fileLoaders + 1] = loader
   end
 
-  local getTestFiles = function(rootFile, patterns, options)
+  local function getTestFiles(rootFile, patterns, options)
     local fileList
+    local rootType = stat_type(rootFile)
 
-    if path.isfile(rootFile) then
+    if rootType == 'file' then
       fileList = { rootFile }
-    elseif path.isdir(rootFile) then
-      local getfiles = options.recursive and dir.getallfiles or dir.getfiles
-      fileList = getfiles(rootFile)
+    elseif rootType == 'directory' then
+      fileList = collect_files(rootFile, not not options.recursive)
 
       fileList = filter(fileList, function(filename)
-        local basename = path.basename(filename)
-        for _, patt in ipairs(options.excludes) do
+        local basename = fs.basename(filename)
+        for _, patt in ipairs(options.excludes or {}) do
           if patt ~= '' and basename:find(patt) then
             return nil
           end
@@ -39,14 +72,6 @@ return function(busted, loaders)
         end
         return #patterns == 0
       end)
-
-      fileList = filter(fileList, function(filename)
-        if path.is_windows then
-          return not filename:find('%\\%.%w+.%w+', #rootFile)
-        else
-          return not filename:find('/%.%w+.%w+', #rootFile)
-        end
-      end)
     else
       busted.publish({ 'error' }, {}, nil, string.format(FILE_NOT_FOUND_MSG, rootFile), {})
       fileList = {}
@@ -56,7 +81,7 @@ return function(busted, loaders)
     return fileList
   end
 
-  local getAllTestFiles = function(rootFiles, patterns, options)
+  local function getAllTestFiles(rootFiles, patterns, options)
     local fileList = {}
     for _, root in ipairs(rootFiles) do
       vim.list_extend(fileList, getTestFiles(root, patterns, options))
@@ -64,19 +89,18 @@ return function(busted, loaders)
     return fileList
   end
 
-  -- runs a testfile, loading its tests
-  local loadTestFile = function(busted, filename)
+  local function loadTestFile(busted_ctx, filename)
     for _, v in pairs(fileLoaders) do
-      if v.match(busted, filename) then
-        return v.load(busted, filename)
+      if v.match(busted_ctx, filename) then
+        return v.load(busted_ctx, filename)
       end
     end
   end
 
-  local loadTestFiles = function(rootFiles, patterns, options)
+  local function loadTestFiles(rootFiles, patterns, options)
     local fileList = getAllTestFiles(rootFiles, patterns, options)
 
-    for i, fileName in ipairs(fileList) do
+    for _, fileName in ipairs(fileList) do
       local testFile, getTrace, rewriteMessage = loadTestFile(busted, fileName)
 
       if testFile then

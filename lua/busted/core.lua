@@ -1,8 +1,7 @@
 local getfenv = _G.getfenv
 local setfenv = _G.setfenv
 local unpack = _G.unpack
-local path = require('pl.path')
-local pretty = require('pl.pretty')
+local fs = vim.fs
 local throw = error
 
 local failureMt = {
@@ -44,6 +43,34 @@ local function isCallable(obj)
   return type(obj) == 'function' or (debug.getmetatable(obj) or {}).__call
 end
 
+local function normalize_source(src)
+  if type(src) ~= 'string' then
+    return nil
+  end
+  if src:sub(1, 1) == '@' then
+    src = src:sub(2)
+  end
+  return fs.normalize(src)
+end
+
+local function dirname(src)
+  local norm = normalize_source(src)
+  if not norm then
+    return nil
+  end
+  return fs.dirname(norm)
+end
+
+local function pretty_write(value)
+  if type(value) == 'string' then
+    return value
+  end
+  if value == nil then
+    return 'nil'
+  end
+  return vim.inspect(value)
+end
+
 return function()
   local mediator = require('mediator')()
 
@@ -73,12 +100,12 @@ return function()
     end
     level = level or 3
 
-    local thisdir = path.dirname(debug.getinfo(1, 'Sl').source)
+    local thisdir = dirname(debug.getinfo(1, 'Sl').source) or ''
     local info = debug.getinfo(level, 'Sl')
     while
       info.what == 'C'
       or info.short_src:match('luassert[/\\].*%.lua$')
-      or (info.source:sub(1, 1) == '@' and thisdir == path.dirname(info.source))
+      or (info.source:sub(1, 1) == '@' and thisdir == (dirname(info.source) or ''))
     do
       level = level + 1
       info = debug.getinfo(level, 'Sl')
@@ -94,7 +121,7 @@ return function()
   function busted.rewriteMessage(element, message, trace)
     local file = busted.getFile(element)
     local msg = hasToString(message) and tostring(message)
-    msg = msg or (message ~= nil and pretty.write(message) or 'Nil error')
+    msg = msg or (message ~= nil and pretty_write(message) or 'Nil error')
     msg = (file and file.rewriteMessage and file.rewriteMessage(file.name, msg) or msg)
 
     local hasFileLine = msg:match('^[^\n]-:%d+: .*')

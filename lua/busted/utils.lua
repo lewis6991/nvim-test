@@ -1,3 +1,10 @@
+local function split(value, sep)
+  if type(value) ~= 'string' then
+    return {}
+  end
+  return vim.split(value, sep or ',', { plain = true, trimempty = true })
+end
+
 return {
   copy_interpreter_args = function(arguments)
     -- copy non-positive command-line args auto-inserted by Lua interpreter
@@ -10,7 +17,7 @@ return {
     end
   end,
 
-  split = require('pl.utils').split,
+  split = split,
 
   shuffle = function(t, seed)
     if seed then

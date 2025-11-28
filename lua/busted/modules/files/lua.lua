@@ -1,5 +1,3 @@
-local path = require('pl.path')
-
 local ret = {}
 
 local getTrace = function(filename, info)
@@ -8,8 +6,8 @@ local getTrace = function(filename, info)
   return info
 end
 
-ret.match = function(busted, filename)
-  return path.extension(filename) == '.lua'
+ret.match = function(_busted, filename)
+  return type(filename) == 'string' and filename:sub(-4) == '.lua'
 end
 
 ret.load = function(busted, filename)

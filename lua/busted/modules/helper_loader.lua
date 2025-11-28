@@ -1,5 +1,5 @@
-local path = require('pl.path')
 local utils = require('busted.utils')
+local fs = vim.fs
 
 return function()
   local loadHelper = function(busted, helper, options)
@@ -11,7 +11,7 @@ return function()
       _G.arg = options.arguments
 
       if helper:match('%.lua$') then
-        fn = dofile(path.normpath(helper))
+        fn = dofile(fs.normalize(helper))
       else
         fn = require(helper)
       end

@@ -1,7 +1,9 @@
 local utils = require('busted.utils')
-local path = require('pl.path')
 local exit = require('busted.exit')
-local execute = require('pl.utils').execute
+
+local uv = vim.uv or vim.loop
+local fs = vim.fs
+local is_windows = uv.os_uname().sysname:match('Windows')
 
 return function(options)
   local appName = ''
@@ -16,10 +18,40 @@ return function(options)
   local defaultPattern = '_spec'
   local defaultSeed = '/dev/urandom or os.time()'
   local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
-  local cpathprefix = path.is_windows and './csrc/?.dll;./csrc/?/?.dll;'
-    or './csrc/?.so;./csrc/?/?.so;'
+  local cpathprefix = is_windows and './csrc/?.dll;./csrc/?/?.dll;' or './csrc/?.so;./csrc/?/?.so;'
 
   local cliArgsParsed = {}
+
+  local function normalize(pathname)
+    if not pathname or pathname == '' then
+      return pathname
+    end
+    return fs.normalize(pathname)
+  end
+
+  local function join(base, relative)
+    if not base or base == '' then
+      return normalize(relative)
+    end
+    if not relative or relative == '' then
+      return normalize(base)
+    end
+    return normalize(fs.joinpath(base, relative))
+  end
+
+  local function isfile(pathname)
+    local stat = uv.fs_stat(pathname)
+    return stat and stat.type == 'file'
+  end
+
+  local function run_lua_interpreter(command, script, args)
+    local cmd = { command, script, '--ignore-lua' }
+    for _, value in ipairs(args) do
+      cmd[#cmd + 1] = value
+    end
+    local result = vim.system(cmd):wait()
+    exit(result.code)
+  end
 
   local function makeList(values)
     return type(values) == 'table' and values or { values }
@@ -102,7 +134,7 @@ return function(options)
   end
 
   local function processDir(key, value, altkey, opt)
-    local dpath = path.normpath(path.join(cliArgsParsed[key] or '', value))
+    local dpath = join(cliArgsParsed[key] or '', value)
     processOption(key, dpath, altkey, opt)
     return true
   end
@@ -287,14 +319,14 @@ return function(options)
     local bustedConfigFilePath
     if cliArgs.f then
       -- if the file is given, then we require it to exist
-      if not path.isfile(cliArgs.f) then
+      if not isfile(cliArgs.f) then
         return nil, ("specified config file '%s' not found"):format(cliArgs.f)
       end
       bustedConfigFilePath = cliArgs.f
     else
       -- try default file
-      bustedConfigFilePath = path.normpath(path.join(cliArgs.directory, '.busted'))
-      if not path.isfile(bustedConfigFilePath) then
+      bustedConfigFilePath = join(cliArgs.directory, '.busted')
+      if not isfile(bustedConfigFilePath) then
         bustedConfigFilePath = nil -- clear default file, since it doesn't exist
       end
     end
@@ -320,9 +352,7 @@ return function(options)
     -- Switch lua, we should rebuild this feature once luarocks changes how it
     -- handles executeable lua files.
     if cliArgs['lua'] and not cliArgs['ignore-lua'] then
-      local _, code =
-        execute(cliArgs['lua'] .. ' ' .. args[0] .. ' --ignore-lua ' .. table.concat(args, ' '))
-      exit(code)
+      run_lua_interpreter(cliArgs['lua'], args[0], args)
     end
 
     -- Ensure multi-options are in a list
