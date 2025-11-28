@@ -2,7 +2,6 @@
 
 local path = require('pl.path')
 local tablex = require('pl.tablex')
-local term = require('term')
 local utils = require('busted.utils')
 local exit = require('busted.compatibility').exit
 local loadstring = require('busted.compatibility').loadstring
@@ -15,9 +14,8 @@ return function(options)
     loaded = true
   end
 
-  local isatty = io.type(io.stdout) == 'file' and vim.uv.guess_handle(1) == 'tty'
   options = tablex.update(require('busted.options'), options or {})
-  options.output = options.output or (isatty and 'utfTerminal' or 'plainTerminal')
+  options.output = options.output or 'nvim-test.busted.output_handler'
 
   local busted = require('busted.core')()
 
@@ -137,7 +135,6 @@ return function(options)
   -- Set up output handler to listen to events
   outputHandlerLoader(busted, cliArgs.output, {
     defaultOutput = options.output,
-    enableSound = cliArgs['enable-sound'],
     verbose = cliArgs.verbose,
     suppressPending = cliArgs['suppress-pending'],
     deferPrint = cliArgs['defer-print'],

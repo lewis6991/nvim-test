@@ -12,8 +12,8 @@ return function(options)
   local configLoader = require('busted.modules.configuration_loader')()
 
   -- Default cli arg values
-  local defaultOutput = options.output or 'utfTerminal'
-  local defaultLoaders = 'lua,moonscript'
+  local defaultOutput = options.output or 'nvim-test.busted.output_handler'
+  local defaultLoaders = 'lua'
   local defaultPattern = '_spec'
   local defaultSeed = '/dev/urandom or os.time()'
   local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
@@ -240,7 +240,6 @@ return function(options)
     processOption
   )
   cli:flag('-v, --[no-]verbose', 'verbose output of errors', false, processOption)
-  cli:flag('-s, --[no-]enable-sound', 'executes `say` command if available', false, processOption)
   cli:flag(
     '-l, --list',
     'list the names of all tests instead of running them',
