@@ -76,7 +76,6 @@ return function()
       element = copyElement(element),
       name = handler.getFullName(element),
       message = message,
-      randomseed = parent and parent.randomseed,
       isError = isError,
     }
     formatted.element.trace = element.trace or debug

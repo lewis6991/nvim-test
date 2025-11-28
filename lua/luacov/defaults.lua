@@ -7,10 +7,10 @@
 return {
 
   --- Filename to store collected stats. Default: "luacov.stats.out".
-  statsfile = "luacov.stats.out",
+  statsfile = 'luacov.stats.out',
 
   --- Filename to store report. Default: "luacov.report.out".
-  reportfile = "luacov.report.out",
+  reportfile = 'luacov.report.out',
 
   --- Enable saving coverage data after every `savestepsize` lines?
   -- Setting this flag to `true` in config is equivalent to running LuaCov
@@ -72,5 +72,4 @@ return {
   -- Note that you are not allowed to use patterns in these paths.
   -- Default: false.
   includeuntestedfiles = false,
-
 }

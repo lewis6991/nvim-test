@@ -29,7 +29,6 @@ return function(options)
   }
 
   local repeatSuiteString = '\nRepeating all tests (run %d of %d) . . .\n\n'
-  local randomizeString = c.note('Note: Randomizing test order with a seed of %d.\n')
   local globalSetup = c.sect('--------') .. ' Global test environment setup.\n'
   local fileStartString = c.sect('--------') .. ' Running tests from ' .. c.file('%s') .. '\n'
   local runString = c.sect('RUN     ') .. ' ' .. c.test('%s') .. ': '
@@ -97,7 +96,7 @@ return function(options)
   end
 
   local failureDescription = function(failure)
-    local s = failure.randomseed and ('Random seed: ' .. failure.randomseed .. '\n') or ''
+    local s = ''
     if type(failure.message) == 'string' then
       s = s .. failure.message
     elseif failure.message == nil then
@@ -184,12 +183,9 @@ return function(options)
     return nil, true
   end
 
-  handler.suiteStart = function(_suite, count, total, randomseed)
+  handler.suiteStart = function(_suite, count, total)
     if total > 1 then
       io.write(repeatSuiteString:format(count, total))
-    end
-    if randomseed then
-      io.write(randomizeString:format(randomseed))
     end
     io.write(globalSetup)
     io.flush()

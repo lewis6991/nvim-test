@@ -1,6 +1,3 @@
-local shuffle = require('busted.utils').shuffle
-local urandom = require('busted.utils').urandom
-
 local function sort(elements)
   table.sort(elements, function(t1, t2)
     if t1.name and t2.name then
@@ -15,6 +12,7 @@ return function(busted)
   local block = require('busted.block')(busted)
 
   local function execute(runs, options)
+    options = options or {}
     local root = busted.context.get()
     local children = { unpack(busted.context.children(root)) }
 
@@ -33,8 +31,6 @@ return function(busted)
         end
         busted.context.attach(child)
       end
-
-      busted.randomseed = tonumber(options.seed) or urandom() or os.time()
     end
 
     for i = 1, runs do
@@ -46,13 +42,9 @@ return function(busted)
 
       if options.sort then
         sort(busted.context.children(root))
-      elseif options.shuffle then
-        root.randomseed = busted.randomseed
-        shuffle(busted.context.children(root), busted.randomseed)
       end
 
-      local seed = (busted.randomize and busted.randomseed or nil)
-      if busted.safe_publish('suite', { 'suite', 'start' }, root, i, runs, seed) then
+      if busted.safe_publish('suite', { 'suite', 'start' }, root, i, runs) then
         if block.setup(root) then
           busted.execute()
         end

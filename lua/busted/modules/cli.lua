@@ -54,9 +54,6 @@ OPTIONS:
                               ./csrc/?.so;./csrc/?/?.so;)
   -r, --run=RUN               config to run from .busted file
   --repeat=COUNT              run the tests repeatedly (default: 1)
-  --seed=SEED                 random seed value to use for shuffling
-                              test order (default: /dev/urandom or
-                              os.time())
   --loaders=NAME              test file loaders (default: lua)
   --helper=PATH               A helper script that is run before tests
   --lua=LUA                   The path to the lua interpreter busted
@@ -82,15 +79,6 @@ OPTIONS:
   -k, --[no-]keep-going       continue as much as possible after an
                               error or failure (default: on)
   -R, --[no-]recursive        recurse into subdirectories (default: on)
-  --[no-]shuffle              randomize file and test order, takes
-                              precedence over --sort (--shuffle-test
-                              and --shuffle-files) (default: off)
-  --[no-]shuffle-files        randomize file execution order, takes
-                              precedence over --sort-files (default:
-                              off)
-  --[no-]shuffle-tests        randomize test order within a file, takes
-                              precedence over --sort-tests (default:
-                              off)
   --[no-]sort                 sort file and test order (--sort-tests
                               and --sort-files) (default: off)
   --[no-]sort-files           sort file execution order (default: off)
@@ -112,7 +100,6 @@ return function(options)
   local defaultOutput = options.output or 'nvim-test.busted.output_handler'
   local defaultLoaders = 'lua'
   local defaultPattern = '_spec'
-  local defaultSeed = '/dev/urandom or os.time()'
   local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
   local cpathprefix = is_windows and './csrc/?.dll;./csrc/?/?.dll;' or './csrc/?.so;./csrc/?/?.so;'
 
@@ -196,7 +183,6 @@ return function(options)
       Xoutput = {},
       Xhelper = {},
       ['repeat'] = 1,
-      seed = defaultSeed,
       coverage = false,
       c = false,
       verbose = false,
@@ -296,12 +282,6 @@ return function(options)
     return true
   end
 
-  local function processShuffle(state, _, value)
-    assign(state, 'shuffle-files', value)
-    assign(state, 'shuffle-tests', value)
-    return true
-  end
-
   local function processSort(state, _, value)
     assign(state, 'sort-files', value)
     assign(state, 'sort-tests', value)
@@ -392,9 +372,6 @@ return function(options)
   register_option({ '--repeat' }, value_option('--repeat', function(state, value)
     return processNumber(state, 'repeat', value, nil, '--repeat')
   end))
-  register_option({ '--seed' }, value_option('--seed', function(state, value)
-    return processNumber(state, 'seed', value, nil, '--seed')
-  end))
   register_option({ '--loaders' }, value_option('--loaders', function(state, value)
     return processLoaders(state, 'loaders', value)
   end))
@@ -425,10 +402,6 @@ return function(options)
   register_option({ '--no-keep-going' }, simple_flag('--no-keep-going', 'keep-going', false, 'k'))
   register_option({ '-R', '--recursive' }, simple_flag('--recursive', 'recursive', true, 'R'))
   register_option({ '--no-recursive' }, simple_flag('--no-recursive', 'recursive', false, 'R'))
-  register_option({ '--shuffle-files' }, simple_flag('--shuffle-files', 'shuffle-files', true))
-  register_option({ '--no-shuffle-files' }, simple_flag('--no-shuffle-files', 'shuffle-files', false))
-  register_option({ '--shuffle-tests' }, simple_flag('--shuffle-tests', 'shuffle-tests', true))
-  register_option({ '--no-shuffle-tests' }, simple_flag('--no-shuffle-tests', 'shuffle-tests', false))
   register_option({ '--sort-files' }, simple_flag('--sort-files', 'sort-files', true))
   register_option({ '--no-sort-files' }, simple_flag('--no-sort-files', 'sort-files', false))
   register_option({ '--sort-tests' }, simple_flag('--sort-tests', 'sort-tests', true))
@@ -437,20 +410,6 @@ return function(options)
   register_option({ '--no-suppress-pending' }, simple_flag('--no-suppress-pending', 'suppress-pending', false))
   register_option({ '--defer-print' }, simple_flag('--defer-print', 'defer-print', true))
   register_option({ '--no-defer-print' }, simple_flag('--no-defer-print', 'defer-print', false))
-  register_option({ '--shuffle' }, {
-    takes_value = false,
-    display = '--shuffle',
-    handler = function(state)
-      return processShuffle(state, 'shuffle', true)
-    end,
-  })
-  register_option({ '--no-shuffle' }, {
-    takes_value = false,
-    display = '--no-shuffle',
-    handler = function(state)
-      return processShuffle(state, 'shuffle', false)
-    end,
-  })
   register_option({ '--sort' }, {
     takes_value = false,
     display = '--sort',

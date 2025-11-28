@@ -1,6 +1,5 @@
 local getfenv = _G.getfenv
 local unpack = _G.unpack
-local shuffle = require('busted.utils').shuffle
 
 local function sort(elements)
   table.sort(elements, function(t1, t2)
@@ -24,7 +23,6 @@ return function(busted)
 
   function block.rejectAll(element)
     local env = getfenv(element.run)
-    block.reject('randomize', element)
     for descriptor, _ in pairs(busted.executors) do
       if root.env[descriptor] and (env ~= _G and env[descriptor] or rawget(env, descriptor)) then
         block.reject(descriptor, element)
@@ -144,21 +142,9 @@ return function(busted)
       element.env = {}
     end
 
-    local randomize = busted.randomize
-    local randomseed = busted.randomseed
-    element.env.randomize = function(...)
-      randomize = (select('#', ...) == 0 or ...)
-      if randomize then
-        randomseed = tonumber(({ ... })[1]) or tonumber(({ ... })[2]) or randomseed
-      end
-    end
-
     if busted.safe(descriptor, element.run, element):success() then
       if busted.sort then
         sort(busted.context.children(element))
-      elseif randomize then
-        element.randomseed = randomseed
-        shuffle(busted.context.children(element), randomseed)
       end
 
       if block.setup(element) then

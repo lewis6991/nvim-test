@@ -2,7 +2,6 @@
 
 local uv = vim.uv or vim.loop
 local fs = vim.fs
-local utils = require('busted.utils')
 local exit = require('busted.exit')
 local loadstring = _G.loadstring or load
 local loaded = false
@@ -138,10 +137,8 @@ return function(options)
     return nil, true
   end)
 
-  -- Set up randomization options
+  -- Set up ordering options
   busted.sort = cliArgs['sort-tests']
-  busted.randomize = cliArgs['shuffle-tests']
-  busted.randomseed = tonumber(cliArgs.seed) or utils.urandom() or os.time()
 
   -- Set up output handler to listen to events
   outputHandlerLoader(busted, cliArgs.output, {
@@ -227,8 +224,6 @@ return function(options)
   local runs = cliArgs['repeat']
   local execute = require('busted.execute')(busted)
   execute(runs, {
-    seed = cliArgs.seed,
-    shuffle = cliArgs['shuffle-files'],
     sort = cliArgs['sort-files'],
   })
 

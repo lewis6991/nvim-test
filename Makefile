@@ -22,12 +22,12 @@ $(STYLUA_ZIP):
 stylua: $(STYLUA_ZIP)
 	unzip $<
 
-.PHONY: stylua-check
-stylua-check: stylua
+.PHONY: format-check
+format-check: stylua
 	./stylua --check lua/**/*.lua
 
-.PHONY: stylua-run
-stylua-run: stylua
+.PHONY: format
+format: stylua
 	./stylua lua/**/*.lua
 
 .PHONY: test

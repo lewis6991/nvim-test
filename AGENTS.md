@@ -1,0 +1,2 @@
+- When running in the test runner. `vim.api` and `vim.fn` are not available.
+- `exec_lua()` runs inside an embedded nvim instance which has access to `vim.api` and `vim.fn`
