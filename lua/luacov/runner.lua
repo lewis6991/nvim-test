@@ -510,6 +510,7 @@ end
 -- If table then config table (see file `luacov.default.lua` for an example)
 function M.init(configuration)
   M.configuration = M.load_config(configuration)
+  print('DDDD1', vim.inspect(M.configuration))
 
   -- metatable trick on filehandle won't work if Lua exits through
   -- os.exit() hence wrap that with exit code as well

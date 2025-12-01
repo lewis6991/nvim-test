@@ -10,6 +10,26 @@ end
 --- @cast load_chunk fun(code: string, chunkname?: string): function
 local loaded = false
 
+local function load_luacov(config)
+  local luacov = require('luacov.runner')
+
+  --- @cast luacov luacov.runner
+  -- call it to start
+  luacov(config)
+
+  -- exclude busted files
+  local configuration = luacov.configuration or {}
+  luacov.configuration = configuration
+  local exclude = configuration.exclude or {}
+  configuration.exclude = exclude
+  table.insert(exclude, 'busted_bootstrap$')
+  table.insert(exclude, 'busted%.')
+  table.insert(exclude, 'luassert%.')
+  table.insert(exclude, 'pl%.')
+
+  return luacov
+end
+
 local function main(custom_options)
   local provided_options = custom_options or { standalone = false }
   if loaded then
@@ -33,8 +53,6 @@ local function main(custom_options)
   local filterLoader = require('busted.modules.filter_loader')
   local helperLoader = require('busted.modules.helper_loader')()
   local outputHandlerLoader = require('busted.modules.output_handler_loader')()
-
-  local luacov = require('busted.modules.luacov')()
 
   require('busted')(busted)
 
@@ -70,15 +88,11 @@ local function main(custom_options)
     exit(1, forceExit)
   end
 
+  local luacov
+
   -- If coverage arg is passed in, load LuaCovsupport
   if cliArgs.coverage then
-    local coverage_ok, coverage_err = luacov(cliArgs['coverage-config-file'])
-    if not coverage_ok then
-      io.stderr:write(appName .. ': error: ' .. coverage_err .. '\n')
-      exit(1, forceExit)
-    elseif coverage_err then
-      io.stderr:write(appName .. ': warning: ' .. coverage_err .. '\n')
-    end
+    luacov = load_luacov(cliArgs['coverage-config-file'])
   end
 
   -- If lazy is enabled, make lazy setup/teardown the default
@@ -202,20 +216,8 @@ local function main(custom_options)
 
   busted:publish({ 'exit' })
 
-  if cliArgs.coverage then
-    local ok_luacov, luacov_mod = pcall(require, 'luacov')
-    if ok_luacov and type(luacov_mod) == 'table' and luacov_mod.shutdown then
-      if luacov_mod.load_config then
-        luacov_mod.configuration = nil
-        local config_arg = cliArgs['coverage-config-file']
-        pcall(luacov_mod.load_config, config_arg)
-      end
-
-      local ok_shutdown, err_shutdown = pcall(luacov_mod.shutdown)
-      if not ok_shutdown then
-        io.stderr:write('luacov: shutdown failed: ' .. tostring(err_shutdown) .. '\n')
-      end
-    end
+  if luacov then
+    luacov.shutdown()
   end
 
   if options.standalone or failures > 0 or errors > 0 then

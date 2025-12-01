@@ -6,7 +6,6 @@ local fs = vim.fs
 
 local util = require('luacov.util')
 local stats = require('luacov.stats')
-local runner = require('luacov.runner')
 
 local function tmp_dir()
   local template = fs.joinpath(uv.os_tmpdir(), 'luacov-spec-XXXXXX')
@@ -76,12 +75,13 @@ end)
 
 describe('luacov.runner helpers', function()
   it('applies include/exclude rules', function()
-    runner.configuration = {
+    local runner_mod = dofile('lua/luacov/runner.lua')
+    runner_mod.configuration = {
       include = { 'lua/src' },
       exclude = { 'lua/src/excluded' },
     }
-    assert(runner.file_included('lua/src/module.lua'))
-    assert(not runner.file_included('lua/src/excluded/module.lua'))
+    assert(runner_mod.file_included('lua/src/module.lua'))
+    assert(not runner_mod.file_included('lua/src/excluded/module.lua'))
   end)
 
   it('registers module mappings for real_name', function()
