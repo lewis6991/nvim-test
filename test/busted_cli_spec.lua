@@ -60,15 +60,10 @@ describe('busted.modules.cli', function()
       'alpha',
       '--filter',
       'beta',
-      '--name',
-      'first',
-      '--name',
-      'second',
       '--filter-out',
       'skip',
     })
     assert.are.same({ 'alpha', 'beta' }, parsed.filter)
-    assert.are.same({ 'first', 'second' }, parsed.name)
     assert.are.same({ 'skip' }, parsed['filter-out'])
   end)
 

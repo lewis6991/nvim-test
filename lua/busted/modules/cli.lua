@@ -84,31 +84,6 @@ end
 
 --- @param state busted.cli.State
 --- @param key string
---- @param value any
---- @param altkey string?
---- @return boolean, string?
-local function processOption(state, key, value, altkey)
-  assign(state, key, value, altkey)
-  return true
-end
-
---- @param state busted.cli.State
---- @param key string
---- @param value string?
---- @return boolean, string?
-local function processArgList(state, key, value)
-  value = value or ''
-  local list = state.overrides[key]
-  if not list then
-    list = {}
-  end
-  vim.list_extend(list, utils.split(value, ','))
-  assign(state, key, list)
-  return true
-end
-
---- @param state busted.cli.State
---- @param key string
 --- @param value string?
 --- @param altkey string?
 --- @param opt string
@@ -187,10 +162,16 @@ return function(options)
       }
     end,
     positional_handler = function(state, argument)
-      if allow_roots then
-        return processArgList(state, 'ROOT', argument)
+      if not allow_roots then
+        return false, 'Unexpected positional argument ' .. argument
       end
-      return false, 'Unexpected positional argument ' .. argument
+      local list = state.overrides['ROOT']
+      if not list then
+        list = {}
+      end
+      vim.list_extend(list, utils.split(argument or '', ','))
+      assign(state, 'ROOT', list)
+      return true
     end,
     app_name = appName,
   })
@@ -203,190 +184,144 @@ return function(options)
   end
 
   parser:add_argument({ '--version' }, {
-    handler = function(state)
-      return processOption(state, 'version', true)
-    end,
-    description = 'Print the program version and exit.',
+    help = 'Print the program version and exit.',
     default = false,
   })
   if allow_roots then
     parser:add_argument({ '-p', '--pattern' }, {
-      takes_value = true,
       metavar = 'PATTERN',
       multi = true,
-      description = 'Only run test files matching the Lua pattern (default: _spec).',
+      help = 'Only run test files matching the Lua pattern.',
       default = { '_spec' },
     })
     parser:add_argument({ '--exclude-pattern' }, {
-      takes_value = true,
       metavar = 'PATTERN',
       multi = true,
-      description = 'Do not run files matching the Lua pattern; takes precedence over --pattern.',
+      help = 'Do not run files matching the Lua pattern; takes precedence over --pattern.',
       default = {},
     })
   end
   parser:add_argument({ '-e', '--exec' }, {
-    takes_value = true,
     metavar = 'STATEMENT',
     multi = true,
-    description = 'Execute Lua statement STATEMENT before running tests.',
+    help = 'Execute Lua statement STATEMENT before running tests.',
     default = {},
   })
   parser:add_argument({ '-o', '--output' }, {
-    takes_value = true,
     metavar = 'LIBRARY',
-    description = 'Output handler module to load (default: busted.outputHandlers.output_handler).',
+    help = 'Output handler module to load.',
     default = defaultOutput,
   })
   parser:add_argument({ '-C', '--directory' }, {
-    takes_value = true,
     metavar = 'DIR',
     handler = function(state, value)
       return processDir(state, 'directory', value, 'C')
     end,
-    description = 'Change to DIR before running tests; multiple directories are resolved incrementally.',
+    help = 'Change to DIR before running tests; multiple directories are resolved incrementally.',
     default = './',
   })
   parser:add_argument({ '-f', '--config-file' }, {
-    takes_value = true,
     metavar = 'FILE',
-    description = 'Load configuration options from FILE.',
+    help = 'Load configuration options from FILE.',
   })
   parser:add_argument({ '--coverage-config-file' }, {
-    takes_value = true,
     metavar = 'FILE',
-    description = 'Load LuaCov configuration options from FILE.',
+    help = 'Load LuaCov configuration options from FILE.',
   })
   parser:add_argument({ '-t', '--tags' }, {
-    takes_value = true,
     metavar = 'TAGS',
     handler = function(state, value)
       return processList(state, 'tags', value, 't')
     end,
-    description = 'Only run tests with these comma-separated #tags.',
+    help = 'Only run tests with these comma-separated #tags.',
     default = {},
   })
   parser:add_argument({ '--exclude-tags' }, {
-    takes_value = true,
     metavar = 'TAGS',
     handler = function(state, value)
       return processList(state, 'exclude-tags', value)
     end,
-    description = 'Do not run tests with these #tags; takes precedence over --tags.',
+    help = 'Do not run tests with these #tags; takes precedence over --tags.',
     default = {},
   })
   parser:add_argument({ '--filter' }, {
-    takes_value = true,
     metavar = 'PATTERN',
     multi = true,
-    description = 'Only run tests whose names match the Lua pattern.',
-    default = {},
-  })
-  parser:add_argument({ '--name' }, {
-    takes_value = true,
-    metavar = 'NAME',
-    multi = true,
-    description = 'Run the test with the given full name.',
+    help = 'Only run tests whose names match the Lua pattern.',
     default = {},
   })
   parser:add_argument({ '--filter-out' }, {
-    takes_value = true,
     metavar = 'PATTERN',
     multi = true,
-    description = 'Exclude tests whose names match the Lua pattern; takes precedence over --filter.',
+    help = 'Exclude tests whose names match the Lua pattern; takes precedence over --filter.',
     default = {},
   })
   parser:add_argument({ '--exclude-names-file' }, {
-    takes_value = true,
     metavar = 'FILE',
-    description = 'Skip tests whose names appear in FILE; takes precedence over name filters.',
+    help = 'Skip tests whose names appear in FILE; takes precedence over name filters.',
   })
   parser:add_argument({ '-m', '--lpath' }, {
-    takes_value = true,
     metavar = 'PATH',
     handler = function(state, value)
       return processPath(state, 'lpath', value, 'm')
     end,
-    description = 'Prefix PATH to package.path (default: ./src/?.lua;./src/?/?.lua;./src/?/init.lua).',
+    help = 'Prefix PATH to package.path.',
     default = lpathprefix,
   })
   parser:add_argument({ '--cpath' }, {
-    takes_value = true,
     metavar = 'PATH',
     handler = function(state, value)
       return processPath(state, 'cpath', value)
     end,
-    description = 'Prefix PATH to package.cpath (default: ./csrc/?.so;./csrc/?/?.so;).',
+    help = 'Prefix PATH to package.cpath.',
     default = cpathprefix,
   })
   parser:add_argument({ '-r', '--run' }, {
-    takes_value = true,
     metavar = 'RUN',
-    description = 'Load configuration RUN from the project .busted file.',
+    help = 'Load configuration RUN from the project .busted file.',
   })
   parser:add_argument({ '--repeat' }, {
-    takes_value = true,
     metavar = 'COUNT',
     handler = function(state, value)
       return processNumber(state, 'repeat', value, nil, '--repeat')
     end,
-    description = 'Run the entire test suite COUNT times (default: 1).',
+    help = 'Run the entire test suite COUNT times.',
     default = 1,
   })
   parser:add_argument({ '--loaders' }, {
-    takes_value = true,
     metavar = 'NAME',
     handler = function(state, value)
       return processLoaders(state, 'loaders', value)
     end,
-    description = 'Comma-separated list of test file loaders (default: lua).',
+    help = 'Comma-separated list of test file loaders.',
     default = 'lua',
   })
   parser:add_argument({ '--helper' }, {
-    takes_value = true,
     metavar = 'PATH',
-    description = 'Run helper script at PATH before executing tests.',
+    help = 'Run helper script at PATH before executing tests.',
   })
   parser:add_argument({ '--coverage' }, {
-    description = 'Enable code coverage analysis (requires LuaCov).',
-    handler = function(state)
-      return processOption(state, 'coverage', true)
-    end,
+    help = 'Enable code coverage analysis (requires LuaCov).',
     default = false,
   })
   parser:add_argument({ '-v', '--verbose' }, {
-    description = 'Enable verbose output of errors.',
-    handler = function(state)
-      return processOption(state, 'verbose', true, 'v')
-    end,
+    help = 'Enable verbose output of errors.',
     default = false,
   })
   parser:add_argument({ '-l', '--list' }, {
-    handler = function(state)
-      return processOption(state, 'list', true, 'l')
-    end,
-    description = 'List the names of all tests instead of running them.',
+    help = 'List the names of all tests instead of running them.',
     default = false,
   })
   parser:add_argument({ '--lazy' }, {
-    description = 'Use lazy setup/teardown as the default.',
-    handler = function(state)
-      return processOption(state, 'lazy', true)
-    end,
+    help = 'Use lazy setup/teardown as the default.',
     default = false,
   })
   parser:add_argument({ '--suppress-pending' }, {
-    description = 'Suppress pending test output.',
-    handler = function(state)
-      return processOption(state, 'suppress-pending', true)
-    end,
+    help = 'Suppress pending test output.',
     default = false,
   })
   parser:add_argument({ '--quit-on-error' }, {
-    description = 'Quit the test run on the first error or failure.',
-    handler = function(state)
-      return processOption(state, 'quit-on-error', true)
-    end,
+    help = 'Quit the test run on the first error or failure.',
     default = false,
   })
 

@@ -13,26 +13,18 @@ local M = {}
 --- @class busted.cli.OptionSpec
 --- @field takes_value? boolean
 --- @field handler? busted.cli.Handler
---- @field description? string
+--- @field help? string
 --- @field metavar? string
 --- @field multi? boolean
 --- @field key? string
 --- @field altkey? string
 --- @field display? string
---- @field default? any
-
---- @class busted.cli.NegatableOptionSpec
---- @field description string
---- @field negated_description string
---- @field key? string
---- @field altkey? string
---- @field handler? busted.cli.Handler
---- @field negated_handler? busted.cli.Handler
+--- @field flag_value? any
 --- @field default? any
 
 --- @class busted.cli.framework.Parser
 --- @field private option_handlers table<string, busted.cli.OptionSpec>
---- @field private help_entries { arguments: { name: string, description: string }[], options: { display: string, description: string }[] }
+--- @field private help_entries { arguments: { name: string, help: string }[], options: { display: string, help: string, spec: busted.cli.OptionSpec }[] }
 --- @field private state_factory fun(): busted.cli.State
 --- @field private positional_handler fun(state: busted.cli.State, argument: string): boolean, string?
 --- @field private app_name string
@@ -67,9 +59,9 @@ function M.new_parser(config)
 end
 
 --- @param name string
---- @param description string
-function Parser:add_argument_help(name, description)
-  table.insert(self.help_entries.arguments, { name = name, description = description })
+--- @param help string
+function Parser:add_argument_help(name, help)
+  table.insert(self.help_entries.arguments, { name = name, help = help })
 end
 
 --- @param names string[]
@@ -191,15 +183,21 @@ function Parser:add_argument(names, spec)
   spec.display = spec.display or format_option_display(names, spec)
   spec.key = spec.key or derive_option_key(names)
   spec.altkey = spec.altkey or derive_option_altkey(names)
-  spec.takes_value = spec.takes_value or false
+  spec.takes_value = spec.takes_value or spec.metavar ~= nil or false
   if not spec.handler then
-    if not spec.takes_value then
-      error('missing handler for option without value: ' .. table.concat(names, ', '))
-    end
     if not spec.key or spec.key == '' then
       error('missing key for option: ' .. table.concat(names, ', '))
     end
-    if spec.multi then
+    if not spec.takes_value then
+      local flag_value = spec.flag_value
+      if flag_value == nil then
+        flag_value = true
+      end
+      spec.handler = function(state)
+        assign(state, spec.key, flag_value, spec.altkey)
+        return true
+      end
+    elseif spec.multi then
       spec.handler = function(state, value)
         value = value or ''
         local list = state.overrides[spec.key]
@@ -222,7 +220,8 @@ function Parser:add_argument(names, spec)
   end
   self.help_entries.options[#self.help_entries.options + 1] = {
     display = spec.display,
-    description = spec.description or '',
+    help = spec.help or '',
+    spec = spec,
   }
   if spec.default ~= nil then
     if not spec.key or spec.key == '' then
@@ -255,7 +254,7 @@ function Parser:_format_help()
   if #help_entries.arguments > 0 then
     table.insert(lines, 'ARGUMENTS:')
     for _, entry in ipairs(help_entries.arguments) do
-      local desc_lines = vim.split(entry.description, '\n', { plain = true })
+      local desc_lines = vim.split(entry.help, '\n', { plain = true })
       table.insert(lines, ('  %-26s %s'):format(entry.name, desc_lines[1]))
       for i = 2, #desc_lines do
         table.insert(lines, ('  %-26s %s'):format('', desc_lines[i]))
@@ -266,7 +265,27 @@ function Parser:_format_help()
   if #help_entries.options > 0 then
     table.insert(lines, 'OPTIONS:')
     for _, entry in ipairs(help_entries.options) do
-      local desc_lines = vim.split(entry.description, '\n', { plain = true })
+      local help = entry.help or ''
+      local spec = entry.spec
+      if spec and spec.default ~= nil then
+        local default_value = spec.default
+        local default_str
+        local dtype = type(default_value)
+        if dtype == 'table' then
+          default_str = vim.inspect(default_value)
+        elseif dtype == 'boolean' then
+          default_str = tostring(default_value)
+        else
+          default_str = tostring(default_value)
+        end
+        local suffix = (' (default: %s)'):format(default_str)
+        if help == '' then
+          help = suffix:sub(2)
+        else
+          help = help .. suffix
+        end
+      end
+      local desc_lines = vim.split(help, '\n', { plain = true })
       table.insert(lines, ('  %-26s %s'):format(entry.display, desc_lines[1]))
       for i = 2, #desc_lines do
         table.insert(lines, ('  %-26s %s'):format('', desc_lines[i]))

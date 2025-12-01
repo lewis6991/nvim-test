@@ -193,7 +193,7 @@ local function main(custom_options)
     testFileLoader(rootFiles, patterns, {
       excludes = cliArgs['exclude-pattern'],
       verbose = cliArgs.verbose,
-      recursive = true
+      recursive = true,
     })
   else
     -- Running standalone, use standalone loader
