@@ -2,7 +2,6 @@
 
 local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local fs = vim.fs
-local fs_util = require('nvim-test.util.fs')
 local exit = require('busted.exit')
 local load_chunk = _G.loadstring or load
 if not load_chunk then
@@ -82,11 +81,6 @@ local function main(custom_options)
     end
   end
 
-  -- If auto-insulate is disabled, re-register file without insulation
-  if not cliArgs['auto-insulate'] then
-    busted.register('file', 'file', {})
-  end
-
   -- If lazy is enabled, make lazy setup/teardown the default
   if cliArgs.lazy then
     busted.register('setup', 'lazy_setup')
@@ -112,7 +106,7 @@ local function main(custom_options)
   -- watch for test errors and failures
   local failures = 0
   local errors = 0
-  local quitOnError = not cliArgs['keep-going']
+  local quitOnError = cliArgs['quit-on-error']
 
   busted.subscribe({ 'error', 'output' }, function(element, _parent, message)
     io.stderr:write(
@@ -145,15 +139,15 @@ local function main(custom_options)
   end)
 
   -- Set up ordering options
-  busted.sort = cliArgs['sort-tests']
+  busted.sort = true
 
   -- Set up output handler to listen to events
   outputHandlerLoader(busted, cliArgs.output, {
     defaultOutput = options.output,
     verbose = cliArgs.verbose,
     suppressPending = cliArgs['suppress-pending'],
-    deferPrint = cliArgs['defer-print'],
-    arguments = cliArgs.Xoutput,
+    deferPrint = false,
+    arguments = {},
   })
 
   -- Pre-load the LuaJIT 'ffi' module if applicable
@@ -163,7 +157,7 @@ local function main(custom_options)
   if cliArgs.helper and cliArgs.helper ~= '' then
     local helper_ok, helper_err = helperLoader(busted, cliArgs.helper, {
       verbose = cliArgs.verbose,
-      arguments = cliArgs.Xhelper,
+      arguments = {},
     })
     if not helper_ok then
       io.stderr:write(
@@ -176,27 +170,6 @@ local function main(custom_options)
       )
       exit(1, forceExit)
     end
-  end
-
-  local getFullName = function(name)
-    local parent = busted.context:get()
-    local names = { name }
-
-    while parent and (parent.name or parent.descriptor) and parent.descriptor ~= 'file' do
-      table.insert(names, 1, parent.name or parent.descriptor)
-      parent = busted.context:parent(parent)
-    end
-
-    return table.concat(names, ' ')
-  end
-
-  local log_success = cliArgs['log-success']
-  if log_success then
-    busted.subscribe({ 'test', 'end' }, function(_test, _parent, status)
-      if status == 'success' then
-        fs_util.append_lines(log_success, { getFullName() })
-      end
-    end)
   end
 
   -- Load tag and test filters
@@ -220,7 +193,7 @@ local function main(custom_options)
     testFileLoader(rootFiles, patterns, {
       excludes = cliArgs['exclude-pattern'],
       verbose = cliArgs.verbose,
-      recursive = cliArgs['recursive'],
+      recursive = true
     })
   else
     -- Running standalone, use standalone loader
@@ -230,9 +203,7 @@ local function main(custom_options)
 
   local runs = cliArgs['repeat']
   local execute = require('busted.execute')(busted)
-  execute(runs, {
-    sort = cliArgs['sort-files'],
-  })
+  execute(runs, { sort = busted.sort })
 
   busted.publish({ 'exit' })
 

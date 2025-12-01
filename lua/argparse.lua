@@ -11,7 +11,7 @@ local M = {}
 --- @alias busted.cli.Handler fun(state: busted.cli.State, value?: string, opt?: string): boolean, string?
 
 --- @class busted.cli.OptionSpec
---- @field takes_value boolean
+--- @field takes_value? boolean
 --- @field handler? busted.cli.Handler
 --- @field description? string
 --- @field metavar? string
@@ -19,6 +19,7 @@ local M = {}
 --- @field key? string
 --- @field altkey? string
 --- @field display? string
+--- @field default? any
 
 --- @class busted.cli.NegatableOptionSpec
 --- @field description string
@@ -27,6 +28,7 @@ local M = {}
 --- @field altkey? string
 --- @field handler? busted.cli.Handler
 --- @field negated_handler? busted.cli.Handler
+--- @field default? any
 
 --- @class busted.cli.framework.Parser
 --- @field private option_handlers table<string, busted.cli.OptionSpec>
@@ -34,6 +36,7 @@ local M = {}
 --- @field private state_factory fun(): busted.cli.State
 --- @field private positional_handler fun(state: busted.cli.State, argument: string): boolean, string?
 --- @field private app_name string
+--- @field private defaults fun(state: busted.cli.State)[]
 local Parser = {}
 Parser.__index = Parser
 
@@ -58,6 +61,7 @@ function M.new_parser(config)
       return false, 'Unexpected positional argument ' .. tostring(argument)
     end,
     app_name = config.app_name or '',
+    defaults = {},
   }, Parser)
   return parser
 end
@@ -127,12 +131,67 @@ local function assign(state, key, value, altkey)
   end
 end
 
+--- @param state busted.cli.State
+--- @param spec busted.cli.OptionSpec
+--- @param opt string
+--- @param value string?
+--- @return boolean, string?
+local function invoke_handler(state, spec, opt, value)
+  local handler = spec.handler
+  if not handler then
+    return false, 'Missing handler for ' .. (spec.display or opt)
+  end
+  if value ~= nil then
+    return handler(state, value, spec.display)
+  end
+  return handler(state)
+end
+
+--- @param args string[]
+--- @param index integer
+--- @param attached string?
+--- @param spec busted.cli.OptionSpec
+--- @return string?, integer, string?
+local function ensure_value(args, index, attached, spec)
+  local value = attached
+  local next_index = index
+  if not value or value == '' then
+    next_index = index + 1
+    value = args[next_index]
+    if value == nil then
+      return nil, index, 'Missing value for ' .. spec.display
+    end
+  end
+  return value, next_index, nil
+end
+
+--- @param state busted.cli.State
+--- @param spec busted.cli.OptionSpec
+--- @param opt string
+--- @param args string[]
+--- @param index integer
+--- @param attached string?
+--- @return boolean, string?, integer
+local function process_option(state, spec, opt, args, index, attached)
+  if spec.takes_value then
+    local value, next_index, err = ensure_value(args, index, attached, spec)
+    if not value then
+      return false, err, index
+    end
+    local ok, handler_err = invoke_handler(state, spec, opt, value)
+    return ok, handler_err, next_index
+  end
+  local ok, handler_err = invoke_handler(state, spec, opt)
+  return ok, handler_err, index
+end
+
 --- @param names string[]
 --- @param spec busted.cli.OptionSpec
 function Parser:add_argument(names, spec)
   spec.display = spec.display or format_option_display(names, spec)
   spec.key = spec.key or derive_option_key(names)
   spec.altkey = spec.altkey or derive_option_altkey(names)
+  spec.takes_value = spec.takes_value or false
   if not spec.handler then
     if not spec.takes_value then
       error('missing handler for option without value: ' .. table.concat(names, ', '))
@@ -165,37 +224,22 @@ function Parser:add_argument(names, spec)
     display = spec.display,
     description = spec.description or '',
   }
-end
-
---- @param positive_names string[]
---- @param negative_names string[]
---- @param spec busted.cli.NegatableOptionSpec
-function Parser:add_negatable_argument(positive_names, negative_names, spec)
-  local key = spec.key or derive_option_key(positive_names)
-  if not key or key == '' then
-    error('missing key for negatable option: ' .. table.concat(positive_names, ', '))
+  if spec.default ~= nil then
+    if not spec.key or spec.key == '' then
+      error('missing key for option default: ' .. table.concat(names, ', '))
+    end
+    local default_value = spec.default
+    self.defaults[#self.defaults + 1] = function(state)
+      local value = default_value
+      if type(value) == 'table' then
+        value = vim.deepcopy(value)
+      end
+      state.args[spec.key] = value
+      if spec.altkey then
+        state.args[spec.altkey] = value
+      end
+    end
   end
-  local altkey = spec.altkey or derive_option_altkey(positive_names)
-  self:add_argument(positive_names, {
-    takes_value = false,
-    description = spec.description,
-    key = key,
-    altkey = altkey,
-    handler = spec.handler or function(state)
-      assign(state, key, true, altkey)
-      return true
-    end,
-  })
-  self:add_argument(negative_names, {
-    takes_value = false,
-    description = spec.negated_description,
-    key = key,
-    altkey = altkey,
-    handler = spec.negated_handler or function(state)
-      assign(state, key, false, altkey)
-      return true
-    end,
-  })
 end
 
 --- @private
@@ -236,6 +280,9 @@ end
 --- @return table<string, any>?, table<string, any>|string?
 function Parser:parse(args)
   local state = self.state_factory()
+  for _, apply_default in ipairs(self.defaults) do
+    apply_default(state)
+  end
   local i = 1
   local finished = false
   while i <= #args do
@@ -255,32 +302,10 @@ function Parser:parse(args)
       if not spec then
         return nil, 'Unknown option ' .. key
       end
-      if spec.takes_value then
-        local value = attached
-        if not value or value == '' then
-          i = i + 1
-          value = args[i]
-          if value == nil then
-            return nil, 'Missing value for ' .. spec.display
-          end
-        end
-        local handler = spec.handler
-        if not handler then
-          return nil, 'Missing handler for ' .. (spec.display or key)
-        end
-        local ok, err = handler(state, value, spec.display)
-        if not ok then
-          return nil, err
-        end
-      else
-        local handler = spec.handler
-        if not handler then
-          return nil, 'Missing handler for ' .. (spec.display or key)
-        end
-        local ok, err = handler(state)
-        if not ok then
-          return nil, err
-        end
+      local ok, err
+      ok, err, i = process_option(state, spec, key, args, i, attached)
+      if not ok then
+        return nil, err
       end
     elseif not finished and argument:sub(1, 1) == '-' and argument ~= '-' then
       if argument == '-h' then
@@ -288,29 +313,10 @@ function Parser:parse(args)
       end
       local spec = self.option_handlers[argument]
       if spec then
-        if spec.takes_value then
-          i = i + 1
-          local value = args[i]
-          if value == nil then
-            return nil, 'Missing value for ' .. spec.display
-          end
-          local handler = spec.handler
-          if not handler then
-            return nil, 'Missing handler for ' .. (spec.display or argument)
-          end
-          local ok, err = handler(state, value, spec.display)
-          if not ok then
-            return nil, err
-          end
-        else
-          local handler = spec.handler
-          if not handler then
-            return nil, 'Missing handler for ' .. (spec.display or argument)
-          end
-          local ok, err = handler(state)
-          if not ok then
-            return nil, err
-          end
+        local ok, err
+        ok, err, i = process_option(state, spec, argument, args, i)
+        if not ok then
+          return nil, err
         end
       else
         local pos = 2
@@ -320,38 +326,16 @@ function Parser:parse(args)
           if not nested then
             return nil, 'Unknown option ' .. short
           end
-          if nested.takes_value then
-            local remainder = argument:sub(pos + 1)
-            local value
-            if remainder ~= '' then
-              value = remainder
-            else
-              i = i + 1
-              value = args[i]
-            end
-            if value == nil then
-              return nil, 'Missing value for ' .. nested.display
-            end
-            local handler = nested.handler
-            if not handler then
-              return nil, 'Missing handler for ' .. (nested.display or short)
-            end
-            local ok, err = handler(state, value, nested.display)
-            if not ok then
-              return nil, err
-            end
-            break
-          else
-            local handler = nested.handler
-            if not handler then
-              return nil, 'Missing handler for ' .. (nested.display or short)
-            end
-            local ok, err = handler(state)
-            if not ok then
-              return nil, err
-            end
-            pos = pos + 1
+          local remainder = argument:sub(pos + 1)
+          local ok, err, new_index = process_option(state, nested, short, args, i, remainder)
+          if not ok then
+            return nil, err
           end
+          if nested.takes_value then
+            i = new_index
+            break
+          end
+          pos = pos + 1
         end
       end
     else

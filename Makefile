@@ -22,13 +22,15 @@ $(STYLUA_ZIP):
 stylua: $(STYLUA_ZIP)
 	unzip $<
 
+LUA_FILES = $(shell find lua -name '*.lua')
+
 .PHONY: format-check
 format-check: stylua
-	./stylua --check lua/**/*.lua
+	@./stylua --check $(LUA_FILES)
 
 .PHONY: format
 format: stylua
-	./stylua lua/**/*.lua
+	@./stylua $(LUA_FILES)
 
 .PHONY: test
 test:
