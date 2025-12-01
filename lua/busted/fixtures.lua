@@ -1,4 +1,4 @@
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local fs = vim.fs
 
 local fixtures = {}
@@ -21,6 +21,7 @@ end
 
 --- returns an absolute path to where the current test file is located.
 --- @param sub_path? string relative path to append
+--- @return string absolute path
 function fixtures.path(sub_path)
   if type(sub_path) ~= 'string' and sub_path ~= nil then
     error(
@@ -38,8 +39,11 @@ function fixtures.path(sub_path)
   end
 
   local base_dir = caller and fs.dirname(caller) or uv.cwd()
+  assert(type(base_dir) == 'string', 'base_dir must be resolved')
   if sub_path and #sub_path > 0 then
-    base_dir = fs.joinpath(base_dir, sub_path)
+    local rel = sub_path
+    assert(type(rel) == 'string', 'relative path must be a string')
+    base_dir = fs.joinpath(base_dir, rel)
   end
   return fs.normalize(base_dir)
 end

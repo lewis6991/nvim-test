@@ -1,4 +1,4 @@
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 
 local function mkdir_p(path)
   local absolute = path

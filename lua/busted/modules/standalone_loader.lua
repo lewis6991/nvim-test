@@ -1,11 +1,11 @@
-local getTrace = function(filename, info)
+local getTrace = function(_filename, info)
   local index = info.traceback:find('\n%s*%[C]')
   info.traceback = info.traceback:sub(1, index)
   return info
 end
 
 return function(busted)
-  local loadCurrentFile = function(info, options)
+  local loadCurrentFile = function(info, _options)
     local filename = 'string'
     if info.source:sub(1, 1) == '@' or info.source:sub(1, 1) == '=' then
       filename = info.source:sub(2)

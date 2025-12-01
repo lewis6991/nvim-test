@@ -1,14 +1,18 @@
 -- Busted command-line runner
 
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local fs = vim.fs
 local fs_util = require('nvim-test.util.fs')
 local exit = require('busted.exit')
-local loadstring = _G.loadstring or load
+local load_chunk = _G.loadstring or load
+if not load_chunk then
+  error('load function is required')
+end
+---@cast load_chunk fun(code: string, chunkname?: string): function
 local loaded = false
 
-local function main(options)
-  local options = { standalone = false }
+local function main(custom_options)
+  local provided_options = custom_options or { standalone = false }
   if loaded then
     return function() end
   else
@@ -16,12 +20,12 @@ local function main(options)
   end
 
   local defaultOptions = require('busted.options')
-  if options then
-    for k, v in pairs(options) do
+  if provided_options then
+    for k, v in pairs(provided_options) do
       defaultOptions[k] = v
     end
   end
-  options = defaultOptions
+  local options = defaultOptions
   options.output = options.output or 'busted.outputHandlers.output_handler'
 
   local busted = require('busted.core')()
@@ -60,20 +64,20 @@ local function main(options)
 
   -- Load current working directory
   local target_dir = fs.normalize(cliArgs.directory)
-  local ok, err1 = pcall(uv.chdir, target_dir)
-  if not ok then
-    io.stderr:write(appName .. ': error: ' .. err1 .. '\n')
+  local chdir_ok, chdir_err = pcall(uv.chdir, target_dir)
+  if not chdir_ok then
+    io.stderr:write(appName .. ': error: ' .. chdir_err .. '\n')
     exit(1, forceExit)
   end
 
   -- If coverage arg is passed in, load LuaCovsupport
   if cliArgs.coverage then
-    local ok, err2 = luacov(cliArgs['coverage-config-file'])
-    if not ok then
-      io.stderr:write(appName .. ': error: ' .. err2 .. '\n')
+    local coverage_ok, coverage_err = luacov(cliArgs['coverage-config-file'])
+    if not coverage_ok then
+      io.stderr:write(appName .. ': error: ' .. coverage_err .. '\n')
       exit(1, forceExit)
-    elseif err2 then
-      io.stderr:write(appName .. ': warning: ' .. err2 .. '\n')
+    elseif coverage_err then
+      io.stderr:write(appName .. ': warning: ' .. coverage_err .. '\n')
     end
   end
 
@@ -100,7 +104,7 @@ local function main(options)
   -- Load and execute commands given on the command-line
   if cliArgs.e then
     for _, v in ipairs(cliArgs.e) do
-      loadstring(v)()
+      load_chunk(v)()
     end
   end
 
@@ -156,17 +160,17 @@ local function main(options)
 
   -- Set up helper script, must succeed to even start tests
   if cliArgs.helper and cliArgs.helper ~= '' then
-    local ok, err2 = helperLoader(busted, cliArgs.helper, {
+    local helper_ok, helper_err = helperLoader(busted, cliArgs.helper, {
       verbose = cliArgs.verbose,
       arguments = cliArgs.Xhelper,
     })
-    if not ok then
+    if not helper_ok then
       io.stderr:write(
         appName
           .. ': failed running the specified helper ('
           .. cliArgs.helper
           .. '), error: '
-          .. err2
+          .. helper_err
           .. '\n'
       )
       exit(1, forceExit)

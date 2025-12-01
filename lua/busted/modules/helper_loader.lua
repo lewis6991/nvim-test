@@ -8,6 +8,7 @@ return function()
       local fn
 
       utils.copy_interpreter_args(options.arguments)
+      ---@diagnostic disable-next-line: global-in-non-module
       _G.arg = options.arguments
 
       if helper:match('%.lua$') then
@@ -21,7 +22,8 @@ return function()
       end
     end)
 
-    arg = old_arg --luacheck: ignore
+    ---@diagnostic disable-next-line: global-in-non-module
+    _G.arg = old_arg --luacheck: ignore
 
     if not success then
       return nil, err

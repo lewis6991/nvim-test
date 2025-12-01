@@ -4,7 +4,7 @@
 -- @class module
 -- @name luacov.runner
 
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 
 ---@class luacov.runner
 local runner = {}
@@ -24,7 +24,7 @@ end -- luacheck: compat
 
 -- Returns an anchor that runs fn when collected.
 local function on_exit_wrap(fn)
-  local anchor = new_anchor()
+  local anchor = new_anchor(false)
   debug.setmetatable(anchor, { __gc = fn })
   return anchor
 end
@@ -114,7 +114,7 @@ local cluacov_ok = pcall(require, 'cluacov.version')
 -- if called manually before coverage gathering is started.
 -- @param _ event type, should always be "line".
 -- @param line_nr line number.
--- @param[opt] level passed to debug.getinfo to get name of processed file,
+-- @param level? passed to debug.getinfo to get name of processed file,
 -- 2 by default. Increase it if this function is called manually
 -- from another debug hook.
 -- @usage
@@ -127,12 +127,12 @@ runner.debug_hook = require(cluacov_ok and 'cluacov.hook' or 'luacov.hook').new(
 
 ------------------------------------------------------
 -- Runs the reporter specified in configuration.
--- @param[opt] configuration if string, filename of config file (used to call `load_config`).
+-- @param configuration? if string, filename of config file (used to call `load_config`).
 -- If table then config table (see file `luacov.default.lua` for an example).
 -- If `configuration.reporter` is not set, runs the default reporter;
 -- otherwise, it must be a module name in 'luacov.reporter' namespace.
 -- The module must contain 'report' function, which is called without arguments.
----@param[opt] configuration string|table
+---@param configuration? string|table
 function runner.run_report(configuration)
   configuration = runner.load_config(configuration)
   local reporter = 'luacov.reporter'
@@ -164,6 +164,9 @@ end
 
 local dir_sep = package.config:sub(1, 1)
 local wildcard_expansion = '[^/]+'
+---@class luacov.ModuleMappings
+---@field patterns string[]
+---@field filenames string[]
 
 if not dir_sep:find('[/\\]') then
   dir_sep = '/'
@@ -228,7 +231,7 @@ end
 -- them as runner.modules.patterns and runner.modules.filenames.
 -- Appends these patterns to the include list.
 local function acknowledge_modules()
-  runner.modules = { patterns = {}, filenames = {} }
+  runner.modules = { patterns = {}, filenames = {} } --- @type luacov.ModuleMappings
 
   if not runner.configuration.modules then
     return
@@ -278,6 +281,7 @@ function runner.real_name(filename)
 
     if match then
       local new_filename = runner.modules.filenames[i]
+      assert(new_filename, 'missing module filename mapping')
 
       if pattern:find(wildcard_expansion, 1, true) then
         -- Given a prefix directory, join it
@@ -335,7 +339,8 @@ end
 
 -- Sets configuration. If some options are missing, default values are used instead.
 local function set_config(configuration)
-  runner.configuration = {}
+  assert(configuration ~= nil, 'configuration table is required')
+  runner.configuration = {} --- @type table<string, any>
 
   for option, default_value in pairs(runner.defaults) do
     runner.configuration[option] = default_value
@@ -344,6 +349,9 @@ local function set_config(configuration)
   for option, value in pairs(configuration) do
     runner.configuration[option] = value
   end
+
+  runner.configuration.include = runner.configuration.include or {}
+  runner.configuration.exclude = runner.configuration.exclude or {}
 
   -- Program using LuaCov may change directory during its execution.
   -- Convert path options to absolute paths to use correct paths anyway.
@@ -374,6 +382,7 @@ local function load_config_file(name, is_default)
 
   if ok then
     if type(ret) == 'table' then
+      ---@cast ret table
       for key, value in pairs(ret) do
         if conf[key] == nil then
           conf[key] = value
@@ -398,12 +407,12 @@ local default_config_file = os.getenv('LUACOV_CONFIG') or '.luacov'
 
 ------------------------------------------------------
 -- Loads a valid configuration.
--- @param[opt] configuration user provided config (config-table or filename)
+-- @param configuration? user provided config (config-table or filename)
 -- @return existing configuration if already set, otherwise loads a new
 -- config from the provided data or the defaults.
 -- When loading a new config, if some options are missing, default values
 -- from `luacov.defaults` are used instead.
----@param[opt] configuration string|table
+---@param configuration? string|table
 ---@return table
 function runner.load_config(configuration)
   if not runner.configuration then
@@ -478,7 +487,7 @@ end
 
 --------------------------------------------------
 -- Initializes LuaCov runner to start collecting data.
--- @param[opt] configuration if string, filename of config file (used to call `load_config`).
+-- @param configuration? if string, filename of config file (used to call `load_config`).
 -- If table then config table (see file `luacov.default.lua` for an example)
 function runner.init(configuration)
   runner.configuration = runner.load_config(configuration)

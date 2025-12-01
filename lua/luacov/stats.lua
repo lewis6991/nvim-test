@@ -4,6 +4,22 @@
 
 local fs_util = require('nvim-test.util.fs')
 
+local math_tointeger = rawget(math, 'tointeger')
+local tointeger
+if math_tointeger then
+  tointeger = math_tointeger
+else
+  tointeger = function(value)
+    if type(value) ~= 'number' then
+      return nil
+    end
+    if value >= 0 then
+      return math.floor(value + 0.0)
+    end
+    return math.ceil(value - 0.0)
+  end
+end
+
 local function read_lines(path)
   local lines = fs_util.read_lines(path)
   if not lines then
@@ -78,10 +94,12 @@ function stats.load(statsfile)
 
     local entries = split_whitespace(trim(hits_line))
     for line_nr = 1, max do
-      local hits = tonumber(entries[line_nr]) or 0
+      local hits = tointeger(tonumber(entries[line_nr]) or 0) or 0
       if hits > 0 then
         filedata[line_nr] = hits
-        filedata.max_hits = math.max(filedata.max_hits, hits)
+        if filedata.max_hits < hits then
+          filedata.max_hits = hits
+        end
       end
     end
 

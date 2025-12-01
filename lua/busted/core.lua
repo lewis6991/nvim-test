@@ -4,6 +4,10 @@ local unpack = _G.unpack
 local fs = vim.fs
 local throw = error
 
+--- @class busted.DebugInfo: debuglib.DebugInfo
+--- @field traceback string
+--- @field message string
+
 local failureMt = {
   __index = {},
   __tostring = function(e)
@@ -53,12 +57,10 @@ local function normalize_source(src)
   return fs.normalize(src)
 end
 
+--- @param src string?
+--- @return string?
 local function dirname(src)
-  local norm = normalize_source(src)
-  if not norm then
-    return nil
-  end
-  return fs.dirname(norm)
+  return fs.dirname(normalize_source(src))
 end
 
 local function pretty_write(value)
@@ -71,36 +73,38 @@ local function pretty_write(value)
   return vim.inspect(value)
 end
 
+local Busted = {}
+
+function Busted.init()
+  local root = require('busted.context')()
+
+  --- @class busted.Busted
+  local busted = {
+    version = '2.2.0',
+    context = root.ref(),
+    api = {},
+    executors = {},
+    status = require('busted.status'),
+  }
+
+  return busted
+end
+
 return function()
   local mediator = require('mediator')()
 
-  local busted = {}
-  busted.version = '2.2.0'
-
-  local root = require('busted.context')()
-  busted.context = root.ref()
+  local busted = Busted.init()
 
   local environment = require('busted.environment')(busted.context)
 
-  busted.api = {}
-  busted.executors = {}
   local executors = {}
   local eattributes = {}
 
-  busted.gettime = vim.uv.now
-  busted.monotime = vim.uv.hrtime
-  busted.sleep = vim.uv.sleep
-  busted.status = require('busted.status')
-
   function busted.getTrace(element, level, msg)
-    local function trimTrace(info)
-      local index = info.traceback:find('\n%s*%[C]')
-      info.traceback = info.traceback:sub(1, index)
-      return info
-    end
     level = level or 3
 
     local thisdir = dirname(debug.getinfo(1, 'Sl').source) or ''
+    --- @type busted.DebugInfo
     local info = debug.getinfo(level, 'Sl')
     while
       info.what == 'C'
@@ -115,7 +119,15 @@ return function()
     info.message = tostring(msg)
 
     local file = busted.getFile(element)
-    return file and file.getTrace(file.name, info) or trimTrace(info)
+
+    if file then
+      return file.getTrace(file.name, info)
+    end
+
+    -- trim traceback
+    local index = info.traceback:find('\n%s*%[C]')
+    info.traceback = info.traceback:sub(1, index)
+    return info
   end
 
   function busted.rewriteMessage(element, message, trace)
@@ -215,12 +227,15 @@ return function()
         message = busted.rewriteMessage(element, msg, trace)
       end),
     }
+    --- @cast ret any[]
 
-    if not ret[1] then
+    local ok = ret[1]
+    if not ok then
       if status == 'success' then
         status = 'error'
-        trace = busted.getTrace(element, 3, ret[2])
-        message = busted.rewriteMessage(element, ret[2], trace)
+        local err_msg = ret[2] or message or 'unknown error'
+        trace = busted.getTrace(element, 3, err_msg)
+        message = busted.rewriteMessage(element, err_msg, trace)
       elseif status == 'failure' and descriptor ~= 'it' then
         -- Only 'it' blocks can generate test failures. Failures in all
         -- other blocks are errors outside the test.
@@ -241,21 +256,23 @@ return function()
         trace
       )
     end
-    ret[1] = busted.status(status)
-
+    local results = { busted.status(status) }
+    for i = 2, #ret do
+      results[i] = ret[i]
+    end
     busted.context.pop()
-    return unpack(ret)
+    return unpack(results)
   end
 
   function busted.safe_publish(descriptor, channel, element, ...)
     local args = { ... }
     local n = select('#', ...)
     if channel[2] == 'start' then
-      element.starttick = busted.monotime()
-      element.starttime = busted.gettime()
+      element.starttick = vim.uv.hrtime()
+      element.starttime = vim.uv.now()
     elseif channel[2] == 'end' then
-      element.endtime = busted.gettime()
-      element.endtick = busted.monotime()
+      element.endtime = vim.uv.now()
+      element.endtick = vim.uv.hrtime()
       element.duration = element.starttick and (element.endtick - element.starttick)
     end
     local status = busted.safe(descriptor, function()

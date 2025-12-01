@@ -1,4 +1,4 @@
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 
 --- @class test.ProcessStream
 --- @field private _proc uv.uv_process_t
@@ -19,7 +19,11 @@ function M.spawn(argv)
     _stdout = uv.new_pipe(false),
   }, { __index = M })
 
-  local prog, args = argv[1], vim.list_slice(argv, 2)
+  local prog = argv[1]
+  if type(prog) ~= 'string' then
+    error('argv[1] must be the program path')
+  end
+  local args = vim.list_slice(argv, 2)
 
   --- @diagnostic disable-next-line:missing-fields
   self._proc, self._pid = uv.spawn(prog, {

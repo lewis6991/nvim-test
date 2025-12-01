@@ -1,5 +1,7 @@
 local function getUniqueId(obj)
-  return tonumber(tostring(obj):match(':%s*[0xX]*(%x+)'), 16)
+  local hex = tostring(obj):match(':%s*[0xX]*(%x+)')
+  assert(hex, 'failed to extract unique identifier')
+  return tonumber(hex, 16)
 end
 
 local function Subscriber(fn, options)
@@ -7,10 +9,10 @@ local function Subscriber(fn, options)
     options = options or {},
     fn = fn,
     channel = nil,
-    update = function(self, options)
-      if options then
-        self.fn = options.fn or self.fn
-        self.options = options.options or self.options
+    update = function(self, opts)
+      if opts then
+        self.fn = opts.fn or self.fn
+        self.options = opts.options or self.options
       end
     end,
   }
@@ -30,15 +32,20 @@ local function Channel(namespace, parent)
 
     addSubscriber = function(self, fn, options)
       local callback = Subscriber(fn, options)
-      local priority = (#self.callbacks + 1)
+      local insert_index = (#self.callbacks + 1)
 
-      options = options or {}
+      local opts = options or {}
 
-      if options.priority and options.priority >= 0 and options.priority < priority then
-        priority = options.priority
+      if opts.priority and opts.priority >= 0 and opts.priority < insert_index then
+        insert_index = opts.priority
       end
 
-      table.insert(self.callbacks, priority, callback)
+      insert_index = math.floor(insert_index)
+      if insert_index < 1 then
+        insert_index = 1
+      end
+
+      table.insert(self.callbacks, insert_index, callback)
 
       return callback
     end,
@@ -69,17 +76,17 @@ local function Channel(namespace, parent)
       end
     end,
 
-    addChannel = function(self, namespace)
-      self.channels[namespace] = Channel(namespace, self)
-      return self.channels[namespace]
+    addChannel = function(self, channel_namespace)
+      self.channels[channel_namespace] = Channel(channel_namespace, self)
+      return self.channels[channel_namespace]
     end,
 
-    hasChannel = function(self, namespace)
-      return namespace and self.channels[namespace] and true
+    hasChannel = function(self, channel_namespace)
+      return channel_namespace and self.channels[channel_namespace] and true
     end,
 
-    getChannel = function(self, namespace)
-      return self.channels[namespace] or self:addChannel(namespace)
+    getChannel = function(self, channel_namespace)
+      return self.channels[channel_namespace] or self:addChannel(channel_namespace)
     end,
 
     removeSubscriber = function(self, id)
@@ -127,7 +134,7 @@ local Mediator = setmetatable({
   Channel = Channel,
   Subscriber = Subscriber,
 }, {
-  __call = function(fn, options)
+  __call = function(_, _)
     return {
       channel = Channel('root'),
 

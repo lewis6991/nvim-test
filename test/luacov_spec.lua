@@ -1,7 +1,7 @@
 local helpers = require('nvim-test.helpers')
 local eq = helpers.eq
 
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local fs = vim.fs
 
 local util = require('luacov.util')

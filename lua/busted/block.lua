@@ -90,7 +90,7 @@ return function(busted)
         if err then
           err(descriptor)
         end
-        success = nil
+        success = false
       end
     end
     return success, current
@@ -106,13 +106,13 @@ return function(busted)
         if err then
           err(descriptor)
         end
-        success = nil
+        success = false
       end
     end
 
     if propagate and parent then
       if not block.dexecAll(descriptor, parent, propagate) then
-        success = nil
+        success = false
       end
     end
     return success

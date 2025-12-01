@@ -4,7 +4,7 @@
 -- @name luacov.reporter
 local reporter = {}
 
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local LineScanner = require('luacov.linescanner')
 local luacov = require('luacov.runner')
 local util = require('luacov.util')
@@ -16,8 +16,8 @@ if not dir_sep:find('[/\\]') then
 end
 
 --- returns all files inside dir
---- @param dir directory to be listed
---- @treturn table with filenames and attributes
+--- @param dir string directory to be listed
+--- @return fun(): string, { mode: string? } iterator yielding file info
 local function dirtree(dir)
   assert(dir and dir ~= '', 'Please pass directory parameter')
   if dir:sub(-1):match('[/\\]') then
@@ -26,6 +26,7 @@ local function dirtree(dir)
 
   dir = dir:gsub('[/\\]', dir_sep)
 
+  --- @async
   local function scan(directory)
     local req = uv.fs_scandir(directory)
     if not req then
@@ -52,6 +53,10 @@ local function dirtree(dir)
   end)
 end
 
+---@class luacov.ReportWriter
+---@field write fun(self, ...: string): integer
+---@field close fun(self)
+
 local function open_writer(path)
   local fd, err = uv.fs_open(path, 'w', 420)
   if not fd then
@@ -60,7 +65,7 @@ local function open_writer(path)
 
   local writer = {}
 
-  function writer:write(...)
+  function writer.write(_, ...)
     local chunk = table.concat({ ... })
     local bytes, werr = uv.fs_write(fd, chunk, -1)
     if not bytes then
@@ -69,23 +74,24 @@ local function open_writer(path)
     return bytes
   end
 
-  function writer:close()
+  function writer.close(_)
     if fd then
       uv.fs_close(fd)
       fd = nil
     end
   end
 
+  ---@cast writer luacov.ReportWriter
   return writer
 end
 
 ----------------------------------------------------------------
 --- checks if string 'filename' has pattern 'pattern'
---- @param filename
---- @param pattern
+--- @param filename string
+--- @param pattern string
 --- @return boolean
 local function fileMatches(filename, pattern)
-  return string.find(filename, pattern)
+  return string.find(filename, pattern) ~= nil
 end
 
 ----------------------------------------------------------------
@@ -100,9 +106,25 @@ end
 -- end
 -- @type ReporterBase
 ---@class ReporterBase
+---@field protected _out luacov.ReportWriter?
+---@field protected _cfg table
+---@field protected _data table<string, any>
+---@field protected _files string[]
+---@field protected _mhit integer
+---@field protected _private any
 local ReporterBase = {}
 do
   ReporterBase.__index = ReporterBase
+
+  ---@param handler ReporterBase
+  ---@param hook_name string
+  ---@param ... any
+  local function call_hook(handler, hook_name, ...)
+    local method = handler[hook_name]
+    if type(method) == 'function' then
+      method(handler, ...)
+    end
+  end
 
   function ReporterBase:new(conf)
     local stats = require('luacov.stats')
@@ -211,11 +233,17 @@ do
   --- Writes strings to report file.
   -- @param ... strings.
   function ReporterBase:write(...)
-    return self._out:write(...)
+    local out = assert(self._out, 'report output is not initialized')
+    return out:write(...)
   end
 
   function ReporterBase:close()
-    self._out:close()
+    local out = self._out
+    if not out then
+      return
+    end
+    out:close()
+    self._out = nil
     self._private = nil
   end
 
@@ -231,53 +259,6 @@ do
     return self._data[filename]
   end
 
-  -- Stub methods follow.
-  -- luacheck: push no unused args
-
-  --- Stub method called before reporting.
-  function ReporterBase:on_start() end
-
-  --- Stub method called before processing a file.
-  -- @param filename name of the file.
-  function ReporterBase:on_new_file(filename) end
-
-  --- Stub method called if a file couldn't be processed due to an error.
-  -- @param filename name of the file.
-  -- @param error_type "open", "read" or "load".
-  -- @param message error message.
-  function ReporterBase:on_file_error(filename, error_type, message) end
-
-  --- Stub method called for each empty source line
-  -- and other lines that can't be hit.
-  -- @param filename name of the file.
-  -- @param lineno line number.
-  -- @param line the line itself as a string.
-  function ReporterBase:on_empty_line(filename, lineno, line) end
-
-  --- Stub method called for each missed source line.
-  -- @param filename name of the file.
-  -- @param lineno line number.
-  -- @param line the line itself as a string.
-  function ReporterBase:on_mis_line(filename, lineno, line) end
-
-  --- Stub method called for each hit source line.
-  -- @param filename name of the file.
-  -- @param lineno line number.
-  -- @param line the line itself as a string.
-  -- @param hits number of times the line was hit. Should be positive.
-  function ReporterBase:on_hit_line(filename, lineno, line, hits) end
-
-  --- Stub method called after a file has been processed.
-  -- @param filename name of the file.
-  -- @param hits total number of hit lines in the file.
-  -- @param miss total number of missed lines in the file.
-  function ReporterBase:on_end_file(filename, hits, miss) end
-
-  --- Stub method called after reporting.
-  function ReporterBase:on_end() end
-
-  -- luacheck: pop
-
   local cluacov_ok = pcall(require, 'cluacov.version')
   local deepactivelines
 
@@ -289,17 +270,24 @@ do
     local file, open_err = io.open(filename)
 
     if not file then
-      self:on_file_error(filename, 'open', util.unprefix(open_err, filename .. ': '))
+      local err_msg = util.unprefix(tostring(open_err or ''), filename .. ': ')
+      call_hook(self, 'on_file_error', filename, 'open', err_msg)
       return
     end
 
-    local active_lines
+    local active_lines = {}
 
     if cluacov_ok then
       local src, read_err = file:read('*a')
 
       if not src then
-        self:on_file_error(filename, 'read', read_err)
+        call_hook(
+          self,
+          'on_file_error',
+          filename,
+          'read',
+          tostring(read_err or 'unknown read error')
+        )
         return
       end
 
@@ -307,15 +295,20 @@ do
       local func, load_err = util.load_string(src, nil, '@file')
 
       if not func then
-        self:on_file_error(filename, 'load', 'line ' .. util.unprefix(load_err, 'file:'))
+        local load_msg = util.unprefix(tostring(load_err or ''), 'file:')
+        call_hook(self, 'on_file_error', filename, 'load', 'line ' .. load_msg)
         return
       end
 
-      active_lines = deepactivelines.get(func)
-      file:seek('set')
+      local deep_lines = deepactivelines
+      if not deep_lines then
+        error('deepactivelines module missing')
+      end
+      active_lines = deep_lines.get(func) or {}
+      file:seek('set', 0)
     end
 
-    self:on_new_file(filename)
+    call_hook(self, 'on_new_file', filename)
     local file_hits, file_miss = 0, 0
     local filedata = self:stats(filename)
 
@@ -338,38 +331,38 @@ do
 
       if included then
         if hits == 0 then
-          self:on_mis_line(filename, line_nr, line)
+          call_hook(self, 'on_mis_line', filename, line_nr, line)
           file_miss = file_miss + 1
         else
-          self:on_hit_line(filename, line_nr, line, hits)
+          call_hook(self, 'on_hit_line', filename, line_nr, line, hits)
           file_hits = file_hits + 1
         end
       else
-        self:on_empty_line(filename, line_nr, line)
+        call_hook(self, 'on_empty_line', filename, line_nr, line)
       end
 
       line_nr = line_nr + 1
     end
 
     file:close()
-    self:on_end_file(filename, file_hits, file_miss)
+    call_hook(self, 'on_end_file', filename, file_hits, file_miss)
   end
 
   function ReporterBase:run()
-    self:on_start()
+    call_hook(self, 'on_start')
 
     for _, filename in ipairs(self:files()) do
       self:_run_file(filename)
     end
 
-    self:on_end()
+    call_hook(self, 'on_end')
   end
 end
 --- @section end
 ----------------------------------------------------------------
 
 ----------------------------------------------------------------
-local DefaultReporter = setmetatable({}, ReporterBase)
+local DefaultReporter = setmetatable({}, { __index = ReporterBase })
 do
   DefaultReporter.__index = DefaultReporter
 
@@ -390,7 +383,7 @@ do
     self:write(('='):rep(78), '\n')
   end
 
-  function DefaultReporter:on_file_error(filename, error_type, message) --luacheck: no self
+  function DefaultReporter.on_file_error(_self, filename, error_type, message)
     io.stderr:write(("Couldn't %s %s: %s\n"):format(error_type, filename, message))
   end
 
@@ -463,13 +456,19 @@ do
 
     for _, line in ipairs(lines) do
       for column_nr, column in ipairs(line) do
-        max_column_lengths[column_nr] = math.max(max_column_lengths[column_nr] or -1, #column)
+        local column_length = #column
+        ---@cast column_length integer
+        local current = max_column_lengths[column_nr] or -1
+        if column_length > current then
+          max_column_lengths[column_nr] = column_length
+        end
       end
     end
 
-    local table_width = #max_column_lengths - 1
+    local table_width = #max_column_lengths - 1 --- @type integer
 
     for _, column_length in ipairs(max_column_lengths) do
+      ---@cast column_length integer
       table_width = table_width + column_length
     end
 
@@ -494,7 +493,7 @@ end
 
 --- Runs the report generator.
 -- To load a config, use `luacov.runner.load_config` first.
--- @param[opt] reporter_class custom reporter class. Will be
+-- @param reporter_class? custom reporter class. Will be
 -- instantiated using 'new' method with configuration
 -- (see `luacov.defaults`) as the argument. It should
 -- return nil + error if something went wrong.

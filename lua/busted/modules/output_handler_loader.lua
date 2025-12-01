@@ -39,7 +39,14 @@ return function()
       end
     end
 
-    handler(options):subscribe(options)
+    if not handler then
+      error('no handler resolved', 0)
+    end
+    local handler_instance = handler(options)
+    if not handler_instance then
+      error('output handler did not return an instance', 0)
+    end
+    handler_instance:subscribe(options)
   end
 
   return loadOutputHandler

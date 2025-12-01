@@ -1,4 +1,6 @@
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
+local coroutine_any = coroutine ---@type table<string, any>
+local co_yield = coroutine_any.yield
 
 --- @class test.Session
 --- @field private _msgpack_rpc_stream test.MsgpackRpcStream
@@ -130,10 +132,25 @@ function M:run(request_cb, notification_cb, setup_cb, timeout)
 
   while #self._pending_messages > 0 do
     local msg = table.remove(self._pending_messages, 1)
-    if msg[1] == 'request' then
-      on_request(msg[2], msg[3], msg[4])
-    else
-      on_notification(msg[2], msg[3])
+    if type(msg) ~= 'table' then
+      break
+    end
+    local kind = msg[1]
+    if kind == 'request' then
+      local method = msg[2]
+      local args = msg[3]
+      local response = msg[4]
+      if type(method) == 'string' and type(args) == 'table' and response then
+        ---@cast args any[]
+        on_request(method, args, response)
+      end
+    elseif kind == 'notification' then
+      local method = msg[2]
+      local args = msg[3]
+      if type(method) == 'string' and type(args) == 'table' then
+        ---@cast args any[]
+        on_notification(method, args)
+      end
     end
   end
 
@@ -141,7 +158,7 @@ function M:run(request_cb, notification_cb, setup_cb, timeout)
   self._is_running = false
 end
 
-function M:stop()
+function M.stop(_)
   uv.stop()
 end
 
@@ -162,7 +179,7 @@ end
 --- @return any result
 function M:_yielding_request(method, args)
   --- @param callback fun(err: any, result: any)
-  return coroutine.yield(function(callback)
+  return co_yield(function(callback)
     self._msgpack_rpc_stream:write(method, args, callback)
   end)
 end

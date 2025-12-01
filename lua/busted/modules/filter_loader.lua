@@ -18,7 +18,7 @@ return function()
     end
 
     local filterExcludeTags = function(name)
-      for i, tag in pairs(options.excludeTags) do
+      for _, tag in pairs(options.excludeTags) do
         if hasTag(name, tag) then
           return nil, false
         end
@@ -28,7 +28,7 @@ return function()
 
     local filterTags = function(name)
       local fullname = getFullName(name)
-      for i, tag in pairs(options.tags) do
+      for _, tag in pairs(options.tags) do
         if hasTag(fullname, tag) then
           return nil, true
         end
@@ -37,8 +37,8 @@ return function()
     end
 
     local filterOutNames = function(name)
-      for _, filter in pairs(options.filterOut) do
-        if getFullName(name):find(filter) ~= nil then
+      for _, pattern in pairs(options.filterOut) do
+        if getFullName(name):find(pattern) ~= nil then
           return nil, false
         end
       end
@@ -47,23 +47,23 @@ return function()
 
     local excludeNames = {}
     if options.excludeNamesFile then
-      for name in io.lines(options.excludeNamesFile) do
-        table.insert(excludeNames, name)
+      for line_name in io.lines(options.excludeNamesFile) do
+        table.insert(excludeNames, line_name)
       end
     end
 
     local excludeNamesFile = function(name)
-      for _, filter in ipairs(excludeNames) do
-        if getFullName(name) == filter then
+      for _, candidate in ipairs(excludeNames) do
+        if getFullName(name) == candidate then
           return nil, false
         end
       end
       return nil, true
     end
 
-    local name = function(name)
+    local match_name_filter = function(test_name)
       for _, candidate in pairs(options.name) do
-        if string.find(candidate, getFullName(name), 1, true) then
+        if string.find(candidate, getFullName(test_name), 1, true) then
           return nil, true
         end
       end
@@ -71,15 +71,15 @@ return function()
     end
 
     local filterNames = function(name)
-      for _, filter in pairs(options.filter) do
-        if getFullName(name):find(filter) ~= nil then
+      for _, pattern in pairs(options.filter) do
+        if getFullName(name):find(pattern) ~= nil then
           return nil, true
         end
       end
       return nil, (#options.filter == 0)
     end
 
-    local printTestName = function(element, parent, status)
+    local printTestName = function(element, _parent, status)
       if not (options.suppressPending and status == 'pending') then
         local fullname = getFullName()
         local trace = element.trace
@@ -96,11 +96,11 @@ return function()
     end
 
     local noop = function() end
-    local stubOut = function(descriptor, name, fn, ...)
+    local stubOut = function(descriptor, descriptor_name, fn, ...)
       if fn == noop then
         return nil, true
       end
-      busted.publish({ 'register', descriptor }, name, noop, ...)
+      busted.publish({ 'register', descriptor }, descriptor_name, noop, ...)
       return nil, false
     end
 
@@ -108,16 +108,16 @@ return function()
       return nil, not busted.skipAll
     end
 
-    local applyFilter = function(descriptors, name, fn)
-      if options[name] and options[name] ~= '' then
+    local applyFilter = function(descriptors, option_name, fn)
+      if options[option_name] and options[option_name] ~= '' then
         for _, descriptor in ipairs(descriptors) do
           busted.subscribe({ 'register', descriptor }, fn, { priority = 1 })
         end
       end
     end
 
-    local applyDescFilter = function(descriptors, name, fn)
-      if options[name] and options[name] ~= '' then
+    local applyDescFilter = function(descriptors, option_name, fn)
+      if options[option_name] and options[option_name] ~= '' then
         for _, descriptor in ipairs(descriptors) do
           local f = function(...)
             return fn(descriptor, ...)
@@ -149,7 +149,7 @@ return function()
 
     -- The following filters are applied in reverse order
     applyFilter({ 'it', 'pending' }, 'filter', filterNames)
-    applyFilter({ 'describe', 'it', 'pending' }, 'name', name)
+    applyFilter({ 'describe', 'it', 'pending' }, 'name', match_name_filter)
     applyFilter({ 'describe', 'it', 'pending' }, 'filterOut', filterOutNames)
     applyFilter({ 'describe', 'it', 'pending' }, 'excludeNamesFile', excludeNamesFile)
     applyFilter({ 'it', 'pending' }, 'tags', filterTags)

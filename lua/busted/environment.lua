@@ -17,29 +17,30 @@ return function(context)
     self.env[key] = value
   end
 
-  local function __index(self, key)
+  local function __index(_, key)
     return getEnv(context.get(), key)
   end
 
-  local function __newindex(self, key, value)
+  local function __newindex(_, key, value)
     setEnv(context.get(), key, value)
   end
 
-  local env = setmetatable({}, { __index = __index, __newindex = __newindex })
+  local env = {} --- @type table<string, any>
+  setmetatable(env, { __index = __index, __newindex = __newindex })
 
   function environment.wrap(fn)
     return setfenv(fn, env)
   end
 
   function environment.set(key, value)
-    local env = context.get('env')
+    local current_env = context.get('env')
 
-    if not env then
-      env = {}
-      context.set('env', env)
+    if not current_env then
+      current_env = {}
+      context.set('env', current_env)
     end
 
-    env[key] = value
+    current_env[key] = value
   end
   return environment
 end

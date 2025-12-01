@@ -15,6 +15,10 @@ local ffi = require('ffi')
 
 local function patch_with_return_value(func_name)
   local original = ffi[func_name]
+  if original == nil then
+    error(('ffi.%s is not available'):format(func_name))
+  end
+  ---@cast original fun(primary: unknown, ...: unknown): unknown
   local original_store = {}
 
   ffi[func_name] = function(primary, ...)
@@ -38,6 +42,10 @@ end
 
 local function patch_without_return_value(func_name)
   local original = ffi[func_name]
+  if original == nil then
+    error(('ffi.%s is not available'):format(func_name))
+  end
+  ---@cast original fun(primary: unknown, ...: unknown): unknown
   local original_store = {}
 
   ffi[func_name] = function(primary, ...)

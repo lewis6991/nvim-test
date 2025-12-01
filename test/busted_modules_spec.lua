@@ -1,4 +1,4 @@
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local fs = vim.fs
 
 local test_file_loader_factory = require('busted.modules.test_file_loader')

@@ -1,6 +1,6 @@
 local ret = {}
 
-local getTrace = function(filename, info)
+local getTrace = function(_filename, info)
   local index = info.traceback:find('\n%s*%[C]')
   info.traceback = info.traceback:sub(1, index)
   return info

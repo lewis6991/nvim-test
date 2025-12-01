@@ -11,10 +11,14 @@ return function()
     luacov(config)
 
     -- exclude busted files
-    table.insert(luacov.configuration.exclude, 'busted_bootstrap$')
-    table.insert(luacov.configuration.exclude, 'busted%.')
-    table.insert(luacov.configuration.exclude, 'luassert%.')
-    table.insert(luacov.configuration.exclude, 'pl%.')
+    local configuration = luacov.configuration or {}
+    luacov.configuration = configuration
+    local exclude = configuration.exclude or {}
+    configuration.exclude = exclude
+    table.insert(exclude, 'busted_bootstrap$')
+    table.insert(exclude, 'busted%.')
+    table.insert(exclude, 'luassert%.')
+    table.insert(exclude, 'pl%.')
     return true
   end
 

@@ -1,7 +1,7 @@
 local utils = require('busted.utils')
 local exit = require('busted.exit')
 
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local fs = vim.fs
 local is_windows = uv.os_uname().sysname:match('Windows')
 
@@ -432,6 +432,10 @@ return function(options)
     local finished = false
     while i <= #args do
       local argument = args[i]
+      if type(argument) ~= 'string' then
+        return nil, 'Invalid argument at position ' .. tostring(i)
+      end
+      --- @cast argument string
       if not finished and argument == '--' then
         finished = true
       elseif not finished and argument:sub(1, 2) == '--' then
@@ -611,7 +615,7 @@ return function(options)
       return self
     end,
 
-    parse = function(self, args)
+    parse = function(_, args)
       return parse(args)
     end,
   }

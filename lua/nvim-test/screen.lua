@@ -80,19 +80,25 @@ local dedent = helpers.dedent
 local get_session = helpers.get_session
 local create_callindex = helpers.create_callindex
 
--- Concat list-like tables.
---- @generic T: any[]
---- @param ... T
---- @return T
-local function concat_tables(...)
-  local ret = {} --- @type any[]
-  for i = 1, select('#', ...) do
-    local tbl = select(i, ...) --- @type any[]
-    for _, v in ipairs(tbl or {}) do
-      ret[#ret + 1] = v
+local math_tointeger = rawget(math, 'tointeger')
+local tointeger
+if math_tointeger then
+  tointeger = math_tointeger
+else
+  tointeger = function(value)
+    if type(value) ~= 'number' then
+      return nil
     end
+    if value >= 0 then
+      return math.floor(value + 0.0)
+    end
+    return math.ceil(value - 0.0)
   end
-  return ret
+end
+local function assert_session(self)
+  local session = self._session
+  assert(session, 'Screen is not attached to a session')
+  return session
 end
 
 --- @generic T
@@ -116,8 +122,13 @@ local function isempty(v)
   return type(v) == 'table' and next(v) == nil
 end
 
+--- @class test.screen.Cell
+--- @field text string
+--- @field attrs table<string, any>?
+--- @field hl_id integer
+
 --- @class test.screen.Grid
---- @field rows table[][]
+--- @field rows test.screen.Cell[][]
 --- @field width integer
 --- @field height integer
 
@@ -125,19 +136,25 @@ end
 --- @field colors table<string,integer>
 --- @field colornames table<integer,string>
 --- @field uimeths table<string,function>
---- @field options? table<string,any>
+--- @field options table<string,any>
 --- @field timeout integer
 --- @field win_position table<integer,table<string,integer>>
+--- @field win_viewport table<integer,table<string,integer>>
 --- @field float_pos table<integer,table>
+--- @field popupmenu table?
 --- @field cmdline table<integer,table>
 --- @field cmdline_block table[]
---- @field hl_groups table<string,integer>
+--- @field hl_groups table<string,integer?>
 --- @field messages table<integer,table>
+--- @field msg_grid? integer
+--- @field msg_grid_pos? integer
 --- @field private _cursor {grid:integer,row:integer,col:integer}
---- @field private _grids table<integer,test.screen.Grid>
+--- @field private _grids table<integer,test.screen.Grid?>
 --- @field private _grid_win_extmarks table<integer,table>
---- @field private _attr_table table<integer,table>
+--- @field private _attr_table table<integer,table?>
 --- @field private _hl_info table<integer,table>
+--- @field private _default_attr_ignore? table<string,boolean>
+--- @field private _options test.screen.Opts
 local M = {}
 M.__index = M
 
@@ -153,12 +170,16 @@ end
 local default_screen_timeout = default_timeout_factor * 3500
 
 function M._init_colors()
-  local session = get_session()
+  local session = assert(get_session(), 'no active helper session')
   local status, rv = session:request('nvim_get_color_map')
   if not status then
     error('failed to get color map')
   end
-  local colors = rv --- @type table<string,integer>
+  local colors = rv
+  if colors == nil then
+    error('missing color map payload')
+  end
+  ---@cast colors table<string, integer>
   local colornames = {} --- @type table<integer,string>
   for name, rgb in pairs(colors) do
     -- we disregard the case that colornames might not be unique, as
@@ -205,6 +226,7 @@ function M.new(width, height)
     ruler = {},
     hl_groups = {},
     _default_attr_ids = nil,
+    _default_attr_ignore = nil,
     mouse_enabled = true,
     _attrs = {},
     _hl_info = { [0] = {} },
@@ -223,7 +245,8 @@ function M.new(width, height)
     _busy = false,
   }, M)
   local function ui(method, ...)
-    local status, rv = self._session:request('nvim_ui_' .. method, ...)
+    local session = assert_session(self)
+    local status, rv = session:request('nvim_ui_' .. method, ...)
     if not status then
       error(rv[2])
     end
@@ -250,13 +273,14 @@ end
 --- @field ext_newgrid? boolean
 --- @field ext_popupmenu? boolean
 --- @field ext_wildmenu? boolean
+--- @field ext_hlstate? boolean
 --- @field rgb? boolean
 --- @field _debug_float? boolean
 
 --- @param options? test.screen.Opts
 --- @param session? test.Session
 function M:attach(options, session)
-  session = session or get_session()
+  session = session or assert(get_session(), 'no active helper session')
   options = options or {}
 
   if options.ext_linegrid == nil then
@@ -433,8 +457,11 @@ end
 --- @param attr_ids? table<integer,table<string,any>>
 --- @param ... any
 function M:expect(expected, attr_ids, ...)
-  --- @type string, fun()
-  local grid, condition
+  local grid --- @type string?
+  local condition --- @type fun()?
+  local function compare_values(expected_value, actual_value, label)
+    return eq(expected_value, actual_value, label)
+  end
 
   assert(next({ ... }) == nil, 'invalid args to expect()')
 
@@ -459,7 +486,7 @@ function M:expect(expected, attr_ids, ...)
     condition = expected
     expected = {}
   else
-    assert(false)
+    error('Screen:expect received unsupported expected type')
   end
 
   local expected_rows = {} --- @type string[]
@@ -482,7 +509,7 @@ function M:expect(expected, attr_ids, ...)
   self._new_attrs = false
   self:_wait(function()
     if condition ~= nil then
-      --- @type boolean, string
+      --- @type boolean, any
       local status, res = pcall(condition)
       if not status then
         return tostring(res)
@@ -496,6 +523,7 @@ function M:expect(expected, attr_ids, ...)
     local actual_rows = self:render(not expected.any, attr_state)
 
     if expected.any ~= nil then
+      assert(type(expected.any) == 'string', 'expected.any must be a string')
       -- Search for `any` anywhere in the screen lines.
       local actual_screen_str = table.concat(actual_rows, '\n')
       if nil == string.find(actual_screen_str, expected.any) then
@@ -513,12 +541,15 @@ function M:expect(expected, attr_ids, ...)
 
     if grid then
       for i, row in ipairs(expected_rows) do
-        local count --- @type integer?
-        row, count = row:match('^(.*%|)%*(%d+)$')
-        if row then
-          count = tonumber(count)
+        local repeated_row, count_match = row:match('^(.*%|)%*(%d+)$')
+        if repeated_row then
+          row = repeated_row
+          local repetitions = tonumber(count_match)
           table.remove(expected_rows, i)
-          for _ = 1, count do
+          if not repetitions then
+            error('invalid repetition count in expected row')
+          end
+          for _ = 1, repetitions do
             table.insert(expected_rows, i, row)
           end
         end
@@ -546,10 +577,11 @@ function M:expect(expected, attr_ids, ...)
             end
             --- @type string
             pat = (pat or '') .. pesc(after:sub(1, s - 1)) .. m
-            after = after:sub(e + 1)
+            after = after:sub(assert(e, 'missing MATCH boundary') + 1)
           end
         end
-        if row ~= actual_rows[i] and (not pat or not actual_rows[i]:match(pat)) then
+        local actual_row = actual_rows[i] or ''
+        if row ~= actual_row and (not pat or not actual_row:match(pat)) then
           msg_expected_rows[i] = '*' .. msg_expected_rows[i]
           if i <= #actual_rows then
             msg_actual_rows[i] = '*' .. msg_actual_rows[i]
@@ -594,54 +626,79 @@ screen:redraw_debug() to show all intermediate screen states.]]
     if expected.float_pos then
       expected.float_pos = deepcopy(expected.float_pos)
       for _, v in pairs(expected.float_pos) do
-        if not v.external and v[7] == nil then
+        if type(v) == 'table' and not v.external and v[7] == nil then
           v[7] = 50
         end
       end
     end
 
+    local function compare_ext_section(key)
+      if expected[key] == nil and isempty(extstate[key]) then
+        return nil
+      end
+      local status, res = pcall(compare_values, expected[key], extstate[key], key)
+      if status then
+        return nil
+      end
+      return (
+        tostring(res)
+        .. '\nHint: full state of "'
+        .. key
+        .. '":\n  '
+        .. inspect(extstate[key])
+      )
+    end
+
     -- Convert assertion errors into invalid screen state descriptions.
-    for _, k in ipairs(concat_tables(ext_keys, { 'mode', 'mouse_enabled' })) do
-      -- Empty states are considered the default and need not be mentioned.
-      if not (expected[k] == nil and isempty(extstate[k])) then
-        local status, res = pcall(eq, expected[k], extstate[k], k)
-        if not status then
-          return (
-            tostring(res)
-            .. '\nHint: full state of "'
-            .. k
-            .. '":\n  '
-            .. inspect(extstate[k])
-          )
-        end
+    for _, k in ipairs(ext_keys) do
+      local err = compare_ext_section(k)
+      if err then
+        return err
+      end
+    end
+    for _, k in ipairs({ 'mode', 'mouse_enabled' }) do
+      local err = compare_ext_section(k)
+      if err then
+        return err
       end
     end
 
     if expected.hl_groups ~= nil then
+      ---@cast expected.hl_groups table<string, integer>
       for name, id in pairs(expected.hl_groups) do
         local expected_hl = attr_state.ids[id]
-        local actual_hl = self._attr_table[self.hl_groups[name]][(self._options.rgb and 1) or 2]
-        local status, res = pcall(eq, expected_hl, actual_hl, 'highlight ' .. name)
+        local group_id = self.hl_groups[name]
+        assert(group_id, 'missing highlight group ' .. tostring(name))
+        local attr_entry = self._attr_table[group_id]
+        assert(attr_entry, 'missing attr entry for highlight ' .. tostring(name))
+        local actual_hl = attr_entry[(self._options.rgb and 1) or 2]
+        local status, res = pcall(compare_values, expected_hl, actual_hl, 'highlight ' .. name)
         if not status then
           return tostring(res)
         end
       end
     end
 
-    if expected.extmarks ~= nil then
-      for gridid, expected_marks in pairs(expected.extmarks) do
+    local expected_extmarks = expected.extmarks
+    if expected_extmarks ~= nil then
+      --- @cast expected_extmarks table<integer,table>
+      for gridid, expected_marks in pairs(expected_extmarks) do
         local stored_marks = self._grid_win_extmarks[gridid]
         if stored_marks == nil then
           return 'no win_extmark for grid ' .. tostring(gridid)
         end
-        local status, res =
-          pcall(eq, expected_marks, stored_marks, 'extmarks for grid ' .. tostring(gridid))
+        local status, res = pcall(
+          compare_values,
+          expected_marks,
+          stored_marks,
+          'extmarks for grid ' .. tostring(gridid)
+        )
         if not status then
           return tostring(res)
         end
       end
       for gridid, _ in pairs(self._grid_win_extmarks) do
-        local expected_marks = expected.extmarks[gridid]
+        local expected_marks = expected_extmarks[gridid]
         if expected_marks == nil then
           return 'unexpected win_extmark for grid ' .. tostring(gridid)
         end
@@ -667,10 +724,12 @@ function M:expect_unchanged(intermediate, waittime_ms, ignore_attrs)
 end
 
 --- @private
---- @param check fun(): string
+--- @param check fun(): string?
 --- @param flags table<string,any>
 function M:_wait(check, flags)
-  local err, checked = false, false
+  --- @type string|false|nil
+  local err = false
+  local checked = false
   local success_seen = false
   local failure_after_success = false
   local did_flush = true
@@ -706,7 +765,8 @@ function M:_wait(check, flags)
   end
 
   assert(timeout >= minimal_timeout)
-  local did_minimal_timeout = false
+  local _did_minimal_timeout = false
+  local session = assert_session(self)
 
   local function notification_cb(method, args)
     if method ~= 'redraw' then
@@ -724,8 +784,8 @@ function M:_wait(check, flags)
 
     if not err then
       success_seen = true
-      if did_minimal_timeout then
-        self._session:stop()
+      if _did_minimal_timeout then
+        session:stop()
       end
     elseif success_seen and #args > 0 then
       success_seen = false
@@ -735,7 +795,7 @@ function M:_wait(check, flags)
 
     return true
   end
-  local eof = run_session(self._session, flags.request_cb, notification_cb, minimal_timeout)
+  local eof = run_session(session, flags.request_cb, notification_cb, minimal_timeout)
   if not did_flush then
     err = 'no flush received'
   elseif not checked then
@@ -747,8 +807,9 @@ function M:_wait(check, flags)
   end
 
   if not success_seen and not eof then
-    did_minimal_timeout = true
-    eof = run_session(self._session, flags.request_cb, notification_cb, timeout - minimal_timeout)
+    _did_minimal_timeout = true
+    local remaining = tointeger(timeout - minimal_timeout) or 0
+    eof = run_session(session, flags.request_cb, notification_cb, remaining)
   end
 
   local did_warn = false
@@ -813,7 +874,8 @@ function M:sleep(ms, request_cb)
     assert(method == 'redraw')
     self:_redraw(args)
   end
-  run_session(self._session, request_cb, notification_cb, ms)
+  local session = assert_session(self)
+  run_session(session, request_cb, notification_cb, ms)
 end
 
 --- @private
@@ -868,9 +930,9 @@ local function min(x, y)
 end
 
 function M:_handle_grid_resize(grid, width, height)
-  local rows = {}
+  local rows = {} --- @type test.screen.Cell[][]
   for _ = 1, height do
-    local cols = {}
+    local cols = {} --- @type test.screen.Cell[]
     for _ = 1, width do
       table.insert(cols, { text = ' ', attrs = self._clear_attrs, hl_id = 0 })
     end
@@ -879,8 +941,10 @@ function M:_handle_grid_resize(grid, width, height)
   if grid > 1 and self._grids[grid] ~= nil then
     local old = self._grids[grid]
     for i = 1, min(height, old.height) do
+      local new_row = assert(rows[i], 'new row missing during resize')
+      local old_row = assert(old.rows[i], 'old row missing during resize')
       for j = 1, min(width, old.width) do
-        rows[i][j] = old.rows[i][j]
+        new_row[j] = assert(old_row[j], 'cell missing during resize')
       end
     end
   end
@@ -903,7 +967,7 @@ function M:_handle_msg_set_pos(grid, row, scrolled, char)
   self.msg_sep_char = char
 end
 
-function M:_handle_flush() end
+function M._handle_flush(_) end
 
 function M:_reset()
   -- TODO: generalize to multigrid later
@@ -925,11 +989,14 @@ function M:_handle_mode_info_set(cursor_style_enabled, mode_info)
   for _, item in pairs(mode_info) do
     -- attr IDs are not stable, but their value should be
     if item.attr_id ~= nil then
-      item.attr = self._attr_table[item.attr_id][1]
+      local attr_entry = assert(self._attr_table[item.attr_id], 'missing attr for mode info')
+      item.attr = attr_entry[1]
       item.attr_id = nil
     end
     if item.attr_id_lm ~= nil then
-      item.attr_lm = self._attr_table[item.attr_id_lm][1]
+      local attr_entry_lm =
+        assert(self._attr_table[item.attr_id_lm], 'missing attr_lm for mode info')
+      item.attr_lm = attr_entry_lm[1]
       item.attr_id_lm = nil
     end
   end
@@ -937,6 +1004,7 @@ function M:_handle_mode_info_set(cursor_style_enabled, mode_info)
 end
 
 function M:_handle_clear()
+  local primary_grid = assert(self._grid, 'primary grid missing during clear')
   -- the first implemented UI protocol clients (python-gui and builitin TUI)
   -- allowed the cleared region to be restricted by setting the scroll region.
   -- this was never used by nvim tough, and not documented and implemented by
@@ -944,16 +1012,17 @@ function M:_handle_clear()
   -- ensure the scroll region is in a reset state.
   local expected_region = {
     top = 1,
-    bot = self._grid.height,
+    bot = primary_grid.height,
     left = 1,
-    right = self._grid.width,
+    right = primary_grid.width,
   }
   eq(expected_region, self._scroll_region)
   self:_handle_grid_clear(1)
 end
 
 function M:_handle_grid_clear(grid)
-  self:_clear_block(self._grids[grid], 1, self._grids[grid].height, 1, self._grids[grid].width)
+  local grid_obj = assert(self._grids[grid], 'grid missing during clear')
+  self:_clear_block(grid_obj, 1, grid_obj.height, 1, grid_obj.width)
 end
 
 function M:_handle_grid_destroy(grid)
@@ -966,7 +1035,8 @@ end
 
 function M:_handle_eol_clear()
   local row, col = self._cursor.row, self._cursor.col
-  self:_clear_block(self._grid, row, row, col, self._grid.width)
+  local grid = assert(self._grid, 'primary grid missing during eol clear')
+  self:_clear_block(grid, row, row, col, grid.width)
 end
 
 function M:_handle_cursor_goto(row, col)
@@ -1059,7 +1129,8 @@ function M:_handle_mouse_off()
 end
 
 function M:_handle_mode_change(mode, idx)
-  assert(mode == self._mode_info[idx + 1].name)
+  local info = assert(self._mode_info[idx + 1], 'mode info missing')
+  assert(mode == info.name)
   self.mode = mode
 end
 
@@ -1082,7 +1153,8 @@ function M:_handle_grid_scroll(g, top, bot, left, right, rows, cols)
   top = top + 1
   left = left + 1
   assert(cols == 0)
-  local grid = self._grids[g]
+  local grid = assert(self._grids[g], 'grid missing during scroll')
+  ---@cast grid test.screen.Grid
   local start, stop, step
 
   if rows > 0 then
@@ -1097,12 +1169,14 @@ function M:_handle_grid_scroll(g, top, bot, left, right, rows, cols)
 
   -- shift scroll region
   for i = start, stop, step do
-    local target = grid.rows[i]
-    local source = grid.rows[i + rows]
+    local target = assert(grid.rows[i], 'target row missing during scroll')
+    local source = assert(grid.rows[i + rows], 'source row missing during scroll')
     for j = left, right do
-      target[j].text = source[j].text
-      target[j].attrs = source[j].attrs
-      target[j].hl_id = source[j].hl_id
+      local target_cell = assert(target[j], 'target cell missing during scroll')
+      local source_cell = assert(source[j], 'source cell missing during scroll')
+      target_cell.text = source_cell.text
+      target_cell.attrs = source_cell.attrs
+      target_cell.hl_id = source_cell.hl_id
     end
   end
 
@@ -1126,7 +1200,8 @@ end
 
 function M:get_hl(val)
   if self._options.ext_newgrid then
-    return self._attr_table[val][1]
+    local attr = assert(self._attr_table[val], 'missing attr for get_hl')
+    return attr[1]
   else
     return val
   end
@@ -1137,8 +1212,12 @@ function M:_handle_highlight_set(attrs)
 end
 
 function M:_handle_put(str)
-  assert(not self._options.ext_linegrid)
-  local cell = self._grid.rows[self._cursor.row][self._cursor.col]
+  if self._options.ext_linegrid then
+    error('_handle_put should not be invoked in linegrid mode')
+  end
+  local grid = assert(self._grid, 'primary grid is not initialized')
+  local row = assert(grid.rows[self._cursor.row], 'row missing during put')
+  local cell = assert(row[self._cursor.col], 'cell missing during put')
   cell.text = str
   cell.attrs = self._attrs
   cell.hl_id = -1
@@ -1150,8 +1229,11 @@ end
 --- @param col integer
 --- @param items integer[][]
 function M:_handle_grid_line(grid, row, col, items)
-  assert(self._options.ext_linegrid)
-  local line = self._grids[grid].rows[row + 1]
+  if not self._options.ext_linegrid then
+    error('_handle_grid_line requires ext_linegrid support')
+  end
+  local grid_obj = assert(self._grids[grid], 'grid missing')
+  local line = assert(grid_obj.rows[row + 1], 'line missing during grid_line')
   local colpos = col + 1
   local hl_id = 0
   for _, item in ipairs(items) do
@@ -1160,7 +1242,7 @@ function M:_handle_grid_line(grid, row, col, items)
       hl_id = hl_id_cell
     end
     for _ = 1, (count or 1) do
-      local cell = line[colpos]
+      local cell = assert(line[colpos], 'cell missing during grid_line update')
       cell.text = text
       cell.hl_id = hl_id
       colpos = colpos + 1
@@ -1215,6 +1297,9 @@ function M:_handle_set_icon(icon)
 end
 
 function M:_handle_option_set(name, value)
+  if not self.options then
+    self.options = {}
+  end
   self.options[name] = value
 end
 
@@ -1227,6 +1312,10 @@ function M:_handle_popupmenu_show(items, selected, row, col, grid)
 end
 
 function M:_handle_popupmenu_select(selected)
+  if not self.popupmenu then
+    self.popupmenu = { items = {}, pos = selected }
+    return
+  end
   self.popupmenu.pos = selected
 end
 
@@ -1337,11 +1426,12 @@ function M:_clear_block(grid, top, bot, left, right)
 end
 
 function M:_clear_row_section(grid, rownum, startcol, stopcol, invalid)
-  local row = grid.rows[rownum]
+  local row = assert(grid.rows[rownum], 'row missing during clear')
   for i = startcol, stopcol do
-    row[i].text = (invalid and '�' or ' ')
-    row[i].attrs = self._clear_attrs
-    row[i].hl_id = 0
+    local cell = assert(row[i], 'cell missing during clear')
+    cell.text = (invalid and '�' or ' ')
+    cell.attrs = self._clear_attrs
+    cell.hl_id = 0
   end
 end
 
@@ -1350,8 +1440,10 @@ function M:_row_repr(gridnr, rownr, attr_state, cursor)
   local current_attr_id
   local i = 1
   local has_windows = self._options.ext_multigrid and gridnr == 1
-  local row = self._grids[gridnr].rows[rownr]
-  if has_windows and self.msg_grid and self.msg_grid_pos < rownr then
+  local grid = assert(self._grids[gridnr], 'grid missing during row_repr')
+  local row = assert(grid.rows[rownr], 'row missing during row_repr')
+  local msg_grid_pos = self.msg_grid_pos
+  if has_windows and self.msg_grid and msg_grid_pos and msg_grid_pos < rownr then
     return '[' .. self.msg_grid .. ':' .. string.rep('-', #row) .. ']'
   end
   while i <= #row do
@@ -1376,7 +1468,8 @@ function M:_row_repr(gridnr, rownr, attr_state, cursor)
     end
 
     if not did_window then
-      local attr_id = self:_get_attr_id(attr_state, row[i].attrs, row[i].hl_id)
+      local cell = assert(row[i], 'cell missing during row_repr iteration')
+      local attr_id = self:_get_attr_id(attr_state, cell.attrs, cell.hl_id)
       if current_attr_id and attr_id ~= current_attr_id then
         -- close current attribute bracket
         table.insert(rv, '}')
@@ -1390,7 +1483,7 @@ function M:_row_repr(gridnr, rownr, attr_state, cursor)
       if not self._busy and cursor and self._cursor.col == i then
         table.insert(rv, '^')
       end
-      table.insert(rv, row[i].text)
+      table.insert(rv, cell.text)
       i = i + 1
     end
   end
@@ -1449,7 +1542,8 @@ function M:_chunks_repr(chunks, attr_state)
     local hl, text = unpack(chunk)
     local attrs
     if self._options.ext_linegrid then
-      attrs = self._attr_table[hl][1]
+      local attr_entry = assert(self._attr_table[hl], 'missing attr entry for highlight lookup')
+      attrs = attr_entry[1]
     else
       attrs = hl
     end
@@ -1486,7 +1580,8 @@ function M:redraw_debug(attrs, ignore, timeout)
   if timeout == nil then
     timeout = 250
   end
-  run_session(self._session, nil, notification_cb, timeout)
+  local session = assert_session(self)
+  run_session(session, nil, notification_cb, timeout)
 end
 
 --- @param headers boolean
@@ -1494,7 +1589,7 @@ end
 --- @param preview? boolean
 --- @return string[]
 function M:render(headers, attr_state, preview)
-  headers = headers and (self._options.ext_multigrid or self._options._debug_float)
+  headers = headers and ((self._options.ext_multigrid or self._options._debug_float) ~= nil)
   local rv = {}
   for igrid, grid in pairs(self._grids) do
     if headers then
@@ -1511,7 +1606,10 @@ function M:render(headers, attr_state, preview)
     end
     local height = grid.height
     if igrid == self.msg_grid then
-      height = self._grids[1].height - self.msg_grid_pos
+      local base_grid = assert(self._grids[1], 'primary grid missing')
+      local msg_pos = assert(self.msg_grid_pos, 'message grid position missing')
+      height = base_grid.height - msg_pos
+      --- @cast height integer
     end
     for i = 1, height do
       local cursor = self._cursor.grid == igrid and self._cursor.row == i
@@ -1671,6 +1769,9 @@ function M:_insert_hl_id(attr_state, hl_id)
   end
 
   local entry = self._attr_table[hl_id]
+  if not entry then
+    error('missing attr entry for highlight id ' .. tostring(hl_id))
+  end
   local attrval
   if self._rgb_cterm then
     attrval = { entry[1], entry[2], info } -- unpack() doesn't work

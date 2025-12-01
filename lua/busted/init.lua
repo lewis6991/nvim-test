@@ -121,11 +121,11 @@ return setmetatable({}, {
     init(busted)
 
     return setmetatable(self, {
-      __index = function(self, key)
+      __index = function(_, key)
         return busted.api[key]
       end,
 
-      __newindex = function(self, key, value)
+      __newindex = function(_, _key, _value)
         error('Attempt to modify busted')
       end,
     })

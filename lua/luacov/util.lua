@@ -3,10 +3,11 @@
 -- @class module
 -- @name luacov.util
 
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = vim and vim.uv or error('nvim-test requires vim.uv')
 
 local READ_MODE = 'r'
 local DEFAULT_PERMS = 420 -- 0644
+local DEFAULT_ENV = rawget(_G, '_ENV') or _G
 
 ---@class luacov.util
 local util = {}
@@ -50,8 +51,8 @@ end
 
 --- Loads a string.
 ---@param str string
----@param[opt] env table
----@param[opt] chunkname string
+---@param env? table optional environment table
+---@param chunkname? string optional chunkname used for errors
 ---@return function?, string?
 function util.load_string(str, env, chunkname)
   if _VERSION:find('5%.1') then
@@ -67,7 +68,8 @@ function util.load_string(str, env, chunkname)
 
     return func
   else
-    return load(str, chunkname, 'bt', env or _ENV) -- luacheck: compat
+    local load_fn = load or error('load is required')
+    return load_fn(str, chunkname, 'bt', env or DEFAULT_ENV) -- luacheck: compat
   end
 end
 
@@ -86,13 +88,15 @@ function util.load_config(name, env)
   local func, load_err = util.load_string(src, env, '@config')
 
   if not func then
-    return nil, 'load', 'line ' .. util.unprefix(load_err, 'config:')
+    local reason = tostring(load_err or 'unknown')
+    return nil, 'load', 'line ' .. util.unprefix(reason, 'config:')
   end
 
   local ok, ret = pcall(func)
 
   if not ok then
-    return nil, 'run', 'line ' .. util.unprefix(ret, 'config:')
+    local reason = tostring(ret)
+    return nil, 'run', 'line ' .. util.unprefix(reason, 'config:')
   end
 
   return true, ret

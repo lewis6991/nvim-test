@@ -15,37 +15,37 @@ return function()
     inProgress = {},
   }
 
-  handler.cancelOnPending = function(element, parent, status)
+  handler.cancelOnPending = function(element, _parent, status)
     return not (
       (element.descriptor == 'pending' or status == 'pending') and handler.options.suppressPending
     )
   end
 
-  handler.subscribe = function(handler, options)
-    handler.options = options
+  handler.subscribe = function(output_handler, options)
+    output_handler.options = options
 
-    busted.subscribe({ 'suite', 'reset' }, handler.baseSuiteReset, { priority = 1 })
-    busted.subscribe({ 'suite', 'start' }, handler.baseSuiteStart, { priority = 1 })
-    busted.subscribe({ 'suite', 'end' }, handler.baseSuiteEnd, { priority = 1 })
+    busted.subscribe({ 'suite', 'reset' }, output_handler.baseSuiteReset, { priority = 1 })
+    busted.subscribe({ 'suite', 'start' }, output_handler.baseSuiteStart, { priority = 1 })
+    busted.subscribe({ 'suite', 'end' }, output_handler.baseSuiteEnd, { priority = 1 })
     busted.subscribe(
       { 'test', 'start' },
-      handler.baseTestStart,
-      { priority = 1, predicate = handler.cancelOnPending }
+      output_handler.baseTestStart,
+      { priority = 1, predicate = output_handler.cancelOnPending }
     )
     busted.subscribe(
       { 'test', 'end' },
-      handler.baseTestEnd,
-      { priority = 1, predicate = handler.cancelOnPending }
+      output_handler.baseTestEnd,
+      { priority = 1, predicate = output_handler.cancelOnPending }
     )
     busted.subscribe(
       { 'pending' },
-      handler.basePending,
-      { priority = 1, predicate = handler.cancelOnPending }
+      output_handler.basePending,
+      { priority = 1, predicate = output_handler.cancelOnPending }
     )
-    busted.subscribe({ 'failure', 'it' }, handler.baseTestFailure, { priority = 1 })
-    busted.subscribe({ 'error', 'it' }, handler.baseTestError, { priority = 1 })
-    busted.subscribe({ 'failure' }, handler.baseError, { priority = 1 })
-    busted.subscribe({ 'error' }, handler.baseError, { priority = 1 })
+    busted.subscribe({ 'failure', 'it' }, output_handler.baseTestFailure, { priority = 1 })
+    busted.subscribe({ 'error', 'it' }, output_handler.baseTestError, { priority = 1 })
+    busted.subscribe({ 'failure' }, output_handler.baseError, { priority = 1 })
+    busted.subscribe({ 'error' }, output_handler.baseError, { priority = 1 })
   end
 
   handler.getFullName = function(context)
@@ -60,7 +60,7 @@ return function()
     return table_concat(names, ' ')
   end
 
-  handler.format = function(element, parent, message, debug, isError)
+  handler.format = function(element, _parent, message, debug, isError)
     local function copyElement(e)
       local copy = {}
       for k, v in next, e do
@@ -117,7 +117,7 @@ return function()
     return nil, true
   end
 
-  handler.baseTestStart = function(element, parent)
+  handler.baseTestStart = function(element, _parent)
     handler.inProgress[tostring(element)] = {}
     return nil, true
   end
@@ -151,12 +151,16 @@ return function()
       handler.inProgress[id] = nil
     end
 
+    if not insertTable then
+      return nil, true
+    end
+
     table_insert(insertTable, formatted)
 
     return nil, true
   end
 
-  handler.basePending = function(element, parent, message, debug)
+  handler.basePending = function(element, _parent, message, debug)
     local id = tostring(element)
     handler.inProgress[id].message = message
     handler.inProgress[id].trace = debug

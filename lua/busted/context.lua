@@ -60,7 +60,7 @@ return function()
         element.env = {}
       end
       setmetatable(element.env, {
-        __newindex = function(self, key, value)
+        __newindex = function(_, key, value)
           if not parent then
             _G[key] = value
           else
@@ -74,7 +74,8 @@ return function()
     end
 
     local function push_state(current)
-      local state = false
+      ---@type table?
+      local state
       if current.attributes.envmode == 'insulate' then
         state = save()
       elseif current.attributes.envmode == 'unwrap' then
@@ -90,7 +91,7 @@ return function()
       if current.attributes.envmode == 'expose' then
         states[#states] = states[#states] and save()
       end
-      if state then
+      if state ~= nil then
         restore(state)
       end
     end

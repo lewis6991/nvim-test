@@ -1,5 +1,5 @@
 local assert = require('luassert')
-local uv = assert(vim and vim.uv, 'nvim-test requires vim.uv')
+local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local Session = require('nvim-test.client.session')
 local ProcessStream = require('nvim-test.client.uv_stream')
 local MsgpackRpcStream = require('nvim-test.client.msgpack_rpc_stream')
@@ -10,7 +10,7 @@ local M = {}
 
 M.sleep = uv.sleep
 
---- @type fun(expected: any, actual: any)
+--- @type fun(expected: any, actual: any, message?: string)
 M.eq = assert.are.same
 M.neq = assert.are_not.same
 
@@ -97,9 +97,9 @@ function M.pcall_err(fn, ...)
   )
 end
 
---- @param str string
---- @param leave_indent? integer
---- @return string
+---@param str string
+---@param leave_indent? integer
+---@return string
 function M.dedent(str, leave_indent)
   -- find minimum common indent across lines
   local indent = nil --- @type string?
@@ -147,7 +147,8 @@ local session --- @type test.Session?
 local loop_running = false
 local last_error --- @type string?
 local exec_lua
-local flush_coverage = function() end
+---@type fun()
+local flush_coverage
 
 function M.get_session()
   return session
@@ -155,7 +156,7 @@ end
 
 --- @param lsession test.Session
 --- @param ... any
---- @return string
+--- @return any
 local function call_and_stop_on_error(lsession, ...)
   local status, result = pcall(...)
   if not status then
@@ -222,11 +223,15 @@ M.api = vim.api
     assert(session)
     local status, rv = session:request(...)
     if not status then
+      local err_result = rv
+      if err_result == nil then
+        error('session request failed without result')
+      end
       if loop_running then
-        last_error = rv[2]
+        last_error = err_result[2]
         session:stop()
       else
-        error(rv[2])
+        error(err_result[2])
       end
     end
     return rv
@@ -288,28 +293,6 @@ function M.feed(...)
   end
 end
 
-local function check_close()
-  if not session then
-    return
-  end
-  flush_coverage()
-  local start_time = uv.now()
-  session:close()
-  uv.update_time() -- Update cached value of luv.now() (libuv: uv_now()).
-  local end_time = uv.now()
-  local delta = end_time - start_time
-  if delta > 500 then
-    print(
-      'nvim took '
-        .. delta
-        .. ' milliseconds to exit after last test\n'
-        .. 'This indicates a likely problem with the test even if it passed!\n'
-    )
-    io.stdout:flush()
-  end
-  session = nil
-end
-
 exec_lua = M.exec_lua
 
 local function coverage_enabled()
@@ -344,6 +327,28 @@ flush_coverage = function()
   end
 end
 
+local function check_close()
+  if not session then
+    return
+  end
+  flush_coverage()
+  local start_time = uv.now()
+  session:close()
+  uv.update_time() -- Update cached value of luv.now() (libuv: uv_now()).
+  local end_time = uv.now()
+  local delta = end_time - start_time
+  if delta > 500 then
+    print(
+      'nvim took '
+        .. delta
+        .. ' milliseconds to exit after last test\n'
+        .. 'This indicates a likely problem with the test even if it passed!\n'
+    )
+    io.stdout:flush()
+  end
+  session = nil
+end
+
 --- Starts a new global Nvim session.
 --- @param init_lua_path? string
 function M.clear(init_lua_path)
@@ -365,11 +370,11 @@ function M.clear(init_lua_path)
   local proc_stream = ProcessStream.spawn(nvim_cmd)
   local msgpack_stream = MsgpackRpcStream.new(proc_stream)
 
-  local log_cb --- @type function?
+  local log_cb --- @type fun(type: string, method: string, args: any[])?
   if M.options.verbose then
     --- @param method string
     --- @param args any[]
-    log_cb = function(method, args)
+    local function handle_notification(method, args)
       if method == 'nvim_error_event' then
         print(('%s: %s'):format(method, args[1]))
       elseif method == 'nvim_print_event' then
@@ -378,6 +383,12 @@ function M.clear(init_lua_path)
           table.insert(msg, tostring(v))
         end
         print(('%s: %s'):format(method, table.concat(msg, ' ')))
+      end
+    end
+
+    log_cb = function(event_type, method, args)
+      if event_type == 'notification' then
+        handle_notification(method, args)
       end
     end
   end
@@ -391,6 +402,8 @@ function M.clear(init_lua_path)
     vim.opt.rtp:append(vim.env.NVIM_TEST_HOME)
 
     local orig_print = _G.print
+    --- Redirects Lua's global print through RPC to the host.
+    --- @return nil
     function _G.print(...)
       vim.rpcnotify(chan, 'nvim_print_event', ...)
       return orig_print(...)
@@ -457,10 +470,12 @@ function M.env()
       return
     end
     local msg = session:next_message(0)
-    if msg then
-      if msg[1] == 'notification' and msg[2] == 'nvim_error_event' then
-        error(msg[3][2])
-      end
+    if type(msg) == 'table' and msg[1] == 'notification' and msg[2] == 'nvim_error_event' then
+      local payload = msg[3]
+      assert(type(payload) == 'table', 'invalid error payload')
+      local err_msg = payload[2]
+      assert(err_msg, 'missing error message')
+      error(err_msg)
     end
   end)
 end

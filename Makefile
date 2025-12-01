@@ -34,3 +34,10 @@ format: stylua
 test:
 	./bin/nvim-test test --coverage
 	# $(MAKE) -C example test LOCAL=1
+
+NVIM_TEST_RUNTIME=$(XDG_DATA_HOME)/nvim-test/nvim-test-nightly/share/nvim/runtime
+
+.PHONY: emmylua-check
+emmylua-check:
+	VIMRUNTIME=$(NVIM_TEST_RUNTIME) \
+		emmylua_check lua --config .emmyrc.json
