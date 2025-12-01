@@ -72,6 +72,96 @@ local function isCallable(obj)
   return type(obj) == 'function' or (debug.getmetatable(obj) or {}).__call
 end
 
+--- @class busted.EventSubscriberOptions
+--- @field priority? integer
+--- @field predicate? fun(...: any): boolean
+
+--- @class busted.EventSubscriber
+--- @field id integer
+--- @field fn fun(...: any): any
+--- @field options busted.EventSubscriberOptions
+
+--- @class busted.EventNode
+--- @field parent? busted.EventNode
+--- @field callbacks busted.EventSubscriber[]
+--- @field children table<string, busted.EventNode>
+
+--- @alias busted.EventChannelPath string[]
+--- @alias busted.EventPublishResult any[]
+--- @alias busted.EventCallback fun(...: any): any, boolean?
+
+--- @param parent? busted.EventNode
+--- @return busted.EventNode
+local function new_event_node(parent)
+  return {
+    parent = parent,
+    callbacks = {},
+    children = {},
+  }
+end
+
+--- @param node busted.EventNode
+--- @param id integer
+--- @return busted.EventNode?, integer?
+local function find_subscription_owner(node, id)
+  for index = 1, #node.callbacks do
+    local callback = node.callbacks[index]
+    if callback and callback.id == id then
+      return node, index
+    end
+  end
+
+  for _, child in pairs(node.children) do
+    local owner, index = find_subscription_owner(child, id)
+    if owner and index then
+      return owner, index
+    end
+  end
+end
+
+--- @param node busted.EventNode
+--- @param channelNamespace busted.EventChannelPath
+--- @return busted.EventNode
+local function resolve_node(node, channelNamespace)
+  for index = 1, #channelNamespace do
+    local key = channelNamespace[index]
+    local child = node.children[key]
+    if not child then
+      child = new_event_node(node)
+      node.children[key] = child
+    end
+    node = child
+  end
+  return node
+end
+
+--- @param node busted.EventNode
+--- @param result busted.EventPublishResult
+--- @return busted.EventPublishResult
+local function dispatch(node, result, ...)
+  for index = 1, #node.callbacks do
+    local callback = node.callbacks[index]
+    if callback then
+      local predicate = callback.options.predicate
+      if not predicate or predicate(...) then
+        local value, continue = callback.fn(...)
+        if value then
+          table.insert(result, value)
+        end
+        if not continue then
+          return result
+        end
+      end
+    end
+  end
+
+  if node.parent then
+    return dispatch(node.parent, result, ...)
+  end
+
+  return result
+end
+
 --- @param src any
 --- @return string?
 local function normalize_source(src)
@@ -153,6 +243,7 @@ end
 --- @class (partial) busted.Busted
 --- @field private _executor_impl table<string, busted.Executor?>
 --- @field private _executor_attributes table<string, busted.ExecutorAttributes?>
+--- @field private _channel_root busted.EventNode
 local M = {}
 M.__index = M
 
@@ -169,7 +260,7 @@ function M.new()
     executors = {},
     status = require('busted.status'),
     skipAll = false,
-    _mediator = require('mediator').new(),
+    _channel_root = new_event_node(),
     _environment = require('busted.environment').new(context),
     _executor_impl = {},
     _executor_attributes = {},
@@ -246,22 +337,54 @@ function M:rewriteMessage(element, message, trace)
   return msg
 end
 
+--- @param channelNamespace busted.EventChannelPath
 --- @param ... any
---- @return mediator.PublishResult
-function M:publish(...)
-  return self._mediator:publish(...)
+--- @return busted.EventPublishResult
+function M:publish(channelNamespace, ...)
+  return dispatch(resolve_node(self._channel_root, channelNamespace), {}, ...)
 end
 
---- @param ... any
---- @return mediator.Subscriber
-function M:subscribe(...)
-  return self._mediator:subscribe(...)
+local next_subscription_id = 1
+
+--- @param channelNamespace busted.EventChannelPath
+--- @param fn busted.EventCallback
+--- @param options? busted.EventSubscriberOptions
+--- @return busted.EventSubscriber
+function M:subscribe(channelNamespace, fn, options)
+  local node = resolve_node(self._channel_root, channelNamespace)
+
+  --- @type busted.EventSubscriber
+  local subscriber = {
+    id = next_subscription_id,
+    fn = fn,
+    options = options or {},
+  }
+  next_subscription_id = next_subscription_id + 1
+
+  local insert_index = #node.callbacks + 1
+  local priority = subscriber.options.priority
+  if priority and priority >= 0 and priority < insert_index then
+    insert_index = math.floor(priority)
+  end
+  if insert_index < 1 then
+    insert_index = 1
+  end
+  table.insert(node.callbacks, insert_index, subscriber)
+
+  return subscriber
 end
 
---- @param ... any
---- @return mediator.Subscriber?
-function M:unsubscribe(...)
-  return self._mediator:removeSubscriber(...)
+--- @param id integer
+--- @param channelNamespace busted.EventChannelPath
+--- @return busted.EventSubscriber?
+function M:unsubscribe(id, channelNamespace)
+  local _ = channelNamespace
+  local node = self._channel_root
+  local owner, index = find_subscription_owner(node, id)
+  if not owner or not index then
+    return nil
+  end
+  return table.remove(owner.callbacks, index)
 end
 
 --- @param element? busted.Element
@@ -353,16 +476,29 @@ function M:wrap(callable)
 end
 
 --- @param descriptor string
---- @param run fun(): any
+--- @param run busted.CallableValue
 --- @param element busted.Element
 --- @return busted.Status, any
 function M:safe(descriptor, run, element)
+  local runner = run
+  if type(runner) ~= 'function' then
+    local target = runner
+    local mt = debug.getmetatable(target)
+    local call = mt and mt.__call
+    if type(call) == 'function' then
+      runner = function(...)
+        return call(target, ...)
+      end
+    else
+      error('attempt to execute non-callable block for ' .. tostring(descriptor), 2)
+    end
+  end
   self.context:push(element)
   local trace, message
   local status = 'success'
 
   local ret = {
-    xpcall(run, function(msg)
+    xpcall(runner, function(msg)
       status = errortype(msg)
       trace = self:getTrace(element, 3, msg)
       message = self:rewriteMessage(element, msg, trace)
@@ -397,7 +533,7 @@ function M:safe(descriptor, run, element)
 end
 
 --- @param descriptor string
---- @param channel mediator.ChannelPath
+--- @param channel busted.EventChannelPath
 --- @param element busted.Element
 --- @param ... any
 --- @return boolean

@@ -1,29 +1,39 @@
+local Block = require('busted.block')
+
 --- @param busted busted.Busted
 --- @return busted.Busted
 local function init(busted)
-  local block = require('busted.block')(busted)
+  local block = Block.new(busted)
 
   local file = function(file)
     busted:wrap(file.run)
     if busted:safe_publish('file', { 'file', 'start' }, file) then
-      block.execute('file', file)
+      block:execute('file', file)
     end
     busted:safe_publish('file', { 'file', 'end' }, file)
   end
 
   local describe = function(describe)
     local parent = busted.context:parent(describe)
+    if not parent then
+      parent = busted.context:get()
+    end
+    --- @cast parent busted.Element
     if busted:safe_publish('describe', { 'describe', 'start' }, describe, parent) then
-      block.execute('describe', describe)
+      block:execute('describe', describe)
     end
     busted:safe_publish('describe', { 'describe', 'end' }, describe, parent)
   end
 
   local it = function(element)
     local parent = busted.context:parent(element)
+    if not parent then
+      parent = busted.context:get()
+    end
+    --- @cast parent busted.Element
     local finally
 
-    if not block.lazySetup(parent) then
+    if not block:lazySetup(parent) then
       -- skip test if any setup failed
       return
     end
@@ -32,20 +42,20 @@ local function init(busted)
       element.env = {}
     end
 
-    block.rejectAll(element)
+    block:rejectAll(element)
     element.env.finally = function(fn)
       finally = fn
     end
     element.env.pending = busted.pending
 
-    local pass, ancestor = block.execAll('before_each', parent, true)
+    local pass, ancestor = block:execAll('before_each', parent, true)
 
     if pass then
       local status = busted.status('success')
       if busted:safe_publish('test', { 'test', 'start' }, element, parent) then
         status:update(busted:safe('it', element.run, element))
         if finally then
-          block.reject('pending', element)
+          block:reject('pending', element)
           status:update(busted:safe('finally', finally, element))
         end
       else
@@ -54,7 +64,7 @@ local function init(busted)
       busted:safe_publish('test', { 'test', 'end' }, element, parent, tostring(status))
     end
 
-    block.dexecAll('after_each', ancestor, true)
+    block:dexecAll('after_each', ancestor, true)
   end
 
   local pending = function(element)
