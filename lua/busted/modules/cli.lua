@@ -1,37 +1,10 @@
 local utils = require('busted.utils')
 local exit = require('busted.exit')
+local argparse = require('argparse')
 
 local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local fs = vim.fs
 local is_windows = uv.os_uname().sysname:match('Windows')
-
---- @class busted.cli.Options
---- @field standalone? boolean
---- @field output? string
-
---- @class busted.cli.State
---- @field args table<string, any>
---- @field overrides table<string, any>
-
---- @alias busted.cli.Handler fun(state: busted.cli.State, value?: string, opt?: string): boolean, string?
-
---- @class busted.cli.OptionSpec
---- @field takes_value boolean
---- @field handler? busted.cli.Handler
---- @field description? string
---- @field metavar? string
---- @field multi? boolean
---- @field key? string
---- @field altkey? string
---- @field display? string
-
---- @class busted.cli.NegatableOptionSpec
---- @field description string
---- @field negated_description string
---- @field key? string
---- @field altkey? string
---- @field handler? busted.cli.Handler
---- @field negated_handler? busted.cli.Handler
 
 --- @param pathname string?
 --- @return string?
@@ -104,39 +77,6 @@ local function append_value(current, value, sep)
     return value
   end
   return current .. sep .. value
-end
-
---- @param appName string
---- @param help_entries { arguments: { name: string, description: string }[], options: { display: string, description: string }[] }
---- @return string
-local function format_help_entries(appName, help_entries)
-  --- @type string[]
-  local lines = {
-    ('Usage: %s [OPTIONS] [--] [ROOT-1 [ROOT-2 [...]]]'):format(appName),
-    '',
-  }
-  if #help_entries.arguments > 0 then
-    table.insert(lines, 'ARGUMENTS:')
-    for _, entry in ipairs(help_entries.arguments) do
-      local desc_lines = vim.split(entry.description, '\n', { plain = true })
-      table.insert(lines, ('  %-26s %s'):format(entry.name, desc_lines[1]))
-      for i = 2, #desc_lines do
-        table.insert(lines, ('  %-26s %s'):format('', desc_lines[i]))
-      end
-    end
-    table.insert(lines, '')
-  end
-  if #help_entries.options > 0 then
-    table.insert(lines, 'OPTIONS:')
-    for _, entry in ipairs(help_entries.options) do
-      local desc_lines = vim.split(entry.description, '\n', { plain = true })
-      table.insert(lines, ('  %-26s %s'):format(entry.display, desc_lines[1]))
-      for i = 2, #desc_lines do
-        table.insert(lines, ('  %-26s %s'):format('', desc_lines[i]))
-      end
-    end
-  end
-  return table.concat(lines, '\n')
 end
 
 local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
@@ -279,19 +219,6 @@ end
 --- @param value string?
 --- @param altkey string?
 --- @return boolean, string?
-local function processMultiOption(state, key, value, altkey)
-  value = value or ''
-  local list = state.overrides[key] or {}
-  table.insert(list, value)
-  assign(state, key, list, altkey)
-  return true
-end
-
---- @param state busted.cli.State
---- @param key string
---- @param value string?
---- @param altkey string?
---- @return boolean, string?
 local function processLoaders(state, key, value, altkey)
   value = value or ''
   local combined = append_value(state.overrides[key], value, ',')
@@ -334,135 +261,33 @@ local function processSort(state, _, value)
   return true
 end
 
+--- @param options? busted.cli.Options
 return function(options)
   local appName = ''
   options = options or {}
   local allow_roots = not options.standalone
   local configLoader = require('busted.modules.configuration_loader')()
-  local help_entries = {
-    arguments = {},
-    options = {},
-  }
-
-  local function add_argument_help(name, description)
-    table.insert(help_entries.arguments, { name = name, description = description })
-  end
-
-  --- @param names string[]
-  --- @param spec busted.cli.OptionSpec
-  --- @return string
-  local function format_option_display(names, spec)
-    if not spec.takes_value then
-      return table.concat(names, ', ')
-    end
-    local metavar = spec.metavar or 'VALUE'
-    local formatted = {}
-    for _, name in ipairs(names) do
-      if name:sub(1, 2) == '--' then
-        formatted[#formatted + 1] = name .. '=' .. metavar
-      else
-        formatted[#formatted + 1] = name .. ' ' .. metavar
+  local parser = argparse.new_parser({
+    state_factory = function()
+      return new_state(options)
+    end,
+    positional_handler = function(state, argument)
+      if allow_roots then
+        return processArgList(state, 'ROOT', argument)
       end
-    end
-    return table.concat(formatted, ', ')
-  end
+      return false, 'Unexpected positional argument ' .. argument
+    end,
+    app_name = appName,
+  })
 
-  local option_handlers = {}
-
-  --- @param names string[]
-  --- @return string?
-  local function derive_option_key(names)
-    for _, name in ipairs(names) do
-      if name:sub(1, 2) == '--' then
-        return name:sub(3)
-      end
-    end
-    local first = names[1]
-    if first then
-      local cleaned = first:gsub('^-+', '')
-      return cleaned
-    end
-    return nil
-  end
-
-  --- @param names string[]
-  --- @return string?
-  local function derive_option_altkey(names)
-    for _, name in ipairs(names) do
-      if name:sub(1, 1) == '-' and name:sub(2, 2) ~= '-' and #name == 2 then
-        return name:sub(2)
-      end
-    end
-    return nil
-  end
-
-  --- @param names string[]
-  --- @param spec busted.cli.OptionSpec
-  local function register_option(names, spec)
-    spec.display = spec.display or format_option_display(names, spec)
-    spec.key = spec.key or derive_option_key(names)
-    spec.altkey = spec.altkey or derive_option_altkey(names)
-    if not spec.handler then
-      if not spec.takes_value then
-        error('missing handler for option without value: ' .. table.concat(names, ', '))
-      end
-      if not spec.key or spec.key == '' then
-        error('missing key for option: ' .. table.concat(names, ', '))
-      end
-      if spec.multi then
-        spec.handler = function(state, value)
-          return processMultiOption(state, spec.key, value, spec.altkey)
-        end
-      else
-        spec.handler = function(state, value)
-          return processOption(state, spec.key, value, spec.altkey)
-        end
-      end
-    end
-    for _, name in ipairs(names) do
-      option_handlers[name] = spec
-    end
-    help_entries.options[#help_entries.options + 1] = {
-      display = spec.display,
-      description = spec.description or '',
-    }
-  end
-
-  --- @param positive_names string[]
-  --- @param negative_names string[]
-  --- @param spec busted.cli.NegatableOptionSpec
-  local function register_negatable_option(positive_names, negative_names, spec)
-    local key = spec.key or derive_option_key(positive_names)
-    if not key or key == '' then
-      error('missing key for negatable option: ' .. table.concat(positive_names, ', '))
-    end
-    local altkey = spec.altkey or derive_option_altkey(positive_names)
-    register_option(positive_names, {
-      takes_value = false,
-      description = spec.description,
-      key = key,
-      altkey = altkey,
-      handler = spec.handler or function(state)
-        return processOption(state, key, true, altkey)
-      end,
-    })
-    register_option(negative_names, {
-      takes_value = false,
-      description = spec.negated_description,
-      key = key,
-      altkey = altkey,
-      handler = spec.negated_handler or function(state)
-        return processOption(state, key, false, altkey)
-      end,
-    })
-  end
   if allow_roots then
-    add_argument_help(
+    parser:add_argument_help(
       'ROOT',
       'Test script file or directory. Directories are traversed for files matching --pattern.'
     )
   end
-  register_option({ '--version' }, {
+
+  parser:add_argument({ '--version' }, {
     takes_value = false,
     handler = function(state)
       return processOption(state, 'version', true)
@@ -470,31 +295,31 @@ return function(options)
     description = 'Print the program version and exit.',
   })
   if allow_roots then
-    register_option({ '-p', '--pattern' }, {
+    parser:add_argument({ '-p', '--pattern' }, {
       takes_value = true,
       metavar = 'PATTERN',
       multi = true,
       description = 'Only run test files matching the Lua pattern (default: _spec).',
     })
-    register_option({ '--exclude-pattern' }, {
+    parser:add_argument({ '--exclude-pattern' }, {
       takes_value = true,
       metavar = 'PATTERN',
       multi = true,
       description = 'Do not run files matching the Lua pattern; takes precedence over --pattern.',
     })
   end
-  register_option({ '-e' }, {
+  parser:add_argument({ '-e' }, {
     takes_value = true,
     metavar = 'STATEMENT',
     multi = true,
     description = 'Execute Lua statement STATEMENT before running tests.',
   })
-  register_option({ '-o', '--output' }, {
+  parser:add_argument({ '-o', '--output' }, {
     takes_value = true,
     metavar = 'LIBRARY',
     description = 'Output handler module to load (default: busted.outputHandlers.output_handler).',
   })
-  register_option({ '-C', '--directory' }, {
+  parser:add_argument({ '-C', '--directory' }, {
     takes_value = true,
     metavar = 'DIR',
     handler = function(state, value)
@@ -502,17 +327,17 @@ return function(options)
     end,
     description = 'Change to DIR before running tests; multiple directories are resolved incrementally.',
   })
-  register_option({ '-f', '--config-file' }, {
+  parser:add_argument({ '-f', '--config-file' }, {
     takes_value = true,
     metavar = 'FILE',
     description = 'Load configuration options from FILE.',
   })
-  register_option({ '--coverage-config-file' }, {
+  parser:add_argument({ '--coverage-config-file' }, {
     takes_value = true,
     metavar = 'FILE',
     description = 'Load LuaCov configuration options from FILE.',
   })
-  register_option({ '-t', '--tags' }, {
+  parser:add_argument({ '-t', '--tags' }, {
     takes_value = true,
     metavar = 'TAGS',
     handler = function(state, value)
@@ -520,7 +345,7 @@ return function(options)
     end,
     description = 'Only run tests with these comma-separated #tags.',
   })
-  register_option({ '--exclude-tags' }, {
+  parser:add_argument({ '--exclude-tags' }, {
     takes_value = true,
     metavar = 'TAGS',
     handler = function(state, value)
@@ -528,35 +353,35 @@ return function(options)
     end,
     description = 'Do not run tests with these #tags; takes precedence over --tags.',
   })
-  register_option({ '--filter' }, {
+  parser:add_argument({ '--filter' }, {
     takes_value = true,
     metavar = 'PATTERN',
     multi = true,
     description = 'Only run tests whose names match the Lua pattern.',
   })
-  register_option({ '--name' }, {
+  parser:add_argument({ '--name' }, {
     takes_value = true,
     metavar = 'NAME',
     multi = true,
     description = 'Run the test with the given full name.',
   })
-  register_option({ '--filter-out' }, {
+  parser:add_argument({ '--filter-out' }, {
     takes_value = true,
     metavar = 'PATTERN',
     multi = true,
     description = 'Exclude tests whose names match the Lua pattern; takes precedence over --filter.',
   })
-  register_option({ '--exclude-names-file' }, {
+  parser:add_argument({ '--exclude-names-file' }, {
     takes_value = true,
     metavar = 'FILE',
     description = 'Skip tests whose names appear in FILE; takes precedence over name filters.',
   })
-  register_option({ '--log-success' }, {
+  parser:add_argument({ '--log-success' }, {
     takes_value = true,
     metavar = 'FILE',
     description = 'Append the name of each successful test to FILE.',
   })
-  register_option({ '-m', '--lpath' }, {
+  parser:add_argument({ '-m', '--lpath' }, {
     takes_value = true,
     metavar = 'PATH',
     handler = function(state, value)
@@ -564,7 +389,7 @@ return function(options)
     end,
     description = 'Prefix PATH to package.path (default: ./src/?.lua;./src/?/?.lua;./src/?/init.lua).',
   })
-  register_option({ '--cpath' }, {
+  parser:add_argument({ '--cpath' }, {
     takes_value = true,
     metavar = 'PATH',
     handler = function(state, value)
@@ -572,12 +397,12 @@ return function(options)
     end,
     description = 'Prefix PATH to package.cpath (default: ./csrc/?.so;./csrc/?/?.so;).',
   })
-  register_option({ '-r', '--run' }, {
+  parser:add_argument({ '-r', '--run' }, {
     takes_value = true,
     metavar = 'RUN',
     description = 'Load configuration RUN from the project .busted file.',
   })
-  register_option({ '--repeat' }, {
+  parser:add_argument({ '--repeat' }, {
     takes_value = true,
     metavar = 'COUNT',
     handler = function(state, value)
@@ -585,7 +410,7 @@ return function(options)
     end,
     description = 'Run the entire test suite COUNT times (default: 1).',
   })
-  register_option({ '--loaders' }, {
+  parser:add_argument({ '--loaders' }, {
     takes_value = true,
     metavar = 'NAME',
     handler = function(state, value)
@@ -593,17 +418,17 @@ return function(options)
     end,
     description = 'Comma-separated list of test file loaders (default: lua).',
   })
-  register_option({ '--helper' }, {
+  parser:add_argument({ '--helper' }, {
     takes_value = true,
     metavar = 'PATH',
     description = 'Run helper script at PATH before executing tests.',
   })
-  register_option({ '--lua' }, {
+  parser:add_argument({ '--lua' }, {
     takes_value = true,
     metavar = 'LUA',
     description = 'Path to the Lua interpreter busted should run under.',
   })
-  register_option({ '-Xoutput' }, {
+  parser:add_argument({ '-Xoutput' }, {
     takes_value = true,
     metavar = 'OPTION',
     handler = function(state, value)
@@ -611,7 +436,7 @@ return function(options)
     end,
     description = 'Pass OPTION (comma-separated) to the output handler.',
   })
-  register_option({ '-Xhelper' }, {
+  parser:add_argument({ '-Xhelper' }, {
     takes_value = true,
     metavar = 'OPTION',
     handler = function(state, value)
@@ -619,61 +444,61 @@ return function(options)
     end,
     description = 'Pass OPTION (comma-separated) to the helper script.',
   })
-  register_negatable_option({ '-c', '--coverage' }, { '--no-coverage' }, {
+  parser:add_negatable_argument({ '-c', '--coverage' }, { '--no-coverage' }, {
     description = 'Enable code coverage analysis (requires LuaCov).',
     negated_description = 'Disable code coverage analysis.',
   })
-  register_negatable_option({ '-v', '--verbose' }, { '--no-verbose' }, {
+  parser:add_negatable_argument({ '-v', '--verbose' }, { '--no-verbose' }, {
     description = 'Enable verbose output of errors.',
     negated_description = 'Disable verbose error output.',
   })
-  register_option({ '-l', '--list' }, {
+  parser:add_argument({ '-l', '--list' }, {
     takes_value = false,
     handler = function(state)
       return processOption(state, 'list', true, 'l')
     end,
     description = 'List the names of all tests instead of running them.',
   })
-  register_option({ '--ignore-lua' }, {
+  parser:add_argument({ '--ignore-lua' }, {
     takes_value = false,
     handler = function(state)
       return processOption(state, 'ignore-lua', true)
     end,
     description = 'Ignore the --lua directive.',
   })
-  register_negatable_option({ '--lazy' }, { '--no-lazy' }, {
+  parser:add_negatable_argument({ '--lazy' }, { '--no-lazy' }, {
     description = 'Use lazy setup/teardown as the default.',
     negated_description = 'Disable lazy setup/teardown.',
   })
-  register_negatable_option({ '--auto-insulate' }, { '--no-auto-insulate' }, {
+  parser:add_negatable_argument({ '--auto-insulate' }, { '--no-auto-insulate' }, {
     description = 'Enable file insulation (default).',
     negated_description = 'Disable file insulation.',
   })
-  register_negatable_option({ '-k', '--keep-going' }, { '--no-keep-going' }, {
+  parser:add_negatable_argument({ '-k', '--keep-going' }, { '--no-keep-going' }, {
     description = 'Continue after errors or failures (default).',
     negated_description = 'Stop on the first error or failure.',
   })
-  register_negatable_option({ '-R', '--recursive' }, { '--no-recursive' }, {
+  parser:add_negatable_argument({ '-R', '--recursive' }, { '--no-recursive' }, {
     description = 'Recurse into subdirectories when searching for specs (default).',
     negated_description = 'Do not recurse into subdirectories.',
   })
-  register_negatable_option({ '--sort-files' }, { '--no-sort-files' }, {
+  parser:add_negatable_argument({ '--sort-files' }, { '--no-sort-files' }, {
     description = 'Sort file execution order alphabetically.',
     negated_description = 'Run files in discovery order.',
   })
-  register_negatable_option({ '--sort-tests' }, { '--no-sort-tests' }, {
+  parser:add_negatable_argument({ '--sort-tests' }, { '--no-sort-tests' }, {
     description = 'Sort test execution order within a file.',
     negated_description = 'Run tests in definition order.',
   })
-  register_negatable_option({ '--suppress-pending' }, { '--no-suppress-pending' }, {
+  parser:add_negatable_argument({ '--suppress-pending' }, { '--no-suppress-pending' }, {
     description = 'Suppress pending test output.',
     negated_description = 'Show pending test output (default).',
   })
-  register_negatable_option({ '--defer-print' }, { '--no-defer-print' }, {
+  parser:add_negatable_argument({ '--defer-print' }, { '--no-defer-print' }, {
     description = 'Defer printing until the suite completes.',
     negated_description = 'Print output as events occur (default).',
   })
-  register_negatable_option({ '--sort' }, { '--no-sort' }, {
+  parser:add_negatable_argument({ '--sort' }, { '--no-sort' }, {
     description = 'Enable both --sort-files and --sort-tests.',
     negated_description = 'Disable both --sort-files and --sort-tests.',
     handler = function(state)
@@ -683,134 +508,11 @@ return function(options)
       return processSort(state, 'sort', false)
     end,
   })
-  --- @param args table
-  --- @return table<string, any>? args
-  --- @return table<string, any>|string? overrides_or_err
-  local function parse_cli_args(args)
-    local state = new_state(options)
-    local i = 1
-    local finished = false
-    while i <= #args do
-      local argument = args[i]
-      if type(argument) ~= 'string' then
-        return nil, 'Invalid argument at position ' .. tostring(i)
-      end
-      --- @cast argument string
-      if not finished and argument == '--' then
-        finished = true
-      elseif not finished and argument:sub(1, 2) == '--' then
-        if argument == '--help' then
-          local help = format_help_entries(appName, help_entries)
-          local f = io.open('/tmp/busted_help_debug.txt', 'w')
-          if f then
-            f:write(help)
-            f:close()
-          end
-          return nil, help
-        end
-        local name, attached = argument:match('^(%-%-[^=]+)=(.*)$')
-        local key = name or argument
-        local spec = option_handlers[key]
-        if not spec then
-          return nil, 'Unknown option ' .. key
-        end
-        if spec.takes_value then
-          local value = attached
-          if not value or value == '' then
-            i = i + 1
-            value = args[i]
-            if value == nil then
-              return nil, 'Missing value for ' .. spec.display
-            end
-          end
-          local ok, err = spec.handler(state, value, spec.display)
-          if not ok then
-            return nil, err
-          end
-        else
-          local ok, err = spec.handler(state)
-          if not ok then
-            return nil, err
-          end
-        end
-      elseif not finished and argument:sub(1, 1) == '-' and argument ~= '-' then
-        if argument == '-h' then
-          local help = format_help_entries(appName, help_entries)
-          local f = io.open('/tmp/busted_help_debug.txt', 'w')
-          if f then
-            f:write(help)
-            f:close()
-          end
-          return nil, help
-        end
-        local spec = option_handlers[argument]
-        if spec then
-          if spec.takes_value then
-            i = i + 1
-            local value = args[i]
-            if value == nil then
-              return nil, 'Missing value for ' .. spec.display
-            end
-            local ok, err = spec.handler(state, value, spec.display)
-            if not ok then
-              return nil, err
-            end
-          else
-            local ok, err = spec.handler(state)
-            if not ok then
-              return nil, err
-            end
-          end
-        else
-          local pos = 2
-          while pos <= #argument do
-            local short = '-' .. argument:sub(pos, pos)
-            local nested = option_handlers[short]
-            if not nested then
-              return nil, 'Unknown option ' .. short
-            end
-            if nested.takes_value then
-              local remainder = argument:sub(pos + 1)
-              local value
-              if remainder ~= '' then
-                value = remainder
-              else
-                i = i + 1
-                value = args[i]
-              end
-              if value == nil then
-                return nil, 'Missing value for ' .. nested.display
-              end
-              local ok, err = nested.handler(state, value, nested.display)
-              if not ok then
-                return nil, err
-              end
-              break
-            else
-              local ok, err = nested.handler(state)
-              if not ok then
-                return nil, err
-              end
-              pos = pos + 1
-            end
-          end
-        end
-      else
-        if allow_roots then
-          processArgList(state, 'ROOT', argument)
-        else
-          return nil, 'Unexpected positional argument ' .. argument
-        end
-      end
-      i = i + 1
-    end
-    return state.args, state.overrides
-  end
   --- @param args string[]
   --- @return table<string, any>? args
   --- @return string? error
   local function parse(args)
-    local cliArgs, cliArgsParsedOrErr = parse_cli_args(args)
+    local cliArgs, cliArgsParsedOrErr = parser:parse(args)
     if not cliArgs then
       return nil, appName .. ': error: ' .. cliArgsParsedOrErr .. '; re-run with --help for usage.'
     end
@@ -872,26 +574,22 @@ return function(options)
     cliArgs['repeat'] = tonumber(cliArgs['repeat'])
     return cliArgs
   end
-  return {
-    --- @param self table
-    --- @param name string
-    --- @return table
-    set_name = function(self, name)
-      appName = name or ''
-      return self
-    end,
-    --- @param self table
-    --- @param name string
-    --- @return table
-    set_silent = function(self, name)
-      appName = name or ''
-      return self
-    end,
-    --- @param _ table
-    --- @param args string[]
-    --- @return table<string, any>?, string?
-    parse = function(_, args)
-      return parse(args)
-    end,
-  }
+
+  local api = {}
+
+  --- @param name string
+  --- @return table
+  function api:set_name(name)
+    appName = name or ''
+    parser:set_name(appName)
+    return self
+  end
+
+  --- @param args string[]
+  --- @return table<string, any>?, string?
+  function api.parse(_, args)
+    return parse(args)
+  end
+
+  return api
 end

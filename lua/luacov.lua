@@ -3,6 +3,6 @@
 -- @class module
 -- @name luacov
 -- @usage lua -lluacov sometest.lua
-local runner = require("luacov.runner")
+local runner = require('luacov.runner')
 runner.init()
 return runner
