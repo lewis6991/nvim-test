@@ -80,8 +80,8 @@ describe('luacov.runner helpers', function()
       include = { 'lua/src' },
       exclude = { 'lua/src/excluded' },
     }
-    assert.is_true(runner.file_included('lua/src/module.lua'))
-    assert.is_false(runner.file_included('lua/src/excluded/module.lua'))
+    assert(runner.file_included('lua/src/module.lua'))
+    assert(not runner.file_included('lua/src/excluded/module.lua'))
   end)
 
 end)
@@ -116,7 +116,7 @@ describe('project .luacov configuration', function()
 
   it('includes nvim-test sources for coverage', function()
     load_project_config()
-    assert.is_true(project_runner.file_included('lua/nvim-test/helpers.lua'))
+    assert(project_runner.file_included('lua/nvim-test/helpers.lua'))
   end)
 
   it('excludes tests and examples from coverage', function()

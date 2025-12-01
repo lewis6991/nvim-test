@@ -423,11 +423,8 @@ function M:register(descriptor, executor, attributes)
 
     self.context:attach(plugin)
 
-    if not ctx[descriptor] then
-      ctx[descriptor] = { plugin }
-    else
-      ctx[descriptor][#ctx[descriptor] + 1] = plugin
-    end
+    ctx[descriptor] = ctx[descriptor] or { plugin }
+    ctx[descriptor][#ctx[descriptor] + 1] = plugin
   end)
 end
 

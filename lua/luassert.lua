@@ -1,38 +1,12 @@
-local inspect = vim and vim.inspect
-
 local function pretty(value)
   if type(value) == 'string' then
     return string.format('%q', value)
   end
-  if inspect then
-    local ok, result = pcall(inspect, value)
-    if ok then
-      return result
-    end
+  local ok, result = pcall(vim.inspect, value)
+  if ok then
+    return result
   end
   return tostring(value)
-end
-
-local function deep_equal(a, b)
-  if vim and vim.deep_equal then
-    return vim.deep_equal(a, b)
-  end
-  if type(a) ~= 'table' or type(b) ~= 'table' then
-    return a == b
-  end
-  local seen = {}
-  for key, value in pairs(a) do
-    seen[key] = true
-    if not deep_equal(value, b[key]) then
-      return false
-    end
-  end
-  for key in pairs(b) do
-    if not seen[key] then
-      return false
-    end
-  end
-  return true
 end
 
 local function fail(message, level)
@@ -96,7 +70,7 @@ Assert.False = Assert.is_false
 
 local function same(expected, actual, message)
   ensure(
-    deep_equal(actual, expected),
+    vim.deep_equal(actual, expected),
     message or ('expected ' .. pretty(expected) .. ', got ' .. pretty(actual)),
     2
   )
@@ -105,7 +79,7 @@ end
 
 local function not_same(expected, actual, message)
   ensure(
-    not deep_equal(actual, expected),
+    not vim.deep_equal(actual, expected),
     message or ('did not expect ' .. pretty(actual) .. ' to equal ' .. pretty(expected)),
     2
   )

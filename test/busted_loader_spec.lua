@@ -34,7 +34,7 @@ describe('busted output handler loader', function()
     })
 
     assert.are.same('missing.output.handler', published[1].element.name)
-    assert.is_true(fallback_called)
+    assert(fallback_called)
     reset_module(fallback_name)
   end)
 
@@ -65,8 +65,8 @@ describe('busted helper loader', function()
 
     local options = { arguments = {} }
     local ok, err = loader({}, helper_name, options)
-    assert.is_true(ok)
-    assert.is_nil(err)
+    assert(ok)
+    assert(err == nil)
     assert.are.same(helper_name, called_with.helper)
     reset_module(helper_name)
   end)
