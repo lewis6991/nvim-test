@@ -1,2 +1,6 @@
 - When running in the test runner. `vim.api` and `vim.fn` are not available.
 - `exec_lua()` runs inside an embedded nvim instance which has access to `vim.api` and `vim.fn`
+- All code must be fully type annotated with LuaCATs annotations.
+- Run `make emmylua-check` to check typing
+- Run `make format` to fix code formatting
+- Run `make test` to run testsuite

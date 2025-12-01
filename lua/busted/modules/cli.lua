@@ -17,93 +17,21 @@ local is_windows = uv.os_uname().sysname:match('Windows')
 
 --- @class busted.cli.OptionSpec
 --- @field takes_value boolean
---- @field display string
---- @field handler busted.cli.Handler
+--- @field handler? busted.cli.Handler
+--- @field description? string
+--- @field metavar? string
+--- @field multi? boolean
+--- @field key? string
+--- @field altkey? string
+--- @field display? string
 
-local HELP_TEMPLATE = [=[
-Usage: %s [OPTIONS] [--] [ROOT-1 [ROOT-2 [...]]]
-
-ARGUMENTS:
-  ROOT                        test script file/folder. Folders will be
-                              traversed for any file that matches the
-                              --pattern option. (optional, default:
-                              nil)
-
-OPTIONS:
-  --version                   prints the program version and exits
-  -p, --pattern=PATTERN       only run test files matching the Lua
-                              pattern (default: _spec)
-  --exclude-pattern=PATTERN   do not run test files matching the Lua
-                              pattern, takes precedence over --pattern
-  -e STATEMENT                execute statement STATEMENT
-  -o, --output=LIBRARY        output library to load (default:
-                              busted.outputHandlers.output_handler)
-  -C, --directory=DIR         change to directory DIR before running
-                              tests. If multiple options are specified,
-                              each is interpreted relative to the
-                              previous one. (default: ./)
-  -f, --config-file=FILE      load configuration options from FILE
-  --coverage-config-file=FILE load luacov configuration options from
-                              FILE
-  -t, --tags=TAGS             only run tests with these #tags (default:
-                              [])
-  --exclude-tags=TAGS         do not run tests with these #tags, takes
-                              precedence over --tags (default: [])
-  --filter=PATTERN            only run test names matching the Lua
-                              pattern (default: [])
-  --name=NAME                 run test with the given full name
-                              (default: [])
-  --filter-out=PATTERN        do not run test names matching the Lua
-                              pattern, takes precedence over --filter
-                              (default: [])
-  --exclude-names-file=FILE   do not run the tests with names listed in
-                              the given file, takes precedence over
-                              --filter
-  --log-success=FILE          append the name of each successful test
-                              to the given file
-  -m, --lpath=PATH            optional path to be prefixed to the Lua
-                              module search path (default:
-                              ./src/?.lua;./src/?/?.lua;./src/?/init.lua)
-  --cpath=PATH                optional path to be prefixed to the Lua C
-                              module search path (default:
-                              ./csrc/?.so;./csrc/?/?.so;)
-  -r, --run=RUN               config to run from .busted file
-  --repeat=COUNT              run the tests repeatedly (default: 1)
-  --loaders=NAME              test file loaders (default: lua)
-  --helper=PATH               A helper script that is run before tests
-  --lua=LUA                   The path to the lua interpreter busted
-                              should run under
-  -Xoutput OPTION             pass `OPTION` as an option to the output
-                              handler. If `OPTION` contains commas, it
-                              is split into multiple options at the
-                              commas. (default: [])
-  -Xhelper OPTION             pass `OPTION` as an option to the helper
-                              script. If `OPTION` contains commas, it
-                              is split into multiple options at the
-                              commas. (default: [])
-  -c, --[no-]coverage         do code coverage analysis (requires
-                              `LuaCov` to be installed) (default: off)
-  -v, --[no-]verbose          verbose output of errors (default: off)
-  -l, --list                  list the names of all tests instead of
-                              running them
-  --ignore-lua                Whether or not to ignore the lua
-                              directive
-  --[no-]lazy                 use lazy setup/teardown as the default
-                              (default: off)
-  --[no-]auto-insulate        enable file insulation (default: on)
-  -k, --[no-]keep-going       continue as much as possible after an
-                              error or failure (default: on)
-  -R, --[no-]recursive        recurse into subdirectories (default: on)
-  --[no-]sort                 sort file and test order (--sort-tests
-                              and --sort-files) (default: off)
-  --[no-]sort-files           sort file execution order (default: off)
-  --[no-]sort-tests           sort test order within a file (default:
-                              off)
-  --[no-]suppress-pending     suppress `pending` test output (default:
-                              off)
-  --[no-]defer-print          defer print to when test suite is
-                              complete (default: off)
-]=]
+--- @class busted.cli.NegatableOptionSpec
+--- @field description string
+--- @field negated_description string
+--- @field key? string
+--- @field altkey? string
+--- @field handler? busted.cli.Handler
+--- @field negated_handler? busted.cli.Handler
 
 --- @param pathname string?
 --- @return string?
@@ -139,7 +67,7 @@ end
 
 --- @param command string
 --- @param script string
---- @param args string[]
+--- @param args table
 local function run_lua_interpreter(command, script, args)
   local cmd = { command, script, '--ignore-lua' }
   for _, value in ipairs(args) do
@@ -176,6 +104,39 @@ local function append_value(current, value, sep)
     return value
   end
   return current .. sep .. value
+end
+
+--- @param appName string
+--- @param help_entries { arguments: { name: string, description: string }[], options: { display: string, description: string }[] }
+--- @return string
+local function format_help_entries(appName, help_entries)
+  --- @type string[]
+  local lines = {
+    ('Usage: %s [OPTIONS] [--] [ROOT-1 [ROOT-2 [...]]]'):format(appName),
+    '',
+  }
+  if #help_entries.arguments > 0 then
+    table.insert(lines, 'ARGUMENTS:')
+    for _, entry in ipairs(help_entries.arguments) do
+      local desc_lines = vim.split(entry.description, '\n', { plain = true })
+      table.insert(lines, ('  %-26s %s'):format(entry.name, desc_lines[1]))
+      for i = 2, #desc_lines do
+        table.insert(lines, ('  %-26s %s'):format('', desc_lines[i]))
+      end
+    end
+    table.insert(lines, '')
+  end
+  if #help_entries.options > 0 then
+    table.insert(lines, 'OPTIONS:')
+    for _, entry in ipairs(help_entries.options) do
+      local desc_lines = vim.split(entry.description, '\n', { plain = true })
+      table.insert(lines, ('  %-26s %s'):format(entry.display, desc_lines[1]))
+      for i = 2, #desc_lines do
+        table.insert(lines, ('  %-26s %s'):format('', desc_lines[i]))
+      end
+    end
+  end
+  return table.concat(lines, '\n')
 end
 
 local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
@@ -373,239 +334,356 @@ local function processSort(state, _, value)
   return true
 end
 
---- @param display string
---- @param key string
---- @param value boolean
---- @param altkey string?
---- @return busted.cli.OptionSpec
-local function simple_flag(display, key, value, altkey)
-  return {
-    takes_value = false,
-    display = display,
-    handler = function(state)
-      return processOption(state, key, value, altkey)
-    end,
-  }
-end
-
---- @param display string
---- @param handler busted.cli.Handler
---- @return busted.cli.OptionSpec
-local function value_option(display, handler)
-  return {
-    takes_value = true,
-    display = display,
-    handler = handler,
-  }
-end
-
 return function(options)
   local appName = ''
   options = options or {}
   local allow_roots = not options.standalone
-
   local configLoader = require('busted.modules.configuration_loader')()
+  local help_entries = {
+    arguments = {},
+    options = {},
+  }
+
+  local function add_argument_help(name, description)
+    table.insert(help_entries.arguments, { name = name, description = description })
+  end
+
+  --- @param names string[]
+  --- @param spec busted.cli.OptionSpec
+  --- @return string
+  local function format_option_display(names, spec)
+    if not spec.takes_value then
+      return table.concat(names, ', ')
+    end
+    local metavar = spec.metavar or 'VALUE'
+    local formatted = {}
+    for _, name in ipairs(names) do
+      if name:sub(1, 2) == '--' then
+        formatted[#formatted + 1] = name .. '=' .. metavar
+      else
+        formatted[#formatted + 1] = name .. ' ' .. metavar
+      end
+    end
+    return table.concat(formatted, ', ')
+  end
 
   local option_handlers = {}
+
+  --- @param names string[]
+  --- @return string?
+  local function derive_option_key(names)
+    for _, name in ipairs(names) do
+      if name:sub(1, 2) == '--' then
+        return name:sub(3)
+      end
+    end
+    local first = names[1]
+    if first then
+      local cleaned = first:gsub('^-+', '')
+      return cleaned
+    end
+    return nil
+  end
+
+  --- @param names string[]
+  --- @return string?
+  local function derive_option_altkey(names)
+    for _, name in ipairs(names) do
+      if name:sub(1, 1) == '-' and name:sub(2, 2) ~= '-' and #name == 2 then
+        return name:sub(2)
+      end
+    end
+    return nil
+  end
+
   --- @param names string[]
   --- @param spec busted.cli.OptionSpec
   local function register_option(names, spec)
+    spec.display = spec.display or format_option_display(names, spec)
+    spec.key = spec.key or derive_option_key(names)
+    spec.altkey = spec.altkey or derive_option_altkey(names)
+    if not spec.handler then
+      if not spec.takes_value then
+        error('missing handler for option without value: ' .. table.concat(names, ', '))
+      end
+      if not spec.key or spec.key == '' then
+        error('missing key for option: ' .. table.concat(names, ', '))
+      end
+      if spec.multi then
+        spec.handler = function(state, value)
+          return processMultiOption(state, spec.key, value, spec.altkey)
+        end
+      else
+        spec.handler = function(state, value)
+          return processOption(state, spec.key, value, spec.altkey)
+        end
+      end
+    end
     for _, name in ipairs(names) do
       option_handlers[name] = spec
     end
+    help_entries.options[#help_entries.options + 1] = {
+      display = spec.display,
+      description = spec.description or '',
+    }
   end
 
-  register_option({ '--version' }, simple_flag('--version', 'version', true))
-
+  --- @param positive_names string[]
+  --- @param negative_names string[]
+  --- @param spec busted.cli.NegatableOptionSpec
+  local function register_negatable_option(positive_names, negative_names, spec)
+    local key = spec.key or derive_option_key(positive_names)
+    if not key or key == '' then
+      error('missing key for negatable option: ' .. table.concat(positive_names, ', '))
+    end
+    local altkey = spec.altkey or derive_option_altkey(positive_names)
+    register_option(positive_names, {
+      takes_value = false,
+      description = spec.description,
+      key = key,
+      altkey = altkey,
+      handler = spec.handler or function(state)
+        return processOption(state, key, true, altkey)
+      end,
+    })
+    register_option(negative_names, {
+      takes_value = false,
+      description = spec.negated_description,
+      key = key,
+      altkey = altkey,
+      handler = spec.negated_handler or function(state)
+        return processOption(state, key, false, altkey)
+      end,
+    })
+  end
   if allow_roots then
-    register_option(
-      { '-p', '--pattern' },
-      value_option('--pattern', function(state, value)
-        return processMultiOption(state, 'pattern', value, 'p')
-      end)
-    )
-    register_option(
-      { '--exclude-pattern' },
-      value_option('--exclude-pattern', function(state, value)
-        return processMultiOption(state, 'exclude-pattern', value)
-      end)
+    add_argument_help(
+      'ROOT',
+      'Test script file or directory. Directories are traversed for files matching --pattern.'
     )
   end
-  register_option(
-    { '-e' },
-    value_option('-e', function(state, value)
-      return processMultiOption(state, 'e', value)
-    end)
-  )
-  register_option(
-    { '-o', '--output' },
-    value_option('--output', function(state, value)
-      return processOption(state, 'output', value, 'o')
-    end)
-  )
-  register_option(
-    { '-C', '--directory' },
-    value_option('--directory', function(state, value)
-      return processDir(state, 'directory', value, 'C')
-    end)
-  )
-  register_option(
-    { '-f', '--config-file' },
-    value_option('--config-file', function(state, value)
-      processOption(state, 'config-file', value)
-      return processOption(state, 'f', value)
-    end)
-  )
-  register_option(
-    { '--coverage-config-file' },
-    value_option('--coverage-config-file', function(state, value)
-      return processOption(state, 'coverage-config-file', value)
-    end)
-  )
-  register_option(
-    { '-t', '--tags' },
-    value_option('--tags', function(state, value)
-      return processList(state, 'tags', value, 't')
-    end)
-  )
-  register_option(
-    { '--exclude-tags' },
-    value_option('--exclude-tags', function(state, value)
-      return processList(state, 'exclude-tags', value)
-    end)
-  )
-  register_option(
-    { '--filter' },
-    value_option('--filter', function(state, value)
-      return processMultiOption(state, 'filter', value)
-    end)
-  )
-  register_option(
-    { '--name' },
-    value_option('--name', function(state, value)
-      return processMultiOption(state, 'name', value)
-    end)
-  )
-  register_option(
-    { '--filter-out' },
-    value_option('--filter-out', function(state, value)
-      return processMultiOption(state, 'filter-out', value)
-    end)
-  )
-  register_option(
-    { '--exclude-names-file' },
-    value_option('--exclude-names-file', function(state, value)
-      return processOption(state, 'exclude-names-file', value)
-    end)
-  )
-  register_option(
-    { '--log-success' },
-    value_option('--log-success', function(state, value)
-      return processOption(state, 'log-success', value)
-    end)
-  )
-  register_option(
-    { '-m', '--lpath' },
-    value_option('--lpath', function(state, value)
-      return processPath(state, 'lpath', value, 'm')
-    end)
-  )
-  register_option(
-    { '--cpath' },
-    value_option('--cpath', function(state, value)
-      return processPath(state, 'cpath', value)
-    end)
-  )
-  register_option(
-    { '-r', '--run' },
-    value_option('--run', function(state, value)
-      return processOption(state, 'run', value)
-    end)
-  )
-  register_option(
-    { '--repeat' },
-    value_option('--repeat', function(state, value)
-      return processNumber(state, 'repeat', value, nil, '--repeat')
-    end)
-  )
-  register_option(
-    { '--loaders' },
-    value_option('--loaders', function(state, value)
-      return processLoaders(state, 'loaders', value)
-    end)
-  )
-  register_option(
-    { '--helper' },
-    value_option('--helper', function(state, value)
-      return processOption(state, 'helper', value)
-    end)
-  )
-  register_option(
-    { '--lua' },
-    value_option('--lua', function(state, value)
-      return processOption(state, 'lua', value)
-    end)
-  )
-  register_option(
-    { '-Xoutput' },
-    value_option('-Xoutput', function(state, value)
-      return processList(state, 'Xoutput', value)
-    end)
-  )
-  register_option(
-    { '-Xhelper' },
-    value_option('-Xhelper', function(state, value)
-      return processList(state, 'Xhelper', value)
-    end)
-  )
-
-  register_option({ '-c', '--coverage' }, simple_flag('--coverage', 'coverage', true, 'c'))
-  register_option({ '--no-coverage' }, simple_flag('--no-coverage', 'coverage', false, 'c'))
-  register_option({ '-v', '--verbose' }, simple_flag('--verbose', 'verbose', true, 'v'))
-  register_option({ '--no-verbose' }, simple_flag('--no-verbose', 'verbose', false, 'v'))
-  register_option({ '-l', '--list' }, simple_flag('--list', 'list', true, 'l'))
-  register_option({ '--ignore-lua' }, simple_flag('--ignore-lua', 'ignore-lua', true))
-  register_option({ '--lazy' }, simple_flag('--lazy', 'lazy', true))
-  register_option({ '--no-lazy' }, simple_flag('--no-lazy', 'lazy', false))
-  register_option({ '--auto-insulate' }, simple_flag('--auto-insulate', 'auto-insulate', true))
-  register_option(
-    { '--no-auto-insulate' },
-    simple_flag('--no-auto-insulate', 'auto-insulate', false)
-  )
-  register_option({ '-k', '--keep-going' }, simple_flag('--keep-going', 'keep-going', true, 'k'))
-  register_option({ '--no-keep-going' }, simple_flag('--no-keep-going', 'keep-going', false, 'k'))
-  register_option({ '-R', '--recursive' }, simple_flag('--recursive', 'recursive', true, 'R'))
-  register_option({ '--no-recursive' }, simple_flag('--no-recursive', 'recursive', false, 'R'))
-  register_option({ '--sort-files' }, simple_flag('--sort-files', 'sort-files', true))
-  register_option({ '--no-sort-files' }, simple_flag('--no-sort-files', 'sort-files', false))
-  register_option({ '--sort-tests' }, simple_flag('--sort-tests', 'sort-tests', true))
-  register_option({ '--no-sort-tests' }, simple_flag('--no-sort-tests', 'sort-tests', false))
-  register_option(
-    { '--suppress-pending' },
-    simple_flag('--suppress-pending', 'suppress-pending', true)
-  )
-  register_option(
-    { '--no-suppress-pending' },
-    simple_flag('--no-suppress-pending', 'suppress-pending', false)
-  )
-  register_option({ '--defer-print' }, simple_flag('--defer-print', 'defer-print', true))
-  register_option({ '--no-defer-print' }, simple_flag('--no-defer-print', 'defer-print', false))
-  register_option({ '--sort' }, {
+  register_option({ '--version' }, {
     takes_value = false,
-    display = '--sort',
+    handler = function(state)
+      return processOption(state, 'version', true)
+    end,
+    description = 'Print the program version and exit.',
+  })
+  if allow_roots then
+    register_option({ '-p', '--pattern' }, {
+      takes_value = true,
+      metavar = 'PATTERN',
+      multi = true,
+      description = 'Only run test files matching the Lua pattern (default: _spec).',
+    })
+    register_option({ '--exclude-pattern' }, {
+      takes_value = true,
+      metavar = 'PATTERN',
+      multi = true,
+      description = 'Do not run files matching the Lua pattern; takes precedence over --pattern.',
+    })
+  end
+  register_option({ '-e' }, {
+    takes_value = true,
+    metavar = 'STATEMENT',
+    multi = true,
+    description = 'Execute Lua statement STATEMENT before running tests.',
+  })
+  register_option({ '-o', '--output' }, {
+    takes_value = true,
+    metavar = 'LIBRARY',
+    description = 'Output handler module to load (default: busted.outputHandlers.output_handler).',
+  })
+  register_option({ '-C', '--directory' }, {
+    takes_value = true,
+    metavar = 'DIR',
+    handler = function(state, value)
+      return processDir(state, 'directory', value, 'C')
+    end,
+    description = 'Change to DIR before running tests; multiple directories are resolved incrementally.',
+  })
+  register_option({ '-f', '--config-file' }, {
+    takes_value = true,
+    metavar = 'FILE',
+    description = 'Load configuration options from FILE.',
+  })
+  register_option({ '--coverage-config-file' }, {
+    takes_value = true,
+    metavar = 'FILE',
+    description = 'Load LuaCov configuration options from FILE.',
+  })
+  register_option({ '-t', '--tags' }, {
+    takes_value = true,
+    metavar = 'TAGS',
+    handler = function(state, value)
+      return processList(state, 'tags', value, 't')
+    end,
+    description = 'Only run tests with these comma-separated #tags.',
+  })
+  register_option({ '--exclude-tags' }, {
+    takes_value = true,
+    metavar = 'TAGS',
+    handler = function(state, value)
+      return processList(state, 'exclude-tags', value)
+    end,
+    description = 'Do not run tests with these #tags; takes precedence over --tags.',
+  })
+  register_option({ '--filter' }, {
+    takes_value = true,
+    metavar = 'PATTERN',
+    multi = true,
+    description = 'Only run tests whose names match the Lua pattern.',
+  })
+  register_option({ '--name' }, {
+    takes_value = true,
+    metavar = 'NAME',
+    multi = true,
+    description = 'Run the test with the given full name.',
+  })
+  register_option({ '--filter-out' }, {
+    takes_value = true,
+    metavar = 'PATTERN',
+    multi = true,
+    description = 'Exclude tests whose names match the Lua pattern; takes precedence over --filter.',
+  })
+  register_option({ '--exclude-names-file' }, {
+    takes_value = true,
+    metavar = 'FILE',
+    description = 'Skip tests whose names appear in FILE; takes precedence over name filters.',
+  })
+  register_option({ '--log-success' }, {
+    takes_value = true,
+    metavar = 'FILE',
+    description = 'Append the name of each successful test to FILE.',
+  })
+  register_option({ '-m', '--lpath' }, {
+    takes_value = true,
+    metavar = 'PATH',
+    handler = function(state, value)
+      return processPath(state, 'lpath', value, 'm')
+    end,
+    description = 'Prefix PATH to package.path (default: ./src/?.lua;./src/?/?.lua;./src/?/init.lua).',
+  })
+  register_option({ '--cpath' }, {
+    takes_value = true,
+    metavar = 'PATH',
+    handler = function(state, value)
+      return processPath(state, 'cpath', value)
+    end,
+    description = 'Prefix PATH to package.cpath (default: ./csrc/?.so;./csrc/?/?.so;).',
+  })
+  register_option({ '-r', '--run' }, {
+    takes_value = true,
+    metavar = 'RUN',
+    description = 'Load configuration RUN from the project .busted file.',
+  })
+  register_option({ '--repeat' }, {
+    takes_value = true,
+    metavar = 'COUNT',
+    handler = function(state, value)
+      return processNumber(state, 'repeat', value, nil, '--repeat')
+    end,
+    description = 'Run the entire test suite COUNT times (default: 1).',
+  })
+  register_option({ '--loaders' }, {
+    takes_value = true,
+    metavar = 'NAME',
+    handler = function(state, value)
+      return processLoaders(state, 'loaders', value)
+    end,
+    description = 'Comma-separated list of test file loaders (default: lua).',
+  })
+  register_option({ '--helper' }, {
+    takes_value = true,
+    metavar = 'PATH',
+    description = 'Run helper script at PATH before executing tests.',
+  })
+  register_option({ '--lua' }, {
+    takes_value = true,
+    metavar = 'LUA',
+    description = 'Path to the Lua interpreter busted should run under.',
+  })
+  register_option({ '-Xoutput' }, {
+    takes_value = true,
+    metavar = 'OPTION',
+    handler = function(state, value)
+      return processList(state, 'Xoutput', value)
+    end,
+    description = 'Pass OPTION (comma-separated) to the output handler.',
+  })
+  register_option({ '-Xhelper' }, {
+    takes_value = true,
+    metavar = 'OPTION',
+    handler = function(state, value)
+      return processList(state, 'Xhelper', value)
+    end,
+    description = 'Pass OPTION (comma-separated) to the helper script.',
+  })
+  register_negatable_option({ '-c', '--coverage' }, { '--no-coverage' }, {
+    description = 'Enable code coverage analysis (requires LuaCov).',
+    negated_description = 'Disable code coverage analysis.',
+  })
+  register_negatable_option({ '-v', '--verbose' }, { '--no-verbose' }, {
+    description = 'Enable verbose output of errors.',
+    negated_description = 'Disable verbose error output.',
+  })
+  register_option({ '-l', '--list' }, {
+    takes_value = false,
+    handler = function(state)
+      return processOption(state, 'list', true, 'l')
+    end,
+    description = 'List the names of all tests instead of running them.',
+  })
+  register_option({ '--ignore-lua' }, {
+    takes_value = false,
+    handler = function(state)
+      return processOption(state, 'ignore-lua', true)
+    end,
+    description = 'Ignore the --lua directive.',
+  })
+  register_negatable_option({ '--lazy' }, { '--no-lazy' }, {
+    description = 'Use lazy setup/teardown as the default.',
+    negated_description = 'Disable lazy setup/teardown.',
+  })
+  register_negatable_option({ '--auto-insulate' }, { '--no-auto-insulate' }, {
+    description = 'Enable file insulation (default).',
+    negated_description = 'Disable file insulation.',
+  })
+  register_negatable_option({ '-k', '--keep-going' }, { '--no-keep-going' }, {
+    description = 'Continue after errors or failures (default).',
+    negated_description = 'Stop on the first error or failure.',
+  })
+  register_negatable_option({ '-R', '--recursive' }, { '--no-recursive' }, {
+    description = 'Recurse into subdirectories when searching for specs (default).',
+    negated_description = 'Do not recurse into subdirectories.',
+  })
+  register_negatable_option({ '--sort-files' }, { '--no-sort-files' }, {
+    description = 'Sort file execution order alphabetically.',
+    negated_description = 'Run files in discovery order.',
+  })
+  register_negatable_option({ '--sort-tests' }, { '--no-sort-tests' }, {
+    description = 'Sort test execution order within a file.',
+    negated_description = 'Run tests in definition order.',
+  })
+  register_negatable_option({ '--suppress-pending' }, { '--no-suppress-pending' }, {
+    description = 'Suppress pending test output.',
+    negated_description = 'Show pending test output (default).',
+  })
+  register_negatable_option({ '--defer-print' }, { '--no-defer-print' }, {
+    description = 'Defer printing until the suite completes.',
+    negated_description = 'Print output as events occur (default).',
+  })
+  register_negatable_option({ '--sort' }, { '--no-sort' }, {
+    description = 'Enable both --sort-files and --sort-tests.',
+    negated_description = 'Disable both --sort-files and --sort-tests.',
     handler = function(state)
       return processSort(state, 'sort', true)
     end,
-  })
-  register_option({ '--no-sort' }, {
-    takes_value = false,
-    display = '--no-sort',
-    handler = function(state)
+    negated_handler = function(state)
       return processSort(state, 'sort', false)
     end,
   })
-
-  --- @param args string[]
+  --- @param args table
   --- @return table<string, any>? args
   --- @return table<string, any>|string? overrides_or_err
   local function parse_cli_args(args)
@@ -622,7 +700,13 @@ return function(options)
         finished = true
       elseif not finished and argument:sub(1, 2) == '--' then
         if argument == '--help' then
-          return nil, string.format(HELP_TEMPLATE, appName)
+          local help = format_help_entries(appName, help_entries)
+          local f = io.open('/tmp/busted_help_debug.txt', 'w')
+          if f then
+            f:write(help)
+            f:close()
+          end
+          return nil, help
         end
         local name, attached = argument:match('^(%-%-[^=]+)=(.*)$')
         local key = name or argument
@@ -651,7 +735,13 @@ return function(options)
         end
       elseif not finished and argument:sub(1, 1) == '-' and argument ~= '-' then
         if argument == '-h' then
-          return nil, string.format(HELP_TEMPLATE, appName)
+          local help = format_help_entries(appName, help_entries)
+          local f = io.open('/tmp/busted_help_debug.txt', 'w')
+          if f then
+            f:write(help)
+            f:close()
+          end
+          return nil, help
         end
         local spec = option_handlers[argument]
         if spec then
@@ -716,7 +806,6 @@ return function(options)
     end
     return state.args, state.overrides
   end
-
   --- @param args string[]
   --- @return table<string, any>? args
   --- @return string? error
@@ -728,7 +817,6 @@ return function(options)
     local cliArgsParsed = cliArgsParsedOrErr
     --- @cast cliArgs table<string, any>
     --- @cast cliArgsParsed table<string, any>
-
     local bustedConfigFilePath
     if cliArgs.f then
       if not isfile(cliArgs.f) then
@@ -741,7 +829,6 @@ return function(options)
         bustedConfigFilePath = nil
       end
     end
-
     if bustedConfigFilePath then
       local bustedConfigFile, err = loadfile(bustedConfigFilePath)
       if not bustedConfigFile then
@@ -760,25 +847,21 @@ return function(options)
     else
       cliArgs = vim.tbl_extend('force', cliArgs or {}, cliArgsParsed or {})
     end
-
     if cliArgs['lua'] and not cliArgs['ignore-lua'] then
       run_lua_interpreter(cliArgs['lua'], assert(args[0]), args)
     end
-
     cliArgs.e = makeList(cliArgs.e)
     cliArgs.pattern = makeList(cliArgs.pattern)
     cliArgs.p = cliArgs.pattern
     cliArgs['exclude-pattern'] = makeList(cliArgs['exclude-pattern'])
     cliArgs.filter = makeList(cliArgs.filter)
     cliArgs['filter-out'] = makeList(cliArgs['filter-out'])
-
     cliArgs.tags = fixupList(cliArgs.tags)
     cliArgs.t = cliArgs.tags
     cliArgs['exclude-tags'] = fixupList(cliArgs['exclude-tags'])
     cliArgs.loaders = fixupList(cliArgs.loaders)
     cliArgs.Xoutput = fixupList(cliArgs.Xoutput)
     cliArgs.Xhelper = fixupList(cliArgs.Xhelper)
-
     for _, excluded in pairs(cliArgs['exclude-tags']) do
       for _, included in pairs(cliArgs.tags) do
         if excluded == included then
@@ -786,12 +869,9 @@ return function(options)
         end
       end
     end
-
     cliArgs['repeat'] = tonumber(cliArgs['repeat'])
-
     return cliArgs
   end
-
   return {
     --- @param self table
     --- @param name string
@@ -800,7 +880,6 @@ return function(options)
       appName = name or ''
       return self
     end,
-
     --- @param self table
     --- @param name string
     --- @return table
@@ -808,7 +887,6 @@ return function(options)
       appName = name or ''
       return self
     end,
-
     --- @param _ table
     --- @param args string[]
     --- @return table<string, any>?, string?

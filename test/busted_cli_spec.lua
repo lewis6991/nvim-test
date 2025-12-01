@@ -57,6 +57,24 @@ describe('busted.modules.cli', function()
     assert.are.same({ 'lua', 'plenary' }, parsed.loaders)
   end)
 
+  it('derives default handlers for multi options', function()
+    local parsed = parse_args({
+      '--filter',
+      'alpha',
+      '--filter',
+      'beta',
+      '--name',
+      'first',
+      '--name',
+      'second',
+      '--filter-out',
+      'skip',
+    })
+    assert.are.same({ 'alpha', 'beta' }, parsed.filter)
+    assert.are.same({ 'first', 'second' }, parsed.name)
+    assert.are.same({ 'skip' }, parsed['filter-out'])
+  end)
+
   it('honors negatable flags', function()
     local parsed = parse_args({
       '--no-auto-insulate',
@@ -116,5 +134,14 @@ describe('busted.modules.cli', function()
     local ok, err = standalone:parse({ [0] = 'busted', 'spec/foo_spec.lua' })
     assert.is_nil(ok)
     assert.matches('Unexpected positional argument', err)
+  end)
+  it('toggles both sort flags via combined options', function()
+    local sorted = parse_args({ '--sort' })
+    assert.is_true(sorted['sort-files'])
+    assert.is_true(sorted['sort-tests'])
+
+    local unsorted = parse_args({ '--no-sort' })
+    assert.is_false(unsorted['sort-files'])
+    assert.is_false(unsorted['sort-tests'])
   end)
 end)
