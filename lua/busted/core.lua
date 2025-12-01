@@ -106,6 +106,7 @@ local PUBLIC_METHODS = {
 --- @field envmode? 'insulate'|'unwrap'|'expose'
 
 --- @alias busted.Executor fun(plugin: table)
+--- @alias busted.CallableValue (fun(...: any): any)|{ __call: fun(...: any): any }
 
 local function bind_method(instance, method)
   return function(arg1, ...)
@@ -133,7 +134,7 @@ function M.new()
     context = context,
     --- @type table<string, any>
     api = {},
-    --- @type table<string, fun(name: string, fn?: fun())>
+    --- @type table<string, fun(name: string, fn?: busted.CallableValue)>
     executors = {},
     status = require('busted.status'),
     skipAll = false,

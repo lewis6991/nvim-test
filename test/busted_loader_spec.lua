@@ -11,7 +11,7 @@ describe('busted output handler loader', function()
     local loader = output_loader_factory()
     local published = {}
     local busted = {
-      publish = function(subjects, element, _, message)
+      publish = function(_, subjects, element, _, message)
         published[#published + 1] = { subjects = subjects, element = element, message = message }
       end,
     }

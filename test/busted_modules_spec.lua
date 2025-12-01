@@ -71,7 +71,7 @@ describe('busted.modules.test_file_loader', function()
           table.insert(published, name)
         end,
       },
-      publish = function(subjects, element, _, message)
+      publish = function(_, subjects, element, _, message)
         table.insert(published, { subjects = subjects, element = element, message = message })
       end,
     }

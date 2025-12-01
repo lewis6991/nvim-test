@@ -1,23 +1,52 @@
-local function stat_type(target)
-  local stat = vim.uv.fs_stat(target)
-  return stat and stat.type or nil
+--- @class test_file_loader.Options
+--- @field recursive? boolean
+--- @field excludes? string[]
+
+--- @alias test_file_loader.LoadedFile fun(...: any): any
+---
+--- @alias test_file_loader.GetTrace
+--- fun(filename: string, info: table): table?
+
+--- @alias test_file_loader.LoadTestFile
+--- fun(busted_ctx: busted.Busted, filename: string): (
+---   test_file_loader.LoadedFile?,
+---   test_file_loader.GetTrace?
+--- )
+
+local fs = vim.fs
+local uv = vim.uv
+local EMPTY_OPTIONS = {} ---@type test_file_loader.Options
+local EMPTY_PATTERNS = {} ---@type string[]
+
+--- @param target string
+--- @return string?
+local function get_path_type(target)
+  local stat = uv.fs_stat(target)
+  if not stat then
+    return nil
+  end
+  return stat.type
 end
 
-local function collect_files(root, recursive)
-  local files = {}
+--- @param directory string
+--- @param recursive boolean
+--- @return string[]
+local function collect_files(directory, recursive)
+  local files = {} ---@type string[]
 
+  ---@param dir string
   local function walk(dir)
-    local iter = vim.uv.fs_scandir(dir)
+    local iter = uv.fs_scandir(dir)
     if not iter then
       return
     end
     while true do
-      local name, type = vim.uv.fs_scandir_next(iter)
+      local name, type = uv.fs_scandir_next(iter)
       if not name then
         break
       end
       if name:sub(1, 1) ~= '.' then
-        local full = vim.fs.joinpath(dir, name)
+        local full = fs.joinpath(dir, name)
         if type == 'file' then
           files[#files + 1] = full
         elseif type == 'directory' and recursive then
@@ -27,75 +56,146 @@ local function collect_files(root, recursive)
     end
   end
 
-  walk(root)
+  walk(directory)
   return files
 end
 
+--- @param filename string
+--- @param patterns string[]
+--- @param excludes string[]
+--- @return boolean
+local function should_include_file(filename, patterns, excludes)
+  local basename = fs.basename(filename)
+
+  for _, patt in ipairs(excludes) do
+    if patt ~= '' and basename:find(patt) then
+      return false
+    end
+  end
+
+  if #patterns == 0 then
+    return true
+  end
+
+  for _, patt in ipairs(patterns) do
+    if basename:find(patt) then
+      return true
+    end
+  end
+
+  return false
+end
+
 --- @param busted busted.Busted
+--- @param root string
+--- @param patterns string[]
+--- @param options test_file_loader.Options
+--- @return string[]
+local function gather_root_files(busted, root, patterns, options)
+  local root_type = get_path_type(root)
+
+  if root_type == 'file' then
+    return { root }
+  end
+
+  if root_type == 'directory' then
+    local excludes = options.excludes or {}
+    local recursive = options.recursive == true
+    local files = collect_files(root, recursive)
+
+    return vim.tbl_filter(function(path)
+      return should_include_file(path, patterns, excludes)
+    end, files)
+  end
+
+  busted:publish({ 'error' }, {}, nil, string.format('Cannot find file or directory: %s', root), {})
+  return {}
+end
+
+--- @param busted busted.Busted
+--- @param patterns string[]
+local function publish_no_matches(busted, patterns)
+  local pattern = patterns[1] or ''
+  if #patterns > 1 then
+    pattern = '\n\t' .. table.concat(patterns, '\n\t')
+  end
+
+  busted:publish(
+    { 'error' },
+    {},
+    nil,
+    string.format('No test files found matching Lua pattern: %s', pattern),
+    {}
+  )
+end
+
+--- @param _filename string
+--- @param info table
+--- @return table
+local function trim_c_frames(_filename, info)
+  local index = info.traceback:find('\n%s*%[C]')
+  if index then
+    info.traceback = info.traceback:sub(1, index)
+  end
+  return info
+end
+
+--- @param busted busted.Busted
+--- @return fun(rootFiles: string[], patterns: string[]?, options: test_file_loader.Options?): string[] load_test_files
+--- @return test_file_loader.LoadTestFile load_test_file
+--- @return fun(rootFiles: string[], patterns: string[]?, options: test_file_loader.Options?): string[] get_all_test_files
 return function(busted)
-  local loader = require('busted.modules.files.lua')
-
-  local function getTestFiles(rootFile, patterns, options)
-    local fileList --- @type string[]
-    local rootType = stat_type(rootFile)
-
-    if rootType == 'file' then
-      fileList = { rootFile }
-    elseif rootType == 'directory' then
-      fileList = collect_files(rootFile, not not options.recursive)
-
-      fileList = vim.tbl_filter(function(filename)
-        local basename = vim.fs.basename(filename)
-        for _, patt in ipairs(options.excludes or {}) do
-          if patt ~= '' and basename:find(patt) then
-            return false
-          end
-        end
-        for _, patt in ipairs(patterns) do
-          if basename:find(patt) then
-            return true
-          end
-        end
-        return #patterns == 0
-      end, fileList)
-    else
-      busted:publish(
-        { 'error' },
-        {},
-        nil,
-        string.format('Cannot find file or directory: %s', rootFile),
-        {}
-      )
-      fileList = {}
-    end
-    table.sort(fileList)
-    return fileList
-  end
-
-  local function getAllTestFiles(rootFiles, patterns, options)
-    local fileList = {}
+  ---@param rootFiles string[]
+  ---@param patterns string[]?
+  ---@param options test_file_loader.Options?
+  ---@return string[]
+  local function get_all_test_files(rootFiles, patterns, options)
+    options = options or EMPTY_OPTIONS
+    patterns = patterns or EMPTY_PATTERNS
+    local fileList = {} ---@type string[]
     for _, root in ipairs(rootFiles) do
-      vim.list_extend(fileList, getTestFiles(root, patterns, options))
+      local files = gather_root_files(busted, root, patterns, options)
+      table.sort(files)
+      vim.list_extend(fileList, files)
     end
     return fileList
   end
 
-  local function loadTestFile(busted_ctx, filename)
-    if loader.match(busted_ctx, filename) then
-      return loader.load(busted_ctx, filename)
+  ---@param busted_ctx busted.Busted
+  ---@param filename string
+  ---@return test_file_loader.LoadedFile?, test_file_loader.GetTrace?
+  local function load_test_file(busted_ctx, filename)
+    if filename:sub(-4) == '.lua' then
+      local file, err = loadfile(filename)
+      if not file then
+        busted_ctx:publish(
+          { 'error', 'file' },
+          { descriptor = 'file', name = filename },
+          nil,
+          err,
+          {}
+        )
+        return nil, nil
+      end
+      return file, trim_c_frames
     end
   end
-
-  local function loadTestFiles(rootFiles, patterns, options)
-    local fileList = getAllTestFiles(rootFiles, patterns, options)
+  ---@param rootFiles string[]
+  ---@param patterns string[]?
+  ---@param options test_file_loader.Options?
+  ---@return string[]
+  local function load_test_files(rootFiles, patterns, options)
+    patterns = patterns or EMPTY_PATTERNS
+    options = options or EMPTY_OPTIONS
+    local fileList = get_all_test_files(rootFiles, patterns, options)
 
     for _, fileName in ipairs(fileList) do
-      local testFile, getTrace, rewriteMessage = loadTestFile(busted, fileName)
+      local testFile, getTrace = load_test_file(busted, fileName)
 
       if testFile then
+        --- @type busted.CallableValue
         local file = setmetatable({
           getTrace = getTrace,
-          rewriteMessage = rewriteMessage,
         }, {
           __call = testFile,
         })
@@ -105,20 +205,11 @@ return function(busted)
     end
 
     if #fileList == 0 then
-      local pattern = patterns[1]
-      if #patterns > 1 then
-        pattern = '\n\t' .. table.concat(patterns, '\n\t')
-      end
-      busted:publish(
-        { 'error' },
-        {},
-        nil,
-        string.format('No test files found matching Lua pattern: %s', pattern),
-        {}
-      )
+      publish_no_matches(busted, patterns)
     end
+
     return fileList
   end
 
-  return loadTestFiles, loadTestFile, getAllTestFiles
+  return load_test_files, load_test_file, get_all_test_files
 end

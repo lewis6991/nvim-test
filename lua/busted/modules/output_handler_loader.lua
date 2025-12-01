@@ -30,7 +30,7 @@ return function()
     end)
 
     if not ok then
-      busted.publish({ 'error', 'output' }, { descriptor = 'output', name = output }, nil, err, {})
+      busted:publish({ 'error', 'output' }, { descriptor = 'output', name = output }, nil, err, {})
       ok, err = pcall(function()
         handler = resolve_handler(options.defaultOutput)
       end)
