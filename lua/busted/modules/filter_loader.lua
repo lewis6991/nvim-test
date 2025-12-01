@@ -1,12 +1,12 @@
 return function()
   local function filter(busted, options)
     local getFullName = function(name)
-      local parent = busted.context.get()
+      local parent = busted.context:get()
       local names = { name }
 
       while parent and (parent.name or parent.descriptor) and parent.descriptor ~= 'file' do
         table.insert(names, 1, parent.name or parent.descriptor)
-        parent = busted.context.parent(parent)
+        parent = busted.context:parent(parent)
       end
 
       return table.concat(names, ' ')

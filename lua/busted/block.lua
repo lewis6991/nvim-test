@@ -13,7 +13,7 @@ end
 
 return function(busted)
   local block = {}
-  local root = busted.context.get()
+  local root = busted.context:get()
 
   function block.reject(descriptor, element)
     element.env[descriptor] = function(...)
@@ -40,7 +40,7 @@ return function(busted)
   end
 
   function block.execAllOnce(descriptor, current, err)
-    local parent = busted.context.parent(current)
+    local parent = busted.context:parent(current)
 
     if parent then
       local success = block.execAllOnce(descriptor, parent)
@@ -73,7 +73,7 @@ return function(busted)
   end
 
   function block.execAll(descriptor, current, propagate, err)
-    local parent = busted.context.parent(current)
+    local parent = busted.context:parent(current)
 
     if propagate and parent then
       local success, ancestor = block.execAll(descriptor, parent, propagate)
@@ -97,7 +97,7 @@ return function(busted)
   end
 
   function block.dexecAll(descriptor, current, propagate, err)
-    local parent = busted.context.parent(current)
+    local parent = busted.context:parent(current)
     local list = current[descriptor] or {}
 
     local success = true
@@ -144,7 +144,7 @@ return function(busted)
 
     if busted.safe(descriptor, element.run, element):success() then
       if busted.sort then
-        sort(busted.context.children(element))
+        sort(busted.context:children(element))
       end
 
       if block.setup(element) then

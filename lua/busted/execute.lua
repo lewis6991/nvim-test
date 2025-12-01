@@ -13,14 +13,14 @@ return function(busted)
 
   local function execute(runs, options)
     options = options or {}
-    local root = busted.context.get()
-    local children = { unpack(busted.context.children(root)) }
+    local root = busted.context:get()
+    local children = { unpack(busted.context:children(root)) }
 
     local function suite_reset()
-      local oldctx = busted.context.get()
+      local oldctx = busted.context:get()
 
-      busted.context.clear()
-      local ctx = busted.context.get()
+      busted.context:clear()
+      local ctx = busted.context:get()
       for k, v in pairs(oldctx) do
         ctx[k] = v
       end
@@ -29,19 +29,19 @@ return function(busted)
         for descriptor, _ in pairs(busted.executors) do
           child[descriptor] = nil
         end
-        busted.context.attach(child)
+        busted.context:attach(child)
       end
     end
 
     for i = 1, runs do
       if i > 1 then
         suite_reset()
-        root = busted.context.get()
+        root = busted.context:get()
         busted.safe_publish('suite', { 'suite', 'reset' }, root, i, runs)
       end
 
       if options.sort then
-        sort(busted.context.children(root))
+        sort(busted.context:children(root))
       end
 
       if busted.safe_publish('suite', { 'suite', 'start' }, root, i, runs) then

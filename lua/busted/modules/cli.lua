@@ -5,6 +5,21 @@ local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local fs = vim.fs
 local is_windows = uv.os_uname().sysname:match('Windows')
 
+--- @class busted.cli.Options
+--- @field standalone? boolean
+--- @field output? string
+
+--- @class busted.cli.State
+--- @field args table<string, any>
+--- @field overrides table<string, any>
+
+--- @alias busted.cli.Handler fun(state: busted.cli.State, value?: string, opt?: string): boolean, string?
+
+--- @class busted.cli.OptionSpec
+--- @field takes_value boolean
+--- @field display string
+--- @field handler busted.cli.Handler
+
 local HELP_TEMPLATE = [=[
 Usage: %s [OPTIONS] [--] [ROOT-1 [ROOT-2 [...]]]
 
@@ -90,6 +105,300 @@ OPTIONS:
                               complete (default: off)
 ]=]
 
+--- @param pathname string?
+--- @return string?
+local function normalize(pathname)
+  if not pathname or pathname == '' then
+    return pathname
+  end
+  return fs.normalize(pathname)
+end
+
+--- @param base string?
+--- @param relative string?
+--- @return string?
+local function join(base, relative)
+  if not base or base == '' then
+    return normalize(relative)
+  end
+  if not relative or relative == '' then
+    return normalize(base)
+  end
+  return normalize(fs.joinpath(base, relative))
+end
+
+--- @param pathname string?
+--- @return boolean
+local function isfile(pathname)
+  if not pathname or pathname == '' then
+    return false
+  end
+  local stat = uv.fs_stat(pathname)
+  return stat ~= nil and stat.type == 'file'
+end
+
+--- @param command string
+--- @param script string
+--- @param args string[]
+local function run_lua_interpreter(command, script, args)
+  local cmd = { command, script, '--ignore-lua' }
+  for _, value in ipairs(args) do
+    cmd[#cmd + 1] = value
+  end
+  local result = vim.system(cmd):wait()
+  exit(result.code)
+end
+
+--- @param values string|string[]?
+--- @return string[]
+local function makeList(values)
+  return type(values) == 'table' and values or { values }
+end
+
+--- @param values string|string[]
+--- @return string[]
+local function fixupList(values)
+  local list = type(values) == 'table' and values or { values }
+  local ret = {}
+  for _, v in ipairs(list) do
+    vim.list_extend(ret, utils.split(v, ','))
+  end
+  return ret
+end
+
+--- @param current string?
+--- @param value string?
+--- @param sep string
+--- @return string
+local function append_value(current, value, sep)
+  value = value or ''
+  if not current or current == '' then
+    return value
+  end
+  return current .. sep .. value
+end
+
+local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
+local cpathprefix = is_windows and './csrc/?.dll;./csrc/?/?.dll;' or './csrc/?.so;./csrc/?/?.so;'
+
+--- @param options busted.cli.Options
+--- @return table<string, any>
+local function make_defaults(options)
+  local defaultOutput = options.output or 'busted.outputHandlers.output_handler'
+  local pattern = { '_spec' }
+  local tags = {}
+  local roots = { 'spec' }
+  return {
+    ROOT = roots,
+    pattern = pattern,
+    p = pattern,
+    ['exclude-pattern'] = {},
+    e = {},
+    directory = './',
+    C = './',
+    lpath = lpathprefix,
+    m = lpathprefix,
+    cpath = cpathprefix,
+    output = defaultOutput,
+    o = defaultOutput,
+    tags = tags,
+    t = tags,
+    name = {},
+    filter = {},
+    ['filter-out'] = {},
+    ['exclude-tags'] = {},
+    loaders = { 'lua' },
+    helper = nil,
+    lua = nil,
+    run = nil,
+    f = nil,
+    ['config-file'] = nil,
+    ['coverage-config-file'] = nil,
+    ['log-success'] = nil,
+    ['exclude-names-file'] = nil,
+    Xoutput = {},
+    Xhelper = {},
+    ['repeat'] = 1,
+    coverage = false,
+    c = false,
+    verbose = false,
+    v = false,
+    list = false,
+    l = false,
+    lazy = false,
+    ['auto-insulate'] = true,
+    ['keep-going'] = true,
+    k = true,
+    recursive = true,
+    R = true,
+    ['ignore-lua'] = false,
+    ['suppress-pending'] = false,
+    ['defer-print'] = false,
+    version = false,
+  }
+end
+
+--- @param options busted.cli.Options
+--- @return busted.cli.State
+local function new_state(options)
+  return {
+    args = make_defaults(options),
+    overrides = {},
+  }
+end
+
+--- @param state busted.cli.State
+--- @param key string
+--- @param value any
+--- @param altkey string?
+local function assign(state, key, value, altkey)
+  state.args[key] = value
+  state.overrides[key] = value
+  if altkey then
+    state.args[altkey] = value
+    state.overrides[altkey] = value
+  end
+end
+
+--- @param state busted.cli.State
+--- @param key string
+--- @param value any
+--- @param altkey string?
+--- @return boolean, string?
+local function processOption(state, key, value, altkey)
+  assign(state, key, value, altkey)
+  return true
+end
+
+--- @param state busted.cli.State
+--- @param key string
+--- @param value string?
+--- @return boolean, string?
+local function processArgList(state, key, value)
+  value = value or ''
+  local list = state.overrides[key]
+  if not list then
+    list = {}
+  end
+  vim.list_extend(list, utils.split(value, ','))
+  assign(state, key, list)
+  return true
+end
+
+--- @param state busted.cli.State
+--- @param key string
+--- @param value string?
+--- @param altkey string?
+--- @param opt string
+--- @return boolean, string?
+local function processNumber(state, key, value, altkey, opt)
+  local number = tonumber(value)
+  if not number then
+    return false, 'argument to ' .. opt .. ' must be a number'
+  end
+  assign(state, key, number, altkey)
+  return true
+end
+
+--- @param state busted.cli.State
+--- @param key string
+--- @param value string?
+--- @param altkey string?
+--- @return boolean, string?
+local function processList(state, key, value, altkey)
+  value = value or ''
+  local list = state.overrides[key] or {}
+  vim.list_extend(list, utils.split(value, ','))
+  assign(state, key, list, altkey)
+  return true
+end
+
+--- @param state busted.cli.State
+--- @param key string
+--- @param value string?
+--- @param altkey string?
+--- @return boolean, string?
+local function processMultiOption(state, key, value, altkey)
+  value = value or ''
+  local list = state.overrides[key] or {}
+  table.insert(list, value)
+  assign(state, key, list, altkey)
+  return true
+end
+
+--- @param state busted.cli.State
+--- @param key string
+--- @param value string?
+--- @param altkey string?
+--- @return boolean, string?
+local function processLoaders(state, key, value, altkey)
+  value = value or ''
+  local combined = append_value(state.overrides[key], value, ',')
+  assign(state, key, combined, altkey)
+  return true
+end
+
+--- @param state busted.cli.State
+--- @param key string
+--- @param value string?
+--- @param altkey string?
+--- @return boolean, string?
+local function processPath(state, key, value, altkey)
+  value = value or ''
+  local combined = append_value(state.overrides[key], value, ';')
+  assign(state, key, combined, altkey)
+  return true
+end
+
+--- @param state busted.cli.State
+--- @param key string
+--- @param value string?
+--- @param altkey string?
+--- @return boolean, string?
+local function processDir(state, key, value, altkey)
+  value = value or ''
+  local base = state.overrides[key] or ''
+  local dpath = join(base, value)
+  assign(state, key, dpath, altkey)
+  return true
+end
+
+--- @param state busted.cli.State
+--- @param _ string
+--- @param value boolean
+--- @return boolean, string?
+local function processSort(state, _, value)
+  assign(state, 'sort-files', value)
+  assign(state, 'sort-tests', value)
+  return true
+end
+
+--- @param display string
+--- @param key string
+--- @param value boolean
+--- @param altkey string?
+--- @return busted.cli.OptionSpec
+local function simple_flag(display, key, value, altkey)
+  return {
+    takes_value = false,
+    display = display,
+    handler = function(state)
+      return processOption(state, key, value, altkey)
+    end,
+  }
+end
+
+--- @param display string
+--- @param handler busted.cli.Handler
+--- @return busted.cli.OptionSpec
+local function value_option(display, handler)
+  return {
+    takes_value = true,
+    display = display,
+    handler = handler,
+  }
+end
+
 return function(options)
   local appName = ''
   options = options or {}
@@ -97,296 +406,158 @@ return function(options)
 
   local configLoader = require('busted.modules.configuration_loader')()
 
-  local defaultOutput = options.output or 'busted.outputHandlers.output_handler'
-  local defaultLoaders = 'lua'
-  local defaultPattern = '_spec'
-  local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
-  local cpathprefix = is_windows and './csrc/?.dll;./csrc/?/?.dll;' or './csrc/?.so;./csrc/?/?.so;'
-
-  local function normalize(pathname)
-    if not pathname or pathname == '' then
-      return pathname
-    end
-    return fs.normalize(pathname)
-  end
-
-  local function join(base, relative)
-    if not base or base == '' then
-      return normalize(relative)
-    end
-    if not relative or relative == '' then
-      return normalize(base)
-    end
-    return normalize(fs.joinpath(base, relative))
-  end
-
-  local function isfile(pathname)
-    local stat = uv.fs_stat(pathname)
-    return stat and stat.type == 'file'
-  end
-
-  local function run_lua_interpreter(command, script, args)
-    local cmd = { command, script, '--ignore-lua' }
-    for _, value in ipairs(args) do
-      cmd[#cmd + 1] = value
-    end
-    local result = vim.system(cmd):wait()
-    exit(result.code)
-  end
-
-  local function makeList(values)
-    return type(values) == 'table' and values or { values }
-  end
-
-  local function fixupList(values, sep)
-    sep = sep or ','
-    local list = type(values) == 'table' and values or { values }
-    local olist = {}
-    for _, v in ipairs(list) do
-      vim.list_extend(olist, utils.split(v, sep))
-    end
-    return olist
-  end
-
-  local function make_defaults()
-    local pattern = { defaultPattern }
-    local tags = {}
-    local roots = { 'spec' }
-    return {
-      ROOT = roots,
-      pattern = pattern,
-      p = pattern,
-      ['exclude-pattern'] = {},
-      e = {},
-      directory = './',
-      C = './',
-      lpath = lpathprefix,
-      m = lpathprefix,
-      cpath = cpathprefix,
-      output = defaultOutput,
-      o = defaultOutput,
-      tags = tags,
-      t = tags,
-      name = {},
-      filter = {},
-      ['filter-out'] = {},
-      ['exclude-tags'] = {},
-      loaders = { defaultLoaders },
-      helper = nil,
-      lua = nil,
-      run = nil,
-      f = nil,
-      ['config-file'] = nil,
-      ['coverage-config-file'] = nil,
-      ['log-success'] = nil,
-      ['exclude-names-file'] = nil,
-      Xoutput = {},
-      Xhelper = {},
-      ['repeat'] = 1,
-      coverage = false,
-      c = false,
-      verbose = false,
-      v = false,
-      list = false,
-      l = false,
-      lazy = false,
-      ['auto-insulate'] = true,
-      ['keep-going'] = true,
-      k = true,
-      recursive = true,
-      R = true,
-      ['ignore-lua'] = false,
-      ['suppress-pending'] = false,
-      ['defer-print'] = false,
-      version = false,
-    }
-  end
-
-  local function new_state()
-    return {
-      args = make_defaults(),
-      overrides = {},
-    }
-  end
-
-  local function assign(state, key, value, altkey)
-    state.args[key] = value
-    state.overrides[key] = value
-    if altkey then
-      state.args[altkey] = value
-      state.overrides[altkey] = value
-    end
-  end
-
-  local function processOption(state, key, value, altkey)
-    assign(state, key, value, altkey)
-    return true
-  end
-
-  local function processArgList(state, key, value)
-    local list = state.overrides[key]
-    if not list then
-      list = {}
-    end
-    vim.list_extend(list, utils.split(value, ','))
-    assign(state, key, list)
-    return true
-  end
-
-  local function processNumber(state, key, value, altkey, opt)
-    local number = tonumber(value)
-    if not number then
-      return nil, 'argument to ' .. opt .. ' must be a number'
-    end
-    assign(state, key, number, altkey)
-    return true
-  end
-
-  local function processList(state, key, value, altkey)
-    local list = state.overrides[key] or {}
-    vim.list_extend(list, utils.split(value, ','))
-    assign(state, key, list, altkey)
-    return true
-  end
-
-  local function processMultiOption(state, key, value, altkey)
-    local list = state.overrides[key] or {}
-    table.insert(list, value)
-    assign(state, key, list, altkey)
-    return true
-  end
-
-  local function append_value(current, value, sep)
-    if not current or current == '' then
-      return value
-    end
-    return current .. sep .. value
-  end
-
-  local function processLoaders(state, key, value, altkey)
-    local combined = append_value(state.overrides[key], value, ',')
-    assign(state, key, combined, altkey)
-    return true
-  end
-
-  local function processPath(state, key, value, altkey)
-    local combined = append_value(state.overrides[key], value, ';')
-    assign(state, key, combined, altkey)
-    return true
-  end
-
-  local function processDir(state, key, value, altkey)
-    local base = state.overrides[key] or ''
-    local dpath = join(base, value)
-    assign(state, key, dpath, altkey)
-    return true
-  end
-
-  local function processSort(state, _, value)
-    assign(state, 'sort-files', value)
-    assign(state, 'sort-tests', value)
-    return true
-  end
-
   local option_handlers = {}
+  --- @param names string[]
+  --- @param spec busted.cli.OptionSpec
   local function register_option(names, spec)
     for _, name in ipairs(names) do
       option_handlers[name] = spec
     end
   end
 
-  local function simple_flag(display, key, value, altkey)
-    return {
-      takes_value = false,
-      display = display,
-      handler = function(state)
-        return processOption(state, key, value, altkey)
-      end,
-    }
-  end
-
-  local function value_option(display, handler)
-    return {
-      takes_value = true,
-      display = display,
-      handler = handler,
-    }
-  end
-
   register_option({ '--version' }, simple_flag('--version', 'version', true))
 
   if allow_roots then
-    register_option({ '-p', '--pattern' }, value_option('--pattern', function(state, value)
-      return processMultiOption(state, 'pattern', value, 'p')
-    end))
-    register_option({ '--exclude-pattern' }, value_option('--exclude-pattern', function(state, value)
-      return processMultiOption(state, 'exclude-pattern', value)
-    end))
+    register_option(
+      { '-p', '--pattern' },
+      value_option('--pattern', function(state, value)
+        return processMultiOption(state, 'pattern', value, 'p')
+      end)
+    )
+    register_option(
+      { '--exclude-pattern' },
+      value_option('--exclude-pattern', function(state, value)
+        return processMultiOption(state, 'exclude-pattern', value)
+      end)
+    )
   end
-  register_option({ '-e' }, value_option('-e', function(state, value)
-    return processMultiOption(state, 'e', value)
-  end))
-  register_option({ '-o', '--output' }, value_option('--output', function(state, value)
-    return processOption(state, 'output', value, 'o')
-  end))
-  register_option({ '-C', '--directory' }, value_option('--directory', function(state, value)
-    return processDir(state, 'directory', value, 'C')
-  end))
-  register_option({ '-f', '--config-file' }, value_option('--config-file', function(state, value)
-    processOption(state, 'config-file', value)
-    return processOption(state, 'f', value)
-  end))
-  register_option({ '--coverage-config-file' }, value_option('--coverage-config-file', function(state, value)
-    return processOption(state, 'coverage-config-file', value)
-  end))
-  register_option({ '-t', '--tags' }, value_option('--tags', function(state, value)
-    return processList(state, 'tags', value, 't')
-  end))
-  register_option({ '--exclude-tags' }, value_option('--exclude-tags', function(state, value)
-    return processList(state, 'exclude-tags', value)
-  end))
-  register_option({ '--filter' }, value_option('--filter', function(state, value)
-    return processMultiOption(state, 'filter', value)
-  end))
-  register_option({ '--name' }, value_option('--name', function(state, value)
-    return processMultiOption(state, 'name', value)
-  end))
-  register_option({ '--filter-out' }, value_option('--filter-out', function(state, value)
-    return processMultiOption(state, 'filter-out', value)
-  end))
-  register_option({ '--exclude-names-file' }, value_option('--exclude-names-file', function(state, value)
-    return processOption(state, 'exclude-names-file', value)
-  end))
-  register_option({ '--log-success' }, value_option('--log-success', function(state, value)
-    return processOption(state, 'log-success', value)
-  end))
-  register_option({ '-m', '--lpath' }, value_option('--lpath', function(state, value)
-    return processPath(state, 'lpath', value, 'm')
-  end))
-  register_option({ '--cpath' }, value_option('--cpath', function(state, value)
-    return processPath(state, 'cpath', value)
-  end))
-  register_option({ '-r', '--run' }, value_option('--run', function(state, value)
-    return processOption(state, 'run', value)
-  end))
-  register_option({ '--repeat' }, value_option('--repeat', function(state, value)
-    return processNumber(state, 'repeat', value, nil, '--repeat')
-  end))
-  register_option({ '--loaders' }, value_option('--loaders', function(state, value)
-    return processLoaders(state, 'loaders', value)
-  end))
-  register_option({ '--helper' }, value_option('--helper', function(state, value)
-    return processOption(state, 'helper', value)
-  end))
-  register_option({ '--lua' }, value_option('--lua', function(state, value)
-    return processOption(state, 'lua', value)
-  end))
-  register_option({ '-Xoutput' }, value_option('-Xoutput', function(state, value)
-    return processList(state, 'Xoutput', value)
-  end))
-  register_option({ '-Xhelper' }, value_option('-Xhelper', function(state, value)
-    return processList(state, 'Xhelper', value)
-  end))
+  register_option(
+    { '-e' },
+    value_option('-e', function(state, value)
+      return processMultiOption(state, 'e', value)
+    end)
+  )
+  register_option(
+    { '-o', '--output' },
+    value_option('--output', function(state, value)
+      return processOption(state, 'output', value, 'o')
+    end)
+  )
+  register_option(
+    { '-C', '--directory' },
+    value_option('--directory', function(state, value)
+      return processDir(state, 'directory', value, 'C')
+    end)
+  )
+  register_option(
+    { '-f', '--config-file' },
+    value_option('--config-file', function(state, value)
+      processOption(state, 'config-file', value)
+      return processOption(state, 'f', value)
+    end)
+  )
+  register_option(
+    { '--coverage-config-file' },
+    value_option('--coverage-config-file', function(state, value)
+      return processOption(state, 'coverage-config-file', value)
+    end)
+  )
+  register_option(
+    { '-t', '--tags' },
+    value_option('--tags', function(state, value)
+      return processList(state, 'tags', value, 't')
+    end)
+  )
+  register_option(
+    { '--exclude-tags' },
+    value_option('--exclude-tags', function(state, value)
+      return processList(state, 'exclude-tags', value)
+    end)
+  )
+  register_option(
+    { '--filter' },
+    value_option('--filter', function(state, value)
+      return processMultiOption(state, 'filter', value)
+    end)
+  )
+  register_option(
+    { '--name' },
+    value_option('--name', function(state, value)
+      return processMultiOption(state, 'name', value)
+    end)
+  )
+  register_option(
+    { '--filter-out' },
+    value_option('--filter-out', function(state, value)
+      return processMultiOption(state, 'filter-out', value)
+    end)
+  )
+  register_option(
+    { '--exclude-names-file' },
+    value_option('--exclude-names-file', function(state, value)
+      return processOption(state, 'exclude-names-file', value)
+    end)
+  )
+  register_option(
+    { '--log-success' },
+    value_option('--log-success', function(state, value)
+      return processOption(state, 'log-success', value)
+    end)
+  )
+  register_option(
+    { '-m', '--lpath' },
+    value_option('--lpath', function(state, value)
+      return processPath(state, 'lpath', value, 'm')
+    end)
+  )
+  register_option(
+    { '--cpath' },
+    value_option('--cpath', function(state, value)
+      return processPath(state, 'cpath', value)
+    end)
+  )
+  register_option(
+    { '-r', '--run' },
+    value_option('--run', function(state, value)
+      return processOption(state, 'run', value)
+    end)
+  )
+  register_option(
+    { '--repeat' },
+    value_option('--repeat', function(state, value)
+      return processNumber(state, 'repeat', value, nil, '--repeat')
+    end)
+  )
+  register_option(
+    { '--loaders' },
+    value_option('--loaders', function(state, value)
+      return processLoaders(state, 'loaders', value)
+    end)
+  )
+  register_option(
+    { '--helper' },
+    value_option('--helper', function(state, value)
+      return processOption(state, 'helper', value)
+    end)
+  )
+  register_option(
+    { '--lua' },
+    value_option('--lua', function(state, value)
+      return processOption(state, 'lua', value)
+    end)
+  )
+  register_option(
+    { '-Xoutput' },
+    value_option('-Xoutput', function(state, value)
+      return processList(state, 'Xoutput', value)
+    end)
+  )
+  register_option(
+    { '-Xhelper' },
+    value_option('-Xhelper', function(state, value)
+      return processList(state, 'Xhelper', value)
+    end)
+  )
 
   register_option({ '-c', '--coverage' }, simple_flag('--coverage', 'coverage', true, 'c'))
   register_option({ '--no-coverage' }, simple_flag('--no-coverage', 'coverage', false, 'c'))
@@ -397,7 +568,10 @@ return function(options)
   register_option({ '--lazy' }, simple_flag('--lazy', 'lazy', true))
   register_option({ '--no-lazy' }, simple_flag('--no-lazy', 'lazy', false))
   register_option({ '--auto-insulate' }, simple_flag('--auto-insulate', 'auto-insulate', true))
-  register_option({ '--no-auto-insulate' }, simple_flag('--no-auto-insulate', 'auto-insulate', false))
+  register_option(
+    { '--no-auto-insulate' },
+    simple_flag('--no-auto-insulate', 'auto-insulate', false)
+  )
   register_option({ '-k', '--keep-going' }, simple_flag('--keep-going', 'keep-going', true, 'k'))
   register_option({ '--no-keep-going' }, simple_flag('--no-keep-going', 'keep-going', false, 'k'))
   register_option({ '-R', '--recursive' }, simple_flag('--recursive', 'recursive', true, 'R'))
@@ -406,8 +580,14 @@ return function(options)
   register_option({ '--no-sort-files' }, simple_flag('--no-sort-files', 'sort-files', false))
   register_option({ '--sort-tests' }, simple_flag('--sort-tests', 'sort-tests', true))
   register_option({ '--no-sort-tests' }, simple_flag('--no-sort-tests', 'sort-tests', false))
-  register_option({ '--suppress-pending' }, simple_flag('--suppress-pending', 'suppress-pending', true))
-  register_option({ '--no-suppress-pending' }, simple_flag('--no-suppress-pending', 'suppress-pending', false))
+  register_option(
+    { '--suppress-pending' },
+    simple_flag('--suppress-pending', 'suppress-pending', true)
+  )
+  register_option(
+    { '--no-suppress-pending' },
+    simple_flag('--no-suppress-pending', 'suppress-pending', false)
+  )
   register_option({ '--defer-print' }, simple_flag('--defer-print', 'defer-print', true))
   register_option({ '--no-defer-print' }, simple_flag('--no-defer-print', 'defer-print', false))
   register_option({ '--sort' }, {
@@ -425,9 +605,11 @@ return function(options)
     end,
   })
 
+  --- @param args string[]
+  --- @return table<string, any>? args
+  --- @return table<string, any>|string? overrides_or_err
   local function parse_cli_args(args)
-    local state = new_state()
-    args = args or {}
+    local state = new_state(options)
     local i = 1
     local finished = false
     while i <= #args do
@@ -535,12 +717,17 @@ return function(options)
     return state.args, state.overrides
   end
 
+  --- @param args string[]
+  --- @return table<string, any>? args
+  --- @return string? error
   local function parse(args)
     local cliArgs, cliArgsParsedOrErr = parse_cli_args(args)
     if not cliArgs then
       return nil, appName .. ': error: ' .. cliArgsParsedOrErr .. '; re-run with --help for usage.'
     end
     local cliArgsParsed = cliArgsParsedOrErr
+    --- @cast cliArgs table<string, any>
+    --- @cast cliArgsParsed table<string, any>
 
     local bustedConfigFilePath
     if cliArgs.f then
@@ -554,6 +741,7 @@ return function(options)
         bustedConfigFilePath = nil
       end
     end
+
     if bustedConfigFilePath then
       local bustedConfigFile, err = loadfile(bustedConfigFilePath)
       if not bustedConfigFile then
@@ -574,7 +762,7 @@ return function(options)
     end
 
     if cliArgs['lua'] and not cliArgs['ignore-lua'] then
-      run_lua_interpreter(cliArgs['lua'], args[0], args)
+      run_lua_interpreter(cliArgs['lua'], assert(args[0]), args)
     end
 
     cliArgs.e = makeList(cliArgs.e)
@@ -605,16 +793,25 @@ return function(options)
   end
 
   return {
+    --- @param self table
+    --- @param name string
+    --- @return table
     set_name = function(self, name)
       appName = name or ''
       return self
     end,
 
+    --- @param self table
+    --- @param name string
+    --- @return table
     set_silent = function(self, name)
       appName = name or ''
       return self
     end,
 
+    --- @param _ table
+    --- @param args string[]
+    --- @return table<string, any>?, string?
     parse = function(_, args)
       return parse(args)
     end,

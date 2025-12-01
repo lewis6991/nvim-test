@@ -28,7 +28,7 @@ local function main(custom_options)
   local options = defaultOptions
   options.output = options.output or 'busted.outputHandlers.output_handler'
 
-  local busted = require('busted.core')()
+  local busted = require('busted.core').new()
 
   local cli = require('busted.modules.cli')(options)
   local filterLoader = require('busted.modules.filter_loader')()
@@ -53,6 +53,7 @@ local function main(custom_options)
     io.stderr:write(err .. '\n')
     exit(1, forceExit)
   end
+  --- @cast cliArgs table<string, any>
 
   io.stderr:write('coverage flag: ' .. tostring(cliArgs.coverage) .. '\n')
 
@@ -63,7 +64,7 @@ local function main(custom_options)
   end
 
   -- Load current working directory
-  local target_dir = fs.normalize(cliArgs.directory)
+  local target_dir = fs.normalize(cliArgs.directory or './')
   local chdir_ok, chdir_err = pcall(uv.chdir, target_dir)
   if not chdir_ok then
     io.stderr:write(appName .. ': error: ' .. chdir_err .. '\n')
@@ -178,12 +179,12 @@ local function main(custom_options)
   end
 
   local getFullName = function(name)
-    local parent = busted.context.get()
+    local parent = busted.context:get()
     local names = { name }
 
     while parent and (parent.name or parent.descriptor) and parent.descriptor ~= 'file' do
       table.insert(names, 1, parent.name or parent.descriptor)
-      parent = busted.context.parent(parent)
+      parent = busted.context:parent(parent)
     end
 
     return table.concat(names, ' ')

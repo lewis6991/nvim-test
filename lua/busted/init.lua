@@ -10,7 +10,7 @@ local function init(busted)
   end
 
   local describe = function(describe)
-    local parent = busted.context.parent(describe)
+    local parent = busted.context:parent(describe)
     if busted.safe_publish('describe', { 'describe', 'start' }, describe, parent) then
       block.execute('describe', describe)
     end
@@ -18,7 +18,7 @@ local function init(busted)
   end
 
   local it = function(element)
-    local parent = busted.context.parent(element)
+    local parent = busted.context:parent(element)
     local finally
 
     if not block.lazySetup(parent) then
@@ -56,7 +56,7 @@ local function init(busted)
   end
 
   local pending = function(element)
-    local parent = busted.context.parent(element)
+    local parent = busted.context:parent(element)
     local status = 'pending'
     if not busted.safe_publish('it', { 'test', 'start' }, element, parent) then
       status = 'error'
