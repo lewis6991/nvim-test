@@ -116,13 +116,7 @@ local function bind_method(instance, method)
   end
 end
 
---- @class busted.Busted
---- @field version string
---- @field context busted.Context
---- @field api table<string, any>
---- @field executors table<string, fun(name: string, fn?: fun())>
---- @field status fun(status: string): busted.Status
---- @field skipAll boolean
+--- @class (partial) busted.Busted
 --- @field private _mediator busted.Mediator
 --- @field private _environment busted.Environment
 --- @field private _executor_impl table<string, busted.Executor?>
@@ -130,21 +124,22 @@ end
 local M = {}
 M.__index = M
 
+--- @return busted.Busted
 function M.new()
   local context = require('busted.context').new()
+  --- @class (partial) busted.Busted
   local instance = {
     version = '2.2.0',
     context = context,
+    --- @type table<string, any>
     api = {},
+    --- @type table<string, fun(name: string, fn?: fun())>
     executors = {},
     status = require('busted.status'),
     skipAll = false,
-    --- @type busted.Mediator
     _mediator = require('mediator')(),
     _environment = require('busted.environment').new(context),
-    --- @type table<string, busted.Executor?>
     _executor_impl = {},
-    --- @type table<string, busted.ExecutorAttributes?>
     _executor_attributes = {},
   }
 

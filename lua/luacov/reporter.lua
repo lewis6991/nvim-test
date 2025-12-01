@@ -53,9 +53,9 @@ local function dirtree(dir)
   end)
 end
 
----@class luacov.ReportWriter
----@field write fun(self, ...: string): integer
----@field close fun(self)
+--- @class luacov.ReportWriter
+--- @field write fun(self, ...: string): integer
+--- @field close fun(self)
 
 local function open_writer(path)
   local fd, err = uv.fs_open(path, 'w', 420)
@@ -105,13 +105,13 @@ end
 --    self:write(("File %s: hit line %s %d times"):format(...))
 -- end
 -- @type ReporterBase
----@class ReporterBase
----@field protected _out luacov.ReportWriter?
----@field protected _cfg table
----@field protected _data table<string, any>
----@field protected _files string[]
----@field protected _mhit integer
----@field protected _private any
+--- @class ReporterBase
+--- @field protected _out luacov.ReportWriter?
+--- @field protected _cfg table
+--- @field protected _data table<string, any>
+--- @field protected _files string[]
+--- @field protected _mhit integer
+--- @field protected _private any
 local ReporterBase = {}
 do
   ReporterBase.__index = ReporterBase

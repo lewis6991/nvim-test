@@ -44,18 +44,18 @@ local function split_whitespace(str)
   return parts
 end
 
----@class luacov.file_stats
----@field max integer
----@field max_hits integer
----@field [integer] integer
+--- @class luacov.file_stats
+--- @field max integer
+--- @field max_hits integer
+--- @field [integer] integer
 
----@class luacov.stats
+--- @class luacov.stats
 local stats = {}
 
 -----------------------------------------------------
 --- Loads the stats file.
----@param statsfile string path to the stats file.
----@return table<string,luacov.file_stats>|nil
+--- @param statsfile string path to the stats file.
+--- @return table<string,luacov.file_stats>|nil
 function stats.load(statsfile)
   local raw = read_lines(statsfile)
   if not raw then
@@ -115,8 +115,8 @@ end
 
 -----------------------------------------------------
 --- Saves data to the stats file.
----@param statsfile string path to the stats file.
----@param data table<string,luacov.file_stats>
+--- @param statsfile string path to the stats file.
+--- @param data table<string,luacov.file_stats>
 function stats.save(statsfile, data)
   local filenames = {}
   for filename in pairs(data) do

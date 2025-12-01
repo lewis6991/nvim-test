@@ -97,9 +97,9 @@ function M.pcall_err(fn, ...)
   )
 end
 
----@param str string
----@param leave_indent? integer
----@return string
+--- @param str string
+--- @param leave_indent? integer
+--- @return string
 function M.dedent(str, leave_indent)
   -- find minimum common indent across lines
   local indent = nil --- @type string?
@@ -147,7 +147,7 @@ local session --- @type test.Session?
 local loop_running = false
 local last_error --- @type string?
 local exec_lua
----@type fun()
+--- @type fun()
 local flush_coverage
 
 function M.get_session()
@@ -429,7 +429,7 @@ function M.clear(init_lua_path)
   end
 end
 
----@param ... string
+--- @param ... string
 function M.insert(...)
   nvim_feed('i')
   for _, v in ipairs({ ... }) do

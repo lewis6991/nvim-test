@@ -51,9 +51,9 @@ function M.new(stream)
   }, M)
 end
 
----@param method string
----@param args any[]
----@param response_cb? function
+--- @param method string
+--- @param args any[]
+--- @param response_cb? function
 function M:write(method, args, response_cb)
   local data --- @type string[]
   if response_cb then
@@ -86,9 +86,9 @@ function M:_respond(id, value, is_error)
   self._stream:write(table.concat(data))
 end
 
----@param request_cb fun(method: string, args: any[], resp: fun(value: any, is_error: boolean))
----@param notification_cb fun(method: string, args: any[])
----@param eof_cb any
+--- @param request_cb fun(method: string, args: any[], resp: fun(value: any, is_error: boolean))
+--- @param notification_cb fun(method: string, args: any[])
+--- @param eof_cb any
 function M:read_start(request_cb, notification_cb, eof_cb)
   self._stream:read_start(function(data)
     if not data then

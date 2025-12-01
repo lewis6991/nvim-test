@@ -7,7 +7,7 @@ local load_chunk = _G.loadstring or load
 if not load_chunk then
   error('load function is required')
 end
----@cast load_chunk fun(code: string, chunkname?: string): function
+--- @cast load_chunk fun(code: string, chunkname?: string): function
 local loaded = false
 
 local function main(custom_options)
@@ -30,7 +30,7 @@ local function main(custom_options)
   local busted = require('busted.core').new()
 
   local cli = require('busted.modules.cli')(options)
-  local filterLoader = require('busted.modules.filter_loader')()
+  local filterLoader = require('busted.modules.filter_loader')
   local helperLoader = require('busted.modules.helper_loader')()
   local outputHandlerLoader = require('busted.modules.output_handler_loader')()
 
@@ -51,8 +51,8 @@ local function main(custom_options)
   if not cliArgs then
     io.stderr:write(err .. '\n')
     exit(1, forceExit)
+    return
   end
-  --- @cast cliArgs table<string, any>
 
   io.stderr:write('coverage flag: ' .. tostring(cliArgs.coverage) .. '\n')
 
@@ -83,8 +83,8 @@ local function main(custom_options)
 
   -- If lazy is enabled, make lazy setup/teardown the default
   if cliArgs.lazy then
-    busted.register('setup', 'lazy_setup')
-    busted.register('teardown', 'lazy_teardown')
+    busted:register('setup', 'lazy_setup')
+    busted:register('teardown', 'lazy_teardown')
   end
 
   -- Add additional package paths based on lpath and cpath cliArgs
@@ -97,8 +97,8 @@ local function main(custom_options)
   end
 
   -- Load and execute commands given on the command-line
-  if cliArgs.e then
-    for _, v in ipairs(cliArgs.e) do
+  if cliArgs.exec then
+    for _, v in ipairs(cliArgs.exec) do
       load_chunk(v)()
     end
   end
@@ -108,27 +108,27 @@ local function main(custom_options)
   local errors = 0
   local quitOnError = cliArgs['quit-on-error']
 
-  busted.subscribe({ 'error', 'output' }, function(element, _parent, message)
+  busted:subscribe({ 'error', 'output' }, function(element, _parent, message)
     io.stderr:write(
       appName .. ': error: Cannot load output library: ' .. element.name .. '\n' .. message .. '\n'
     )
     return nil, true
   end)
 
-  busted.subscribe({ 'error', 'helper' }, function(element, _parent, message)
+  busted:subscribe({ 'error', 'helper' }, function(element, _parent, message)
     io.stderr:write(
       appName .. ': error: Cannot load helper script: ' .. element.name .. '\n' .. message .. '\n'
     )
     return nil, true
   end)
 
-  busted.subscribe({ 'error' }, function(_element, _parent, _message)
+  busted:subscribe({ 'error' }, function(_element, _parent, _message)
     errors = errors + 1
     busted.skipAll = quitOnError
     return nil, true
   end)
 
-  busted.subscribe({ 'failure' }, function(element, _parent, _message)
+  busted:subscribe({ 'failure' }, function(element, _parent, _message)
     if element.descriptor == 'it' then
       failures = failures + 1
     else
@@ -137,9 +137,6 @@ local function main(custom_options)
     busted.skipAll = quitOnError
     return nil, true
   end)
-
-  -- Set up ordering options
-  busted.sort = true
 
   -- Set up output handler to listen to events
   outputHandlerLoader(busted, cliArgs.output, {
@@ -173,15 +170,14 @@ local function main(custom_options)
   end
 
   -- Load tag and test filters
-  filterLoader(busted, {
+  filterLoader.apply(busted, {
     tags = cliArgs.tags,
     excludeTags = cliArgs['exclude-tags'],
     filter = cliArgs.filter,
-    name = cliArgs.name,
     filterOut = cliArgs['filter-out'],
     excludeNamesFile = cliArgs['exclude-names-file'],
     list = cliArgs.list,
-    nokeepgoing = not cliArgs['keep-going'],
+    nokeepgoing = cliArgs['quit-on-error'],
     suppressPending = cliArgs['suppress-pending'],
   })
 
@@ -189,7 +185,7 @@ local function main(custom_options)
     -- Load test directories/files
     local rootFiles = cliArgs.ROOT
     local patterns = cliArgs.pattern
-    local testFileLoader = require('busted.modules.test_file_loader')(busted, cliArgs.loaders)
+    local testFileLoader = require('busted.modules.test_file_loader')(busted)
     testFileLoader(rootFiles, patterns, {
       excludes = cliArgs['exclude-pattern'],
       verbose = cliArgs.verbose,
@@ -200,12 +196,11 @@ local function main(custom_options)
     local testFileLoader = require('busted.modules.standalone_loader')(busted)
     testFileLoader(info, { verbose = cliArgs.verbose })
   end
-
   local runs = cliArgs['repeat']
   local execute = require('busted.execute')(busted)
-  execute(runs, { sort = busted.sort })
+  execute(runs, { sort = true })
 
-  busted.publish({ 'exit' })
+  busted:publish({ 'exit' })
 
   if cliArgs.coverage then
     local ok_luacov, luacov_mod = pcall(require, 'luacov')

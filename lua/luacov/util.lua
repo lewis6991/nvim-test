@@ -9,12 +9,12 @@ local READ_MODE = 'r'
 local DEFAULT_PERMS = 420 -- 0644
 local DEFAULT_ENV = rawget(_G, '_ENV') or _G
 
----@class luacov.util
+--- @class luacov.util
 local util = {}
 
----@param str string
----@param prefix string
----@return string
+--- @param str string
+--- @param prefix string
+--- @return string
 function util.unprefix(str, prefix)
   if str:sub(1, #prefix) == prefix then
     return str:sub(#prefix + 1)
@@ -24,8 +24,8 @@ function util.unprefix(str, prefix)
 end
 
 -- Returns contents of a file or nil + error message.
----@param name string
----@return string?, string?
+--- @param name string
+--- @return string?, string?
 local function read_file(name)
   local fd, open_err = uv.fs_open(name, READ_MODE, DEFAULT_PERMS)
 
@@ -50,10 +50,10 @@ local function read_file(name)
 end
 
 --- Loads a string.
----@param str string
----@param env? table optional environment table
----@param chunkname? string optional chunkname used for errors
----@return function?, string?
+--- @param str string
+--- @param env? table optional environment table
+--- @param chunkname? string optional chunkname used for errors
+--- @return function?, string?
 function util.load_string(str, env, chunkname)
   if _VERSION:find('5%.1') then
     local func, err = loadstring(str, chunkname) -- luacheck: compat
@@ -75,9 +75,9 @@ end
 
 --- Load a config file.
 -- Reads, loads and runs a Lua file in an environment.
----@param name string file name.
----@param env table environment table.
----@return true|string|nil, string?, string?
+--- @param name string file name.
+--- @param env table environment table.
+--- @return true|string|nil, string?, string?
 function util.load_config(name, env)
   local src, read_err = read_file(name)
 
@@ -103,8 +103,8 @@ function util.load_config(name, env)
 end
 
 --- Checks if a file exists.
----@param name string file name.
----@return boolean
+--- @param name string file name.
+--- @return boolean
 function util.file_exists(name)
   return uv.fs_stat(name) ~= nil
 end

@@ -31,6 +31,7 @@ format-check: stylua
 .PHONY: format
 format: stylua
 	@./stylua $(LUA_FILES)
+	@perl -0pi -e 's/^---@/--- @/gm' $(LUA_FILES)
 
 .PHONY: test
 test:

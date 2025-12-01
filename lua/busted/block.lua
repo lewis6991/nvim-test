@@ -143,9 +143,7 @@ return function(busted)
     end
 
     if busted.safe(descriptor, element.run, element):success() then
-      if busted.sort then
-        sort(busted.context:children(element))
-      end
+      sort(busted.context:children(element))
 
       if block.setup(element) then
         busted.execute(element)

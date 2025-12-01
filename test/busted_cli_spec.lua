@@ -38,20 +38,15 @@ describe('busted.modules.cli', function()
     assert.are.same(fs.normalize('tmp/nested'), parsed.directory)
   end)
 
-  it('parses comma separated lists for tags and loaders', function()
+  it('parses comma separated lists for tags', function()
     local parsed = parse_args({
       '--tags',
       'alpha,beta',
       '--tags',
       'gamma',
-      '--loaders',
-      'lua',
-      '--loaders',
-      'plenary',
     })
     assert.are.same({ 'alpha', 'beta', 'gamma' }, parsed.tags)
     assert.are.same(parsed.tags, parsed.t)
-    assert.are.same({ 'lua', 'plenary' }, parsed.loaders)
   end)
 
   it('derives default handlers for multi options', function()

@@ -6,7 +6,7 @@
 
 local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 
----@class luacov.runner
+--- @class luacov.runner
 local runner = {}
 --- LuaCov version in `MAJOR.MINOR.PATCH` format.
 runner.version = '0.16.0'
@@ -57,8 +57,8 @@ end
 -- coverage data collection.
 -- @param filename name of the file.
 -- @return true if file is included, false otherwise.
----@param filename string
----@return boolean
+--- @param filename string
+--- @return boolean
 function runner.file_included(filename)
   -- Normalize file names before using patterns.
   filename = string.gsub(filename, '\\', '/')
@@ -74,8 +74,8 @@ end
 -- Adds stats to an existing file stats table.
 -- @param old_stats stats to be updated.
 -- @param extra_stats another stats table, will be broken during update.
----@param old_stats table
----@param extra_stats table
+--- @param old_stats table
+--- @param extra_stats table
 function runner.update_stats(old_stats, extra_stats)
   old_stats.max = math.max(old_stats.max, extra_stats.max)
 
@@ -132,7 +132,7 @@ runner.debug_hook = require(cluacov_ok and 'cluacov.hook' or 'luacov.hook').new(
 -- If `configuration.reporter` is not set, runs the default reporter;
 -- otherwise, it must be a module name in 'luacov.reporter' namespace.
 -- The module must contain 'report' function, which is called without arguments.
----@param configuration? string|table
+--- @param configuration? string|table
 function runner.run_report(configuration)
   configuration = runner.load_config(configuration)
   local reporter = 'luacov.reporter'
@@ -164,9 +164,9 @@ end
 
 local dir_sep = package.config:sub(1, 1)
 local wildcard_expansion = '[^/]+'
----@class luacov.ModuleMappings
----@field patterns string[]
----@field filenames string[]
+--- @class luacov.ModuleMappings
+--- @field patterns string[]
+--- @field filenames string[]
 
 if not dir_sep:find('[/\\]') then
   dir_sep = '/'
@@ -269,8 +269,8 @@ end
 -- Returns real name for a source file name
 -- using `luacov.defaults.modules` option.
 -- @param filename name of the file.
----@param filename string
----@return string
+--- @param filename string
+--- @return string
 function runner.real_name(filename)
   local orig_filename = filename
   -- Normalize file names before using patterns.
@@ -412,8 +412,8 @@ local default_config_file = os.getenv('LUACOV_CONFIG') or '.luacov'
 -- config from the provided data or the defaults.
 -- When loading a new config, if some options are missing, default values
 -- from `luacov.defaults` are used instead.
----@param configuration? string|table
----@return table
+--- @param configuration? string|table
+--- @return table
 function runner.load_config(configuration)
   if not runner.configuration then
     if not configuration then

@@ -69,6 +69,37 @@ end
 local lpathprefix = './src/?.lua;./src/?/?.lua;./src/?/init.lua'
 local cpathprefix = is_windows and './csrc/?.dll;./csrc/?/?.dll;' or './csrc/?.so;./csrc/?/?.so;'
 
+--- @class busted.cli.Arguments
+--- @field ROOT string[]
+--- @field version boolean
+--- @field pattern string[]
+--- @field exclude-pattern string[]
+--- @field exec string[]
+--- @field output string
+--- @field directory string
+--- @field config-file string?
+--- @field coverage-config-file string?
+--- @field tags string[]
+--- @field exclude-tags string[]
+--- @field filter string[]
+--- @field filter-out string[]
+--- @field exclude-names-file string?
+--- @field lpath string
+--- @field m string
+--- @field cpath string
+--- @field run? string
+--- @field r? string
+--- @field helper? string
+--- @field repeat integer
+--- @field coverage boolean
+--- @field verbose boolean
+--- @field v boolean
+--- @field list boolean
+--- @field l boolean
+--- @field lazy boolean
+--- @field suppress-pending boolean
+--- @field quit-on-error boolean
+
 --- @param state busted.cli.State
 --- @param key string
 --- @param value any
@@ -115,18 +146,6 @@ end
 --- @param value string?
 --- @param altkey string?
 --- @return boolean, string?
-local function processLoaders(state, key, value, altkey)
-  value = value or ''
-  local combined = append_value(state.overrides[key], value, ',')
-  assign(state, key, combined, altkey)
-  return true
-end
-
---- @param state busted.cli.State
---- @param key string
---- @param value string?
---- @param altkey string?
---- @return boolean, string?
 local function processPath(state, key, value, altkey)
   value = value or ''
   local combined = append_value(state.overrides[key], value, ';')
@@ -147,13 +166,45 @@ local function processDir(state, key, value, altkey)
   return true
 end
 
+local function merge_tables(base, overrides)
+  return vim.deep_extend('force', base or {}, overrides or {})
+end
+
+local function config_loader(config_file, config, defaults)
+  if type(config_file) ~= 'table' then
+    return nil, '.busted file does not return a table.'
+  end
+
+  defaults = defaults or {}
+  local run = config.run or defaults.run
+
+  if run and run ~= '' then
+    local runConfig = config_file[run]
+
+    if type(runConfig) == 'table' then
+      config = merge_tables(runConfig, config)
+    else
+      return nil, 'Task `' .. run .. '` not found, or not a table.'
+    end
+  elseif type(config_file.default) == 'table' then
+    config = merge_tables(config_file.default, config)
+  end
+
+  if type(config_file._all) == 'table' then
+    config = merge_tables(config_file._all, config)
+  end
+
+  config = merge_tables(defaults, config)
+
+  return config
+end
+
 --- @param options? busted.cli.Options
 return function(options)
   local appName = ''
   options = options or {}
   local allow_roots = not options.standalone
   local defaultOutput = options.output or 'busted.outputHandlers.output_handler'
-  local configLoader = require('busted.modules.configuration_loader')()
   local parser = argparse.new_parser({
     state_factory = function()
       return {
@@ -288,14 +339,6 @@ return function(options)
     help = 'Run the entire test suite COUNT times.',
     default = 1,
   })
-  parser:add_argument({ '--loaders' }, {
-    metavar = 'NAME',
-    handler = function(state, value)
-      return processLoaders(state, 'loaders', value)
-    end,
-    help = 'Comma-separated list of test file loaders.',
-    default = 'lua',
-  })
   parser:add_argument({ '--helper' }, {
     metavar = 'PATH',
     help = 'Run helper script at PATH before executing tests.',
@@ -326,7 +369,7 @@ return function(options)
   })
 
   --- @param args string[]
-  --- @return table<string, any>? args
+  --- @return busted.cli.Arguments? args
   --- @return string? error
   local function parse(args)
     local cliArgs, cliArgsParsedOrErr = parser:parse(args)
@@ -354,7 +397,7 @@ return function(options)
         return nil, ('failed loading config file `%s`: %s'):format(bustedConfigFilePath, err)
       else
         local ok, config = pcall(function()
-          local conf, cerr = configLoader(bustedConfigFile(), cliArgsParsed, cliArgs)
+          local conf, cerr = config_loader(bustedConfigFile(), cliArgsParsed, cliArgs)
           return conf or error(cerr, 0)
         end)
         if not ok then
@@ -375,7 +418,6 @@ return function(options)
     cliArgs.tags = fixupList(cliArgs.tags)
     cliArgs.t = cliArgs.tags
     cliArgs['exclude-tags'] = fixupList(cliArgs['exclude-tags'])
-    cliArgs.loaders = fixupList(cliArgs.loaders)
     for _, excluded in pairs(cliArgs['exclude-tags']) do
       for _, included in pairs(cliArgs.tags) do
         if excluded == included then
@@ -398,7 +440,8 @@ return function(options)
   end
 
   --- @param args string[]
-  --- @return table<string, any>?, string?
+  --- @return busted.cli.Arguments? args
+  --- @return string? error
   function api.parse(_, args)
     return parse(args)
   end

@@ -2,6 +2,7 @@ local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local fs = vim.fs
 
 local test_file_loader_factory = require('busted.modules.test_file_loader')
+local FilterLoader = require('busted.modules.filter_loader')
 local fixtures = require('busted.fixtures')
 
 local function mktempdir()
@@ -130,5 +131,108 @@ describe('busted.fixtures', function()
   it('loads Lua files relative to the caller', function()
     local module = fixtures.load('fixtures/sample_module')
     assert.are.same('hello module', module.greeting)
+  end)
+end)
+
+describe('busted.modules.filter_loader', function()
+  local stub_busted
+  local stub_context
+  local subscriptions
+  local published
+  local original_print
+
+  local function apply_filter(options)
+    FilterLoader.apply(stub_busted, options or {})
+  end
+
+  before_each(function()
+    original_print = _G.print
+    subscriptions = {}
+    published = {}
+    stub_context = {}
+    function stub_context:get()
+      return self.current
+    end
+    function stub_context:parent(node)
+      return node and node.parent
+    end
+
+    stub_busted = {
+      skipAll = false,
+      context = stub_context,
+      subscribe = function(_, channel, handler, options)
+        table.insert(subscriptions, { channel = channel, handler = handler, options = options })
+        return handler
+      end,
+      publish = function(_, channel, descriptor_name, fn, ...)
+        table.insert(published, {
+          channel = channel,
+          descriptor_name = descriptor_name,
+          fn = fn,
+          args = { ... },
+        })
+      end,
+    }
+  end)
+
+  after_each(function()
+    _G.print = original_print
+  end)
+
+  local function find_subscription(target)
+    for _, sub in ipairs(subscriptions) do
+      if sub.channel[1] == target[1] and sub.channel[2] == target[2] then
+        return sub
+      end
+    end
+  end
+
+  it('registers skip-on-error filters when keep-going is disabled', function()
+    apply_filter({ nokeepgoing = true })
+    local register_subs = {}
+    for _, sub in ipairs(subscriptions) do
+      if sub.channel[1] == 'register' then
+        table.insert(register_subs, sub)
+      end
+    end
+
+    assert.are.equal(12, #register_subs)
+
+    local _, allow = register_subs[1].handler()
+    assert.is_true(allow)
+  end)
+
+  it('stubs helper callbacks and prints names in list mode', function()
+    stub_context.current = {
+      name = 'example',
+      descriptor = 'it',
+      parent = {
+        name = 'suite',
+        descriptor = 'describe',
+        parent = { descriptor = 'file' },
+      },
+    }
+
+    local printed = {}
+    _G.print = function(msg)
+      table.insert(printed, msg)
+    end
+
+    apply_filter({ list = true })
+
+    local setup_sub = find_subscription({ 'register', 'setup' })
+    assert.is_not_nil(setup_sub)
+
+    local test_end_sub = find_subscription({ 'test', 'end' })
+    assert.is_not_nil(test_end_sub)
+
+    local original_fn = function() end
+    setup_sub.handler('setup block', original_fn)
+    assert.are.same({ 'register', 'setup' }, published[1].channel)
+    assert.are.same('setup block', published[1].descriptor_name)
+    assert.are_not.equal(original_fn, published[1].fn)
+
+    test_end_sub.handler({ trace = { what = 'Lua', short_src = 'spec.lua', currentline = 42 } }, nil, 'success')
+    assert.are.same({ 'spec.lua:42: suite example' }, printed)
   end)
 end)

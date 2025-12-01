@@ -34,9 +34,9 @@ local function coroutine_exec(func, callback)
   step()
 end
 
----@param stream test.MsgpackRpcStream
----@param log_cb? fun(type: string, method: string, args: any[])
----@return test.Session
+--- @param stream test.MsgpackRpcStream
+--- @param log_cb? fun(type: string, method: string, args: any[])
+--- @return test.Session
 function M.new(stream, log_cb)
   return setmetatable({
     _msgpack_rpc_stream = stream,
@@ -93,10 +93,10 @@ function M:request(method, ...)
   return true, result
 end
 
----@param request_cb fun(method: string, args: any[])?
----@param notification_cb fun(method: string, args: any[])?
----@param setup_cb fun()?
----@param timeout integer?
+--- @param request_cb fun(method: string, args: any[])?
+--- @param notification_cb fun(method: string, args: any[])?
+--- @param setup_cb fun()?
+--- @param timeout integer?
 function M:run(request_cb, notification_cb, setup_cb, timeout)
   local function on_request(method, args, response)
     if not request_cb then
