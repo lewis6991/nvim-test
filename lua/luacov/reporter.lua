@@ -1,15 +1,11 @@
-------------------------
--- Report module, will transform statistics file into a report.
--- @class module
--- @name luacov.reporter
-local reporter = {}
+--- Report module, will transform statistics file into a report.
+--- @class luacov.reporter
+local M = {}
 
-local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 local LineScanner = require('luacov.linescanner')
 local luacov = require('luacov.runner')
 local util = require('luacov.util')
 
-----------------------------------------------------------------
 local dir_sep = package.config:sub(1, 1)
 if not dir_sep:find('[/\\]') then
   dir_sep = '/'
@@ -28,13 +24,13 @@ local function dirtree(dir)
 
   --- @async
   local function scan(directory)
-    local req = uv.fs_scandir(directory)
+    local req = vim.uv.fs_scandir(directory)
     if not req then
       return
     end
 
     while true do
-      local entry, kind = uv.fs_scandir_next(req)
+      local entry, kind = vim.uv.fs_scandir_next(req)
       if not entry then
         break
       end
@@ -58,7 +54,7 @@ end
 --- @field close fun(self)
 
 local function open_writer(path)
-  local fd, err = uv.fs_open(path, 'w', 420)
+  local fd, err = vim.uv.fs_open(path, 'w', 420)
   if not fd then
     return nil, err
   end
@@ -67,7 +63,7 @@ local function open_writer(path)
 
   function writer.write(_, ...)
     local chunk = table.concat({ ... })
-    local bytes, werr = uv.fs_write(fd, chunk, -1)
+    local bytes, werr = vim.uv.fs_write(fd, chunk, -1)
     if not bytes then
       error(werr)
     end
@@ -76,7 +72,7 @@ local function open_writer(path)
 
   function writer.close(_)
     if fd then
-      uv.fs_close(fd)
+      vim.uv.fs_close(fd)
       fd = nil
     end
   end
@@ -85,7 +81,6 @@ local function open_writer(path)
   return writer
 end
 
-----------------------------------------------------------------
 --- checks if string 'filename' has pattern 'pattern'
 --- @param filename string
 --- @param pattern string
@@ -94,7 +89,6 @@ local function fileMatches(filename, pattern)
   return string.find(filename, pattern) ~= nil
 end
 
-----------------------------------------------------------------
 --- Basic reporter class stub.
 -- Implements 'new', 'run' and 'close' methods required by `report`.
 -- Provides some helper methods and stubs to be overridden by child classes.
@@ -358,10 +352,7 @@ do
     call_hook(self, 'on_end')
   end
 end
---- @section end
-----------------------------------------------------------------
 
-----------------------------------------------------------------
 local DefaultReporter = setmetatable({}, { __index = ReporterBase })
 do
   DefaultReporter.__index = DefaultReporter
@@ -489,19 +480,18 @@ do
     end
   end
 end
-----------------------------------------------------------------
 
 --- Runs the report generator.
--- To load a config, use `luacov.runner.load_config` first.
--- @param reporter_class? custom reporter class. Will be
--- instantiated using 'new' method with configuration
--- (see `luacov.defaults`) as the argument. It should
--- return nil + error if something went wrong.
--- After acquiring a reporter object its 'run' and 'close'
--- methods will be called.
--- The easiest way to implement a custom reporter class is to
--- extend `ReporterBase`.
-function reporter.report(reporter_class)
+--- To load a config, use `luacov.runner.load_config` first.
+--- @param reporter_class? any custom reporter class. Will be
+--- instantiated using 'new' method with configuration
+--- (see `luacov.defaults`) as the argument. It should
+--- return nil + error if something went wrong.
+--- After acquiring a reporter object its 'run' and 'close'
+--- methods will be called.
+--- The easiest way to implement a custom reporter class is to
+--- extend `ReporterBase`.
+function M.report(reporter_class)
   local configuration = luacov.load_config()
 
   reporter_class = reporter_class or DefaultReporter
@@ -523,8 +513,8 @@ function reporter.report(reporter_class)
   end
 end
 
-reporter.ReporterBase = ReporterBase
+M.ReporterBase = ReporterBase
 
-reporter.DefaultReporter = DefaultReporter
+M.DefaultReporter = DefaultReporter
 
-return reporter
+return M

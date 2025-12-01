@@ -1,11 +1,3 @@
----------------------------------------------------
--- Utility helpers for LuaCov.
--- @class module
--- @name luacov.util
-
-local uv = vim and vim.uv or error('nvim-test requires vim.uv')
-
-local READ_MODE = 'r'
 local DEFAULT_PERMS = 420 -- 0644
 local DEFAULT_ENV = rawget(_G, '_ENV') or _G
 
@@ -27,20 +19,20 @@ end
 --- @param name string
 --- @return string?, string?
 local function read_file(name)
-  local fd, open_err = uv.fs_open(name, READ_MODE, DEFAULT_PERMS)
+  local fd, open_err = vim.uv.fs_open(name, 'r', DEFAULT_PERMS)
 
   if not fd then
     return nil, util.unprefix(tostring(open_err), name .. ': ')
   end
 
-  local stat, stat_err = uv.fs_fstat(fd)
+  local stat, stat_err = vim.uv.fs_fstat(fd)
   if not stat then
-    uv.fs_close(fd)
+    vim.uv.fs_close(fd)
     return nil, tostring(stat_err)
   end
 
-  local contents, read_err = uv.fs_read(fd, stat.size or 0, 0)
-  uv.fs_close(fd)
+  local contents, read_err = vim.uv.fs_read(fd, stat.size or 0, 0)
+  vim.uv.fs_close(fd)
 
   if contents then
     return contents
@@ -56,25 +48,25 @@ end
 --- @return function?, string?
 function util.load_string(str, env, chunkname)
   if _VERSION:find('5%.1') then
-    local func, err = loadstring(str, chunkname) -- luacheck: compat
+    local func, err = loadstring(str, chunkname)
 
     if not func then
       return nil, err
     end
 
     if env then
-      setfenv(func, env) -- luacheck: compat
+      setfenv(func, env)
     end
 
     return func
   else
     local load_fn = load or error('load is required')
-    return load_fn(str, chunkname, 'bt', env or DEFAULT_ENV) -- luacheck: compat
+    return load_fn(str, chunkname, 'bt', env or DEFAULT_ENV)
   end
 end
 
 --- Load a config file.
--- Reads, loads and runs a Lua file in an environment.
+--- Reads, loads and runs a Lua file in an environment.
 --- @param name string file name.
 --- @param env table environment table.
 --- @return true|string|nil, string?, string?
@@ -106,7 +98,7 @@ end
 --- @param name string file name.
 --- @return boolean
 function util.file_exists(name)
-  return uv.fs_stat(name) ~= nil
+  return vim.uv.fs_stat(name) ~= nil
 end
 
 return util

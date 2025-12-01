@@ -1,35 +1,13 @@
------------------------------------------------------
--- @class module
--- @name luacov.stats
-
 local fs_util = require('nvim-test.util.fs')
 
-local math_tointeger = rawget(math, 'tointeger')
-local tointeger
-if math_tointeger then
-  tointeger = math_tointeger
-else
-  tointeger = function(value)
-    if type(value) ~= 'number' then
-      return nil
-    end
-    if value >= 0 then
-      return math.floor(value + 0.0)
-    end
-    return math.ceil(value - 0.0)
-  end
-end
-
-local function read_lines(path)
-  local lines = fs_util.read_lines(path)
-  if not lines then
+local function tointeger(value)
+  if type(value) ~= 'number' then
     return nil
   end
-  return lines
-end
-
-local function write_lines(path, lines)
-  fs_util.write_lines(path, lines)
+  if value >= 0 then
+    return math.floor(value + 0.0)
+  end
+  return math.ceil(value - 0.0)
 end
 
 local function trim(str)
@@ -52,12 +30,11 @@ end
 --- @class luacov.stats
 local stats = {}
 
------------------------------------------------------
 --- Loads the stats file.
 --- @param statsfile string path to the stats file.
 --- @return table<string,luacov.file_stats>|nil
 function stats.load(statsfile)
-  local raw = read_lines(statsfile)
+  local raw = fs_util.read_lines(statsfile)
   if not raw then
     return nil
   end
@@ -113,7 +90,6 @@ function stats.load(statsfile)
   return data
 end
 
------------------------------------------------------
 --- Saves data to the stats file.
 --- @param statsfile string path to the stats file.
 --- @param data table<string,luacov.file_stats>
@@ -124,7 +100,7 @@ function stats.save(statsfile, data)
   end
   table.sort(filenames)
 
-  local lines = {}
+  local lines = {} --- @type string[]
   for _, filename in ipairs(filenames) do
     local filedata = data[filename]
     table.insert(lines, string.format('%d:%s', filedata.max, filename))
@@ -136,7 +112,7 @@ function stats.save(statsfile, data)
     table.insert(lines, table.concat(hits, ' '))
   end
 
-  write_lines(statsfile, lines)
+  fs_util.write_lines(statsfile, lines)
 end
 
 return stats

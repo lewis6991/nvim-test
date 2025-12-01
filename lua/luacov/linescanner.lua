@@ -1,7 +1,8 @@
-local LineScanner = {}
-LineScanner.__index = LineScanner
+--- @class luacov.linescanner
+local M = {}
+M.__index = M
 
-function LineScanner:new()
+function M:new()
   return setmetatable({
     first = true,
     comment = false,
@@ -94,13 +95,13 @@ local function excluded(exclusions, line)
   return false
 end
 
-function LineScanner:find(pattern)
+function M:find(pattern)
   return self.line:find(pattern, self.i)
 end
 
 -- Skips string literal with quote stored as self.quote.
 -- @return boolean indicating success.
-function LineScanner:skip_string()
+function M:skip_string()
   -- Look for closing quote, possibly after even number of backslashes.
   local _, quote_i = self:find('^(\\*)%1' .. self.quote)
   if not quote_i then
@@ -119,7 +120,7 @@ end
 
 -- Skips long string literal with equal signs stored as self.equals.
 -- @return boolean indicating success.
-function LineScanner:skip_long_string()
+function M:skip_long_string()
   local _, bracket_i = self:find('%]' .. self.equals .. '%]')
 
   if bracket_i then
@@ -140,7 +141,7 @@ end
 
 -- Skips function arguments.
 -- @return boolean indicating success.
-function LineScanner:skip_args()
+function M:skip_args()
   local _, paren_i = self:find('%)')
 
   if paren_i then
@@ -152,7 +153,7 @@ function LineScanner:skip_args()
   end
 end
 
-function LineScanner:skip_whitespace()
+function M:skip_whitespace()
   local next_i = self:find('%S') or #self.line + 1
 
   if next_i ~= self.i then
@@ -161,7 +162,7 @@ function LineScanner:skip_whitespace()
   end
 end
 
-function LineScanner:skip_number()
+function M:skip_number()
   if self:find('^0[xX]') then
     self.i = self.i + 2
   end
@@ -206,16 +207,12 @@ for _, keyword in ipairs({
   keywords[keyword] = keyword
 end
 
-function LineScanner:skip_name()
+function M:skip_name()
   -- It is guaranteed that the first character matches "%a_".
   local _, _, name = self:find('^([%w_]*)')
   self.i = self.i + #name
 
-  if keywords[name] then
-    name = keywords[name]
-  else
-    name = 'x'
-  end
+  name = keywords[name] or 'x'
 
   table.insert(self.simple_line_buffer, name)
 
@@ -231,7 +228,7 @@ end
 -- All lines starting from a line containing `disable` option and up to a line containing `enable`
 -- option (or end of file) are excluded.
 
-function LineScanner:check_inline_options(comment_body)
+function M:check_inline_options(comment_body)
   if comment_body:find('^%s*luacov:%s*enable%s*$') then
     self.enabled = true
   elseif comment_body:find('^%s*luacov:%s*disable%s*$') then
@@ -242,7 +239,7 @@ end
 -- Consumes and analyzes a line.
 -- @return boolean indicating whether line must be excluded.
 -- @return boolean indicating whether line must be excluded if not hit.
-function LineScanner:consume(line)
+function M:consume(line)
   if self.first then
     self.first = false
 
@@ -355,4 +352,4 @@ function LineScanner:consume(line)
   return excluded(any_hits_exclusions, simple_line), excluded(zero_hits_exclusions, simple_line)
 end
 
-return LineScanner
+return M
