@@ -10,6 +10,8 @@ end
 --- @cast load_chunk fun(code: string, chunkname?: string): function
 local loaded = false
 
+--- @param config? string
+--- @return luacov.runner
 local function load_luacov(config)
   local luacov = require('luacov.runner')
 
@@ -30,6 +32,8 @@ local function load_luacov(config)
   return luacov
 end
 
+--- @param custom_options? {standalone?: boolean, output?: string, [string]: unknown}
+--- @return fun()?
 local function main(custom_options)
   local provided_options = custom_options or { standalone = false }
   if loaded then
@@ -38,7 +42,9 @@ local function main(custom_options)
     loaded = true
   end
 
-  local defaultOptions = require('busted.options')
+  local defaultOptions = {
+    standalone = true,
+  }
   if provided_options then
     for k, v in pairs(provided_options) do
       defaultOptions[k] = v
@@ -46,7 +52,6 @@ local function main(custom_options)
   end
   local options = defaultOptions
   options.output = options.output or 'busted.outputHandlers.output_handler'
-
   local busted = require('busted.core').new()
 
   local cli = require('busted.cli')(options)
@@ -122,35 +127,64 @@ local function main(custom_options)
   local errors = 0
   local quitOnError = cliArgs['quit-on-error']
 
-  busted:subscribe({ 'error', 'output' }, function(element, _parent, message)
-    io.stderr:write(
-      appName .. ': error: Cannot load output library: ' .. element.name .. '\n' .. message .. '\n'
-    )
-    return nil, true
-  end)
-
-  busted:subscribe({ 'error', 'helper' }, function(element, _parent, message)
-    io.stderr:write(
-      appName .. ': error: Cannot load helper script: ' .. element.name .. '\n' .. message .. '\n'
-    )
-    return nil, true
-  end)
-
-  busted:subscribe({ 'error' }, function(_element, _parent, _message)
-    errors = errors + 1
-    busted.skipAll = quitOnError
-    return nil, true
-  end)
-
-  busted:subscribe({ 'failure' }, function(element, _parent, _message)
-    if element.descriptor == 'it' then
-      failures = failures + 1
-    else
-      errors = errors + 1
+  busted:subscribe(
+    { 'error', 'output' },
+    ---@param element table
+    ---@param _parent table|string|nil
+    ---@param message string
+    function(element, _parent, message)
+      io.stderr:write(
+        appName
+          .. ': error: Cannot load output library: '
+          .. element.name
+          .. '\n'
+          .. message
+          .. '\n'
+      )
+      return nil, true
     end
-    busted.skipAll = quitOnError
-    return nil, true
-  end)
+  )
+
+  busted:subscribe(
+    { 'error', 'helper' },
+    ---@param element table
+    ---@param _parent table|string|nil
+    ---@param message string
+    function(element, _parent, message)
+      io.stderr:write(
+        appName .. ': error: Cannot load helper script: ' .. element.name .. '\n' .. message .. '\n'
+      )
+      return nil, true
+    end
+  )
+
+  busted:subscribe(
+    { 'error' },
+    ---@param _element table
+    ---@param _parent table|string|nil
+    ---@param _message string
+    function(_element, _parent, _message)
+      errors = errors + 1
+      busted.skipAll = quitOnError
+      return nil, true
+    end
+  )
+
+  busted:subscribe(
+    { 'failure' },
+    ---@param element table
+    ---@param _parent table|string|nil
+    ---@param _message string
+    function(element, _parent, _message)
+      if element.descriptor == 'it' then
+        failures = failures + 1
+      else
+        errors = errors + 1
+      end
+      busted.skipAll = quitOnError
+      return nil, true
+    end
+  )
 
   -- Set up output handler to listen to events
   outputHandlerLoader(busted, cliArgs.output, {

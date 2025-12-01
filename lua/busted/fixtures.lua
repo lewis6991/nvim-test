@@ -1,15 +1,17 @@
-local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
-local fs = vim.fs
+--- @class busted.fixtures
+local M = {}
 
-local fixtures = {}
-
+--- @param path? string
+--- @return string?
 local function normalize(path)
   if not path or path == '' then
     return nil
   end
-  return fs.normalize(path)
+  return vim.fs.normalize(path)
 end
 
+--- @param level integer
+--- @return string?
 local function source_path(level)
   local info = debug.getinfo(level, 'S')
   local src = info and info.source or ''
@@ -22,7 +24,7 @@ end
 --- returns an absolute path to where the current test file is located.
 --- @param sub_path? string relative path to append
 --- @return string absolute path
-function fixtures.path(sub_path)
+function M.path(sub_path)
   if type(sub_path) ~= 'string' and sub_path ~= nil then
     error(
       "bad argument to 'path' expected a string (relative filename) or nil, got: " .. type(sub_path),
@@ -38,35 +40,41 @@ function fixtures.path(sub_path)
     caller = source_path(level)
   end
 
-  local base_dir = caller and fs.dirname(caller) or uv.cwd()
+  local base_dir = caller and vim.fs.dirname(caller) or vim.uv.cwd()
   assert(type(base_dir) == 'string', 'base_dir must be resolved')
   if sub_path and #sub_path > 0 then
     local rel = sub_path
     assert(type(rel) == 'string', 'relative path must be a string')
-    base_dir = fs.joinpath(base_dir, rel)
+    base_dir = vim.fs.joinpath(base_dir, rel)
   end
-  return fs.normalize(base_dir)
+  return vim.fs.normalize(base_dir)
 end
 
+--- @param path string
+--- @return string? data
+--- @return string? err
 local function read_file(path)
-  local fd, err = uv.fs_open(path, 'r', 438)
+  local fd, err = vim.uv.fs_open(path, 'r', 438)
   if not fd then
     return nil, err
   end
-  local stat, stat_err = uv.fs_fstat(fd)
+  local stat, stat_err = vim.uv.fs_fstat(fd)
   if not stat then
-    uv.fs_close(fd)
+    vim.uv.fs_close(fd)
     return nil, stat_err
   end
-  local data, read_err = uv.fs_read(fd, stat.size, 0)
-  uv.fs_close(fd)
+  local data, read_err = vim.uv.fs_read(fd, stat.size, 0)
+  vim.uv.fs_close(fd)
   if not data then
     return nil, read_err
   end
   return data
 end
 
-function fixtures.read(rel_path, _is_bin)
+--- @param rel_path string
+--- @param _is_bin? boolean
+--- @return string
+function M.read(rel_path, _is_bin)
   if type(rel_path) ~= 'string' then
     error(
       "bad argument to 'read' expected a string (relative filename), got: " .. type(rel_path),
@@ -74,7 +82,7 @@ function fixtures.read(rel_path, _is_bin)
     )
   end
 
-  local fname = fixtures.path(rel_path)
+  local fname = M.path(rel_path)
   local contents, err = read_file(fname)
   if not contents then
     error(("Error reading file '%s': %s"):format(tostring(fname), tostring(err)), 2)
@@ -83,7 +91,9 @@ function fixtures.read(rel_path, _is_bin)
   return contents
 end
 
-function fixtures.load(rel_path)
+--- @param rel_path string
+--- @return unknown
+function M.load(rel_path)
   if type(rel_path) ~= 'string' then
     error(
       "bad argument to 'load' expected a string (relative filename), got: " .. type(rel_path),
@@ -94,7 +104,7 @@ function fixtures.load(rel_path)
   if not rel_path:match('%.' .. extension .. '$') then
     rel_path = rel_path .. '.' .. extension
   end
-  local code, err = fixtures.read(rel_path)
+  local code, err = M.read(rel_path)
   if not code then
     error(("Error loading file '%s': %s"):format(tostring(rel_path), tostring(err)), 2)
   end
@@ -107,4 +117,4 @@ function fixtures.load(rel_path)
   return func()
 end
 
-return fixtures
+return M

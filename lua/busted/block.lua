@@ -37,23 +37,23 @@ end
 --- @class busted.Block
 --- @field private _busted busted.Busted
 --- @field private _root busted.BlockRuntimeElement
-local Block = {}
-Block.__index = Block
+local M = {}
+M.__index = M
 
 --- @param busted busted.Busted
 --- @return busted.Block
-function Block.new(busted)
+function M.new(busted)
   local root = busted.context:get()
   --- @cast root busted.BlockRuntimeElement
   return setmetatable({
     _busted = busted,
     _root = root,
-  }, Block)
+  }, M)
 end
 
 --- @param descriptor string
 --- @param element busted.Element
-function Block:reject(descriptor, element)
+function M:reject(descriptor, element)
   local _ = self
   --- @cast element busted.BlockRuntimeElement
   local env = element.env
@@ -67,7 +67,7 @@ function Block:reject(descriptor, element)
 end
 
 --- @param element busted.Element
-function Block:rejectAll(element)
+function M:rejectAll(element)
   --- @cast element busted.BlockRuntimeElement
   local run = element.run
   local fn = to_function(run)
@@ -92,7 +92,7 @@ end
 --- @param element busted.Element
 --- @return busted.Status status
 --- @return any ...
-function Block:_exec(descriptor, element)
+function M:_exec(descriptor, element)
   --- @cast element busted.BlockRuntimeElement
   local env = element.env
   if not env then
@@ -111,7 +111,7 @@ end
 --- @param current busted.Element
 --- @param err? fun(descriptor: string)
 --- @return boolean
-function Block:execAllOnce(descriptor, current, err)
+function M:execAllOnce(descriptor, current, err)
   --- @cast current busted.BlockRuntimeElement
   local context = self._busted.context
   local parent = context:parent(current)
@@ -155,7 +155,7 @@ end
 --- @param propagate? boolean
 --- @param err? fun(descriptor: string)
 --- @return boolean, busted.Element
-function Block:execAll(descriptor, current, propagate, err)
+function M:execAll(descriptor, current, propagate, err)
   --- @cast current busted.BlockRuntimeElement
   local context = self._busted.context
   local parent = context:parent(current)
@@ -192,7 +192,7 @@ end
 --- @param propagate? boolean
 --- @param err? fun(descriptor: string)
 --- @return boolean
-function Block:dexecAll(descriptor, current, propagate, err)
+function M:dexecAll(descriptor, current, propagate, err)
   --- @cast current busted.BlockRuntimeElement
   local context = self._busted.context
   local parent = context:parent(current)
@@ -225,14 +225,14 @@ end
 --- @param element busted.Element
 --- @param err? fun(descriptor: string)
 --- @return boolean
-function Block:lazySetup(element, err)
+function M:lazySetup(element, err)
   --- @cast element busted.BlockRuntimeElement
   return self:execAllOnce('lazy_setup', element, err)
 end
 
 --- @param element busted.Element
 --- @param err? fun(descriptor: string)
-function Block:lazyTeardown(element, err)
+function M:lazyTeardown(element, err)
   --- @cast element busted.BlockRuntimeElement
   if element.lazy_setup and element.lazy_setup.success ~= nil then
     self:dexecAll('lazy_teardown', element, nil, err)
@@ -243,7 +243,7 @@ end
 --- @param element busted.Element
 --- @param err? fun(descriptor: string)
 --- @return boolean
-function Block:setup(element, err)
+function M:setup(element, err)
   --- @cast element busted.BlockRuntimeElement
   local success = self:execAll('strict_setup', element, nil, err)
   return success
@@ -252,14 +252,14 @@ end
 --- @param element busted.Element
 --- @param err? fun(descriptor: string)
 --- @return boolean
-function Block:teardown(element, err)
+function M:teardown(element, err)
   --- @cast element busted.BlockRuntimeElement
   return self:dexecAll('strict_teardown', element, nil, err)
 end
 
 --- @param descriptor string
 --- @param element busted.Element
-function Block:execute(descriptor, element)
+function M:execute(descriptor, element)
   --- @cast element busted.BlockRuntimeElement
   if not element.env then
     element.env = {}
@@ -282,8 +282,4 @@ function Block:execute(descriptor, element)
   end
 end
 
-return setmetatable(Block, {
-  __call = function(_, busted)
-    return Block.new(busted)
-  end,
-})
+return M
