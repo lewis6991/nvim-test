@@ -1,8 +1,8 @@
-local cli_factory = require('busted.modules.cli')
+local cli_factory = require('busted.cli')
 
 local fs = vim.fs
 
-describe('busted.modules.cli', function()
+describe('busted.cli', function()
   local cli
 
   local function parse_args(list)

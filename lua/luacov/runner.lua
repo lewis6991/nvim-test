@@ -1,46 +1,58 @@
----------------------------------------------------
--- Statistics collecting module.
--- Calling the module table is a shortcut to calling the `init` function.
--- @class module
--- @name luacov.runner
-
 local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
 
 --- @class luacov.runner
-local runner = {}
+local M = {}
 --- LuaCov version in `MAJOR.MINOR.PATCH` format.
-runner.version = '0.16.0'
+M.version = '0.16.0'
 
 local stats = require('luacov.stats')
 local util = require('luacov.util')
-runner.defaults = require('luacov.defaults')
+M.defaults = require('luacov.defaults')
+
+--- @class luacov.Configuration
+--- @field include string[]?
+--- @field exclude string[]?
+--- @field statsfile string?
+--- @field reportfile string?
+--- @field runreport boolean?
+--- @field reporter string?
+--- @field modules table<string, string>?
+--- @field tick boolean?
+--- @field savestepsize integer?
+--- @field deletestats boolean?
+--- @field codefromstrings boolean?
+--- @field includeuntestedfiles boolean|table?
 
 local debug = require('debug')
 local raw_os_exit = os.exit
 
+--- @return table
 local new_anchor = newproxy or function()
   return {}
 end -- luacheck: compat
 
--- Returns an anchor that runs fn when collected.
+--- Returns an anchor that runs fn when collected.
+--- @param fn fun(anchor?: table)
+--- @return table
 local function on_exit_wrap(fn)
   local anchor = new_anchor(false)
   debug.setmetatable(anchor, { __gc = fn })
   return anchor
 end
 
-runner.data = {}
-runner.paused = true
-runner.initialized = false
-runner.tick = false
+--- @type table<string, luacov.file_stats>
+M.data = {}
+M.paused = true
+M.initialized = false
+M.tick = false
 
--- Checks if a string matches at least one of patterns.
--- @param patterns array of patterns or nil
--- @param str string to match
--- @param on_empty return value in case of empty pattern array
+--- @param patterns string[]?
+--- @param str string
+--- @param on_empty boolean?
+--- @return boolean
 local function match_any(patterns, str, on_empty)
   if not patterns or not patterns[1] then
-    return on_empty
+    return not not on_empty
   end
 
   for _, pattern in ipairs(patterns) do
@@ -55,28 +67,24 @@ end
 --------------------------------------------------
 -- Uses LuaCov's configuration to check if a file is included for
 -- coverage data collection.
--- @param filename name of the file.
--- @return true if file is included, false otherwise.
 --- @param filename string
 --- @return boolean
-function runner.file_included(filename)
+function M.file_included(filename)
   -- Normalize file names before using patterns.
   filename = string.gsub(filename, '\\', '/')
   filename = string.gsub(filename, '%.lua$', '')
 
   -- If include list is empty, everything is included by default.
   -- If exclude list is empty, nothing is excluded by default.
-  return match_any(runner.configuration.include, filename, true)
-    and not match_any(runner.configuration.exclude, filename, false)
+  return match_any(M.configuration.include, filename, true)
+    and not match_any(M.configuration.exclude, filename, false)
 end
 
 --------------------------------------------------
 -- Adds stats to an existing file stats table.
--- @param old_stats stats to be updated.
--- @param extra_stats another stats table, will be broken during update.
---- @param old_stats table
---- @param extra_stats table
-function runner.update_stats(old_stats, extra_stats)
+--- @param old_stats luacov.file_stats stats to be updated.
+--- @param extra_stats luacov.file_stats another stats table, will be broken during update.
+function M.update_stats(old_stats, extra_stats)
   old_stats.max = math.max(old_stats.max, extra_stats.max)
 
   -- Remove string keys so that they do not appear when iterating
@@ -91,19 +99,20 @@ function runner.update_stats(old_stats, extra_stats)
 end
 
 -- Adds accumulated stats to existing stats file or writes a new one, then resets data.
-function runner.save_stats()
-  local loaded = stats.load(runner.configuration.statsfile) or {}
+function M.save_stats()
+  local statsfile = assert(M.configuration.statsfile, 'statsfile is required')
+  local loaded = stats.load(statsfile) or {}
 
-  for name, file_data in pairs(runner.data) do
+  for name, file_data in pairs(M.data) do
     if loaded[name] then
-      runner.update_stats(loaded[name], file_data)
+      M.update_stats(loaded[name], file_data)
     else
       loaded[name] = file_data
     end
   end
 
-  stats.save(runner.configuration.statsfile, loaded)
-  runner.data = {}
+  stats.save(statsfile, loaded)
+  M.data = {}
 end
 
 local cluacov_ok = pcall(require, 'cluacov.version')
@@ -112,29 +121,26 @@ local cluacov_ok = pcall(require, 'cluacov.version')
 -- Debug hook set by LuaCov.
 -- Acknowledges that a line is executed, but does nothing
 -- if called manually before coverage gathering is started.
--- @param _ event type, should always be "line".
--- @param line_nr line number.
--- @param level? passed to debug.getinfo to get name of processed file,
--- 2 by default. Increase it if this function is called manually
--- from another debug hook.
--- @usage
+-- The optional 'level' argument defaults to 2. Increase it if this function is
+-- called manually from another debug hook.
+--- @usage
 -- local function custom_hook(_, line)
 --    runner.debug_hook(_, line, 3)
 --    extra_processing(line)
 -- end
--- @function debug_hook
-runner.debug_hook = require(cluacov_ok and 'cluacov.hook' or 'luacov.hook').new(runner)
+--- @function debug_hook
+--- @type fun(event: string, line_nr: integer, level?: integer)
+M.debug_hook = require(cluacov_ok and 'cluacov.hook' or 'luacov.hook').new(M)
 
 ------------------------------------------------------
 -- Runs the reporter specified in configuration.
--- @param configuration? if string, filename of config file (used to call `load_config`).
+--- @param configuration? string|table if string, filename of config file (used to call `load_config`).
 -- If table then config table (see file `luacov.default.lua` for an example).
 -- If `configuration.reporter` is not set, runs the default reporter;
 -- otherwise, it must be a module name in 'luacov.reporter' namespace.
 -- The module must contain 'report' function, which is called without arguments.
---- @param configuration? string|table
-function runner.run_report(configuration)
-  configuration = runner.load_config(configuration)
+function M.run_report(configuration)
+  configuration = M.load_config(configuration)
   local reporter = 'luacov.reporter'
 
   if configuration.reporter then
@@ -155,10 +161,10 @@ local function on_exit()
   on_exit_run_once = true
   -- disable hooks before aggregating stats
   debug.sethook(nil)
-  runner.save_stats()
+  M.save_stats()
 
-  if runner.configuration.runreport then
-    runner.run_report(runner.configuration)
+  if M.configuration.runreport then
+    M.run_report(M.configuration)
   end
 end
 
@@ -172,6 +178,8 @@ if not dir_sep:find('[/\\]') then
   dir_sep = '/'
 end
 
+--- @param ch string
+--- @return string
 local function escape_module_punctuation(ch)
   if ch == '.' then
     return '/'
@@ -182,6 +190,8 @@ local function escape_module_punctuation(ch)
   end
 end
 
+--- @param name string
+--- @return string[]
 local function reversed_module_name_parts(name)
   local parts = {}
 
@@ -201,6 +211,9 @@ end
 -- from the end, the name that has the first (from the end) literal part
 -- (and the corresponding part for the other name is not literal)
 -- is considered more specific.
+--- @param name1 string
+--- @param name2 string
+--- @return boolean
 local function compare_names(name1, name2)
   local parts1 = reversed_module_name_parts(name1)
   local parts2 = reversed_module_name_parts(name2)
@@ -231,19 +244,19 @@ end
 -- them as runner.modules.patterns and runner.modules.filenames.
 -- Appends these patterns to the include list.
 local function acknowledge_modules()
-  runner.modules = { patterns = {}, filenames = {} } --- @type luacov.ModuleMappings
+  M.modules = { patterns = {}, filenames = {} } --- @type luacov.ModuleMappings
 
-  if not runner.configuration.modules then
+  if not M.configuration.modules then
     return
   end
 
-  if not runner.configuration.include then
-    runner.configuration.include = {}
+  if not M.configuration.include then
+    M.configuration.include = {}
   end
 
   local names = {}
 
-  for name in pairs(runner.configuration.modules) do
+  for name in pairs(M.configuration.modules) do
     table.insert(names, name)
   end
 
@@ -251,16 +264,16 @@ local function acknowledge_modules()
 
   for _, name in ipairs(names) do
     local pattern = name:gsub('%p', escape_module_punctuation) .. '$'
-    local filename = runner.configuration.modules[name]:gsub('[/\\]', dir_sep)
-    table.insert(runner.modules.patterns, pattern)
-    table.insert(runner.configuration.include, pattern)
-    table.insert(runner.modules.filenames, filename)
+    local filename = M.configuration.modules[name]:gsub('[/\\]', dir_sep)
+    table.insert(M.modules.patterns, pattern)
+    table.insert(M.configuration.include, pattern)
+    table.insert(M.modules.filenames, filename)
 
     if filename:match('init%.lua$') then
       pattern = pattern:gsub('$$', '/init$')
-      table.insert(runner.modules.patterns, pattern)
-      table.insert(runner.configuration.include, pattern)
-      table.insert(runner.modules.filenames, filename)
+      table.insert(M.modules.patterns, pattern)
+      table.insert(M.configuration.include, pattern)
+      table.insert(M.modules.filenames, filename)
     end
   end
 end
@@ -268,19 +281,18 @@ end
 --------------------------------------------------
 -- Returns real name for a source file name
 -- using `luacov.defaults.modules` option.
--- @param filename name of the file.
---- @param filename string
+--- @param filename string name of the file.
 --- @return string
-function runner.real_name(filename)
+function M.real_name(filename)
   local orig_filename = filename
   -- Normalize file names before using patterns.
   filename = filename:gsub('\\', '/'):gsub('%.lua$', '')
 
-  for i, pattern in ipairs(runner.modules.patterns) do
+  for i, pattern in ipairs(M.modules.patterns) do
     local match = filename:match(pattern)
 
     if match then
-      local new_filename = runner.modules.filenames[i]
+      local new_filename = M.modules.filenames[i]
       assert(new_filename, 'missing module filename mapping')
 
       if pattern:find(wildcard_expansion, 1, true) then
@@ -315,6 +327,8 @@ local luacov_excludes = {
   'cluacov/version$',
 }
 
+--- @param path string
+--- @return boolean
 local function is_absolute(path)
   if path:sub(1, 1) == dir_sep or path:sub(1, 1) == '/' then
     return true
@@ -327,6 +341,7 @@ local function is_absolute(path)
   return false
 end
 
+--- @return string
 local function get_cur_dir()
   local cur_dir = uv.cwd() or '.'
 
@@ -337,44 +352,50 @@ local function get_cur_dir()
   return cur_dir
 end
 
--- Sets configuration. If some options are missing, default values are used instead.
+--- @param configuration table<string, any>
 local function set_config(configuration)
   assert(configuration ~= nil, 'configuration table is required')
-  runner.configuration = {} --- @type table<string, any>
+  M.configuration = {} --- @type luacov.Configuration
 
-  for option, default_value in pairs(runner.defaults) do
-    runner.configuration[option] = default_value
+  for option, default_value in pairs(M.defaults) do
+    M.configuration[option] = default_value
   end
 
   for option, value in pairs(configuration) do
-    runner.configuration[option] = value
+    M.configuration[option] = value
   end
 
-  runner.configuration.include = runner.configuration.include or {}
-  runner.configuration.exclude = runner.configuration.exclude or {}
+  M.configuration.include = M.configuration.include or {}
+  M.configuration.exclude = M.configuration.exclude or {}
 
   -- Program using LuaCov may change directory during its execution.
   -- Convert path options to absolute paths to use correct paths anyway.
   local cur_dir
 
-  for _, option in ipairs({ 'statsfile', 'reportfile' }) do
-    local path = runner.configuration[option]
+  local statsfile = M.configuration.statsfile
+  if type(statsfile) == 'string' and not is_absolute(statsfile) then
+    cur_dir = cur_dir or get_cur_dir()
+    M.configuration.statsfile = cur_dir .. statsfile
+  end
 
-    if not is_absolute(path) then
-      cur_dir = cur_dir or get_cur_dir()
-      runner.configuration[option] = cur_dir .. path
-    end
+  local reportfile = M.configuration.reportfile
+  if type(reportfile) == 'string' and not is_absolute(reportfile) then
+    cur_dir = cur_dir or get_cur_dir()
+    M.configuration.reportfile = cur_dir .. reportfile
   end
 
   acknowledge_modules()
 
   for _, patt in ipairs(luacov_excludes) do
-    table.insert(runner.configuration.exclude, patt)
+    table.insert(M.configuration.exclude, patt)
   end
 
-  runner.tick = runner.tick or runner.configuration.tick
+  M.tick = M.tick or M.configuration.tick
 end
 
+--- @param name string
+--- @param is_default? boolean
+--- @return table<string, any>?
 local function load_config_file(name, is_default)
   local conf = setmetatable({}, { __index = _G })
 
@@ -407,20 +428,17 @@ local default_config_file = os.getenv('LUACOV_CONFIG') or '.luacov'
 
 ------------------------------------------------------
 -- Loads a valid configuration.
--- @param configuration? user provided config (config-table or filename)
--- @return existing configuration if already set, otherwise loads a new
--- config from the provided data or the defaults.
--- When loading a new config, if some options are missing, default values
--- from `luacov.defaults` are used instead.
---- @param configuration? string|table
---- @return table
-function runner.load_config(configuration)
-  if not runner.configuration then
+--- @param configuration? string|table user provided config (config-table or filename)
+--- @return table existing configuration if already set, otherwise loads a new config or defaults.
+function M.load_config(configuration)
+  if not M.configuration then
     if not configuration then
       -- Nothing provided, load from default location if possible.
-      set_config(load_config_file(default_config_file, true) or runner.defaults)
+      set_config(load_config_file(default_config_file, true) or M.defaults)
     elseif type(configuration) == 'string' then
-      set_config(load_config_file(configuration))
+      local loaded_config = load_config_file(configuration)
+      assert(loaded_config, 'Failed to load LuaCov config: ' .. configuration)
+      set_config(loaded_config)
     elseif type(configuration) == 'table' then
       set_config(configuration)
     else
@@ -428,26 +446,27 @@ function runner.load_config(configuration)
     end
   end
 
-  return runner.configuration
+  return M.configuration
 end
 
 --------------------------------------------------
 -- Pauses saving data collected by LuaCov's runner.
 -- Allows other processes to write to the same stats file.
 -- Data is still collected during pause.
-function runner.pause()
-  runner.paused = true
+function M.pause()
+  M.paused = true
 end
 
 --------------------------------------------------
 -- Resumes saving data collected by LuaCov's runner.
-function runner.resume()
-  runner.paused = false
+function M.resume()
+  M.paused = false
 end
 
 local hook_per_thread
 
 -- Determines whether debug hooks are separate for each thread.
+--- @return boolean
 local function has_hook_per_thread()
   if hook_per_thread == nil then
     local old_hook, old_mask, old_count = debug.gethook()
@@ -471,14 +490,14 @@ end
 -- or before the monkey-patching, this wrapper should be applied to the
 -- main function of the coroutine. Under LuaJIT this function is redundant,
 -- as there is only one, global debug hook.
--- @param f a function
--- @return a function that enables coverage gathering and calls the original function.
--- @usage
+--- @param f fun(...: any): any
+--- @return fun(...: any): any
+--- @usage
 -- local coro = coroutine.create(runner.with_luacov(func))
-function runner.with_luacov(f)
+function M.with_luacov(f)
   return function(...)
     if has_hook_per_thread() then
-      debug.sethook(runner.debug_hook, 'l')
+      debug.sethook(M.debug_hook, 'l')
     end
 
     return f(...)
@@ -487,10 +506,10 @@ end
 
 --------------------------------------------------
 -- Initializes LuaCov runner to start collecting data.
--- @param configuration? if string, filename of config file (used to call `load_config`).
+--- @param configuration? string|table if string, filename of config file (used to call `load_config`).
 -- If table then config table (see file `luacov.default.lua` for an example)
-function runner.init(configuration)
-  runner.configuration = runner.load_config(configuration)
+function M.init(configuration)
+  M.configuration = M.load_config(configuration)
 
   -- metatable trick on filehandle won't work if Lua exits through
   -- os.exit() hence wrap that with exit code as well
@@ -499,7 +518,7 @@ function runner.init(configuration)
     raw_os_exit(...)
   end
 
-  debug.sethook(runner.debug_hook, 'l')
+  debug.sethook(M.debug_hook, 'l')
 
   if has_hook_per_thread() then
     -- debug must be set for each coroutine separately
@@ -508,7 +527,7 @@ function runner.init(configuration)
     local rawcoroutinecreate = coroutine.create
     coroutine.create = function(...) -- luacheck: no global
       local co = rawcoroutinecreate(...)
-      debug.sethook(co, runner.debug_hook, 'l')
+      debug.sethook(co, M.debug_hook, 'l')
       return co
     end
 
@@ -523,32 +542,28 @@ function runner.init(configuration)
 
     coroutine.wrap = function(...) -- luacheck: no global
       local co = rawcoroutinecreate(...)
-      debug.sethook(co, runner.debug_hook, 'l')
+      debug.sethook(co, M.debug_hook, 'l')
       return function(...)
         return safeassert(coroutine.resume(co, ...))
       end
     end
   end
 
-  if not runner.tick then
-    runner.on_exit_trick = on_exit_wrap(on_exit)
+  if not M.tick then
+    M.on_exit_trick = on_exit_wrap(on_exit)
   end
 
-  runner.initialized = true
-  runner.paused = false
+  M.initialized = true
+  M.paused = false
 end
 
---------------------------------------------------
--- Shuts down LuaCov's runner.
--- This should only be called from daemon processes or sandboxes which have
--- disabled os.exit and other hooks that are used to determine shutdown.
-function runner.shutdown()
+function M.shutdown()
   on_exit()
 end
 
--- Gets the sourcefilename from a function.
--- @param func function to lookup.
--- @return sourcefilename or nil when not found.
+--- Gets the source filename from a function.
+--- @param func fun(...: any)
+--- @return string?
 local function getsourcefile(func)
   assert(type(func) == 'function')
   local d = debug.getinfo(func).source
@@ -557,8 +572,10 @@ local function getsourcefile(func)
   end
 end
 
--- Looks for a function inside a table.
--- @param searched set of already checked tables.
+--- Looks for a function inside a table.
+--- @param t table
+--- @param searched table<any, boolean>
+--- @return fun(...: any)?
 local function findfunction(t, searched)
   if searched[t] then
     return
@@ -578,13 +595,9 @@ local function findfunction(t, searched)
   end
 end
 
--- Gets source filename from a file name, module name, function or table.
--- @param name string;   filename,
---             string;   modulename as passed to require(),
---             function; where containing file is looked up,
---             table;    module table where containing file is looked up
--- @raise error message if could not find source filename.
--- @return source filename.
+--- Gets source filename from a file name, module name, function or table.
+--- @param name string|fun(...: any)|table filename, module name, function, or module table
+--- @return string
 local function getfilename(name)
   if type(name) == 'function' then
     local sourcefile = getsourcefile(name)
@@ -617,27 +630,42 @@ local function getfilename(name)
       error("Module/file '" .. name .. "' was not found")
     end
 
-    if type(result) ~= 'table' and type(result) ~= 'function' then
-      error("Module '" .. name .. "' did not return a result to lookup its file name")
+    if type(result) == 'table' then
+      --- @cast result table
+      return getfilename(result)
     end
 
-    return getfilename(result)
+    if type(result) == 'function' then
+      --- @cast result fun(...: any)
+      return getfilename(result)
+    end
+
+    error("Module '" .. name .. "' did not return a result to lookup its file name")
   end
 end
 
--- Escapes a filename.
 -- Escapes magic pattern characters, removes .lua extension
 -- and replaces dir seps by '/'.
+--- @param name string
+--- @return string
 local function escapefilename(name)
-  return name:gsub('%.lua$', ''):gsub('[%%%^%$%.%(%)%[%]%+%*%-%?]', '%%%0'):gsub('\\', '/')
+  local escaped = name:gsub('%.lua$', ''):gsub('[%%%^%$%.%(%)%[%]%+%*%-%?]', '%%%0'):gsub('\\', '/')
+  return escaped
 end
 
+--- @param name string|fun(...: any)|table
+--- @param list string[]
+--- @return string
 local function addfiletolist(name, list)
   local f = '^' .. escapefilename(getfilename(name)) .. '$'
   table.insert(list, f)
   return f
 end
 
+--- @param name string|fun(...: any)|table
+--- @param level? boolean
+--- @param list string[]
+--- @return string, string
 local function addtreetolist(name, level, list)
   local f = escapefilename(getfilename(name))
 
@@ -653,8 +681,11 @@ local function addtreetolist(name, level, list)
   return f, t
 end
 
--- Returns a pcall result, with the initial 'true' value removed
--- and 'false' replaced with nil.
+--- Returns a pcall result, with the initial 'true' value removed
+--- and 'false' replaced with nil.
+--- @param ok boolean
+--- @param ... any
+--- @return any ...
 local function checkresult(ok, ...)
   if ok then
     return ... -- success, strip 'true' value
@@ -670,22 +701,28 @@ end
 -- If the parameter is a string, it will first check if a file by that name exists. If it doesn't exist
 -- it will call `require(name)` to load a module by that name, and the result of require (function or
 -- table expected) is used as described above to get the sourcefile.
--- @param name
+--- @param name string|fun(...: any)|table
 -- * string;   literal filename,
 -- * string;   modulename as passed to require(),
 -- * function; where containing file is looked up,
 -- * table;    module table where containing file is looked up
--- @return the pattern as added to the list, or nil + error
-function runner.excludefile(name)
-  return checkresult(pcall(addfiletolist, name, runner.configuration.exclude))
+--- @return string? pattern the pattern as added to the list
+--- @return any? err error detail when pattern is nil
+function M.excludefile(name)
+  local exclude = assert(M.configuration.exclude, 'exclude configuration missing')
+  return checkresult(pcall(addfiletolist, name, exclude))
 end
+
 -------------------------------------------------------------------
 -- Adds a file to the include list (see `luacov.defaults`).
--- @param name see `excludefile`
--- @return the pattern as added to the list, or nil + error
-function runner.includefile(name)
-  return checkresult(pcall(addfiletolist, name, runner.configuration.include))
+--- @param name string|fun(...: any)|table see `excludefile`
+--- @return string? pattern the pattern as added to the list
+--- @return any? err error detail when pattern is nil
+function M.includefile(name)
+  local include = assert(M.configuration.include, 'include configuration missing')
+  return checkresult(pcall(addfiletolist, name, include))
 end
+
 -------------------------------------------------------------------
 -- Adds a tree to the exclude list (see `luacov.defaults`).
 -- If `name = 'luacov'` and `level = nil` then
@@ -693,23 +730,30 @@ end
 -- If `name = 'pl.path'` and `level = true` then
 -- module 'pl' (pl.lua) and the tree 'pl' (containing `pl/path.lua` etc.) is excluded.
 -- NOTE: in case of an 'init.lua' file, the 'level' parameter will always be set
--- @param name see `excludefile`
--- @param level if truthy then one level up is added, including the tree
--- @return the 2 patterns as added to the list (file and tree), or nil + error
-function runner.excludetree(name, level)
-  return checkresult(pcall(addtreetolist, name, level, runner.configuration.exclude))
-end
--------------------------------------------------------------------
--- Adds a tree to the include list (see `luacov.defaults`).
--- @param name see `excludefile`
--- @param level see `includetree`
--- @return the 2 patterns as added to the list (file and tree), or nil + error
-function runner.includetree(name, level)
-  return checkresult(pcall(addtreetolist, name, level, runner.configuration.include))
+--- @param name string|fun(...: any)|table see `excludefile`
+--- @param level? boolean if truthy then one level up is added, including the tree
+--- @return string? file_pattern
+--- @return string? tree_pattern_or_err tree pattern on success or error detail when file_pattern is nil
+function M.excludetree(name, level)
+  local exclude = assert(M.configuration.exclude, 'exclude configuration missing')
+  return checkresult(pcall(addtreetolist, name, level, exclude))
 end
 
-return setmetatable(runner, {
+-------------------------------------------------------------------
+-- Adds a tree to the include list (see `luacov.defaults`).
+--- @param name string|fun(...: any)|table see `excludefile`
+--- @param level? boolean see `includetree`
+--- @return string? file_pattern
+--- @return string? tree_pattern_or_err tree pattern on success or error detail when file_pattern is nil
+function M.includetree(name, level)
+  local include = assert(M.configuration.include, 'include configuration missing')
+  return checkresult(pcall(addtreetolist, name, level, include))
+end
+
+setmetatable(M, {
   __call = function(_, configfile)
-    runner.init(configfile)
+    M.init(configfile)
   end,
 })
+
+return M

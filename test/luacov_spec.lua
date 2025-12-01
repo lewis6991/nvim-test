@@ -84,6 +84,42 @@ describe('luacov.runner helpers', function()
     assert(not runner.file_included('lua/src/excluded/module.lua'))
   end)
 
+  it('registers module mappings for real_name', function()
+    local runner_mod = dofile('lua/luacov/runner.lua')
+    runner_mod.configuration = nil
+
+    local config = {
+      include = {},
+      exclude = {},
+      modules = {
+        ['demo.module'] = 'lua/demo/module.lua',
+      },
+      statsfile = 'luacov.stats.out',
+      reportfile = 'luacov.report.out',
+    }
+
+    runner_mod.load_config(config)
+
+    local expected = fs.normalize('lua/demo/module.lua')
+    local resolved = runner_mod.real_name('demo/module.lua')
+    assert.are.equal(expected, fs.normalize(resolved))
+  end)
+
+  it('adds include and exclude patterns via helpers', function()
+    local runner_mod = dofile('lua/luacov/runner.lua')
+    runner_mod.configuration = {
+      include = {},
+      exclude = {},
+    }
+
+    local exclude_pattern = runner_mod.excludefile('lua/luacov/runner.lua')
+    assert.are.equal('^lua/luacov/runner$', exclude_pattern)
+    assert.are.same({ exclude_pattern }, runner_mod.configuration.exclude)
+
+    local include_pattern = runner_mod.includefile('lua/luacov/util.lua')
+    assert.are.equal('^lua/luacov/util$', include_pattern)
+    assert.are.same({ include_pattern }, runner_mod.configuration.include)
+  end)
 end)
 
 describe('project .luacov configuration', function()

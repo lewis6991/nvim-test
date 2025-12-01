@@ -29,7 +29,7 @@ local function main(custom_options)
 
   local busted = require('busted.core').new()
 
-  local cli = require('busted.modules.cli')(options)
+  local cli = require('busted.cli')(options)
   local filterLoader = require('busted.modules.filter_loader')
   local helperLoader = require('busted.modules.helper_loader')()
   local outputHandlerLoader = require('busted.modules.output_handler_loader')()

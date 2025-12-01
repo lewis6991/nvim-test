@@ -1,5 +1,8 @@
+--- @return fun(config?: string|table): (boolean, string?)
 return function()
-  -- Function to initialize luacov if available
+  --- Function to initialize luacov if available
+  --- @param config? string|table configuration passed to luacov
+  --- @return boolean, string?
   local loadLuaCov = function(config)
     local result, luacov = pcall(require, 'luacov.runner')
 
@@ -7,6 +10,7 @@ return function()
       return true, 'LuaCov not found; skipping coverage setup.'
     end
 
+    --- @cast luacov luacov.runner
     -- call it to start
     luacov(config)
 
