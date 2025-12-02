@@ -65,12 +65,12 @@ end
 --- @field private _stack table[]
 --- @field private _states table[]
 --- @field private _current table
---- @field get fun(self: busted.Context, key?: any): any
+--- @field get fun(self: busted.Context, key?: any): busted.Element
 --- @field set fun(self: busted.Context, key: string, value: any)
 --- @field clear fun(self: busted.Context)
 --- @field attach fun(self: busted.Context, child: table)
 --- @field children fun(self: busted.Context, parent: table): table[]
---- @field parent fun(self: busted.Context, child: table): table?
+--- @field parent fun(self: busted.Context, child: table): busted.Element?
 --- @field push fun(self: busted.Context, element: table)
 --- @field pop fun(self: busted.Context)
 local M = {}

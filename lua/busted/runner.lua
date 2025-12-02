@@ -2,6 +2,11 @@
 
 local uv = vim.uv
 local fs = vim.fs
+
+local test_file_loader = require('busted.test_file_loader')
+local filter_loader = require('busted.filter_loader')
+local cli_parser = require('busted.cli')
+
 local exit = require('busted.exit')
 local load_chunk = _G.loadstring or load
 if not load_chunk then
@@ -33,10 +38,9 @@ local function load_luacov(config)
 end
 
 --- @param options? {output?: string}
---- @return fun()?
 local function main(options)
   if loaded then
-    return function() end
+    return
   end
 
   loaded = true
@@ -45,8 +49,7 @@ local function main(options)
   options.output = options.output or 'busted.outputHandlers.output_handler'
   local busted = require('busted.core').new()
 
-  local cli = require('busted.cli')(options)
-  local filterLoader = require('busted.filter_loader')
+  local cli = cli_parser(options)
   local helperLoader = require('busted.helper_loader')()
   local outputHandlerLoader = require('busted.output_handler_loader')()
 
@@ -209,7 +212,7 @@ local function main(options)
   end
 
   -- Load tag and test filters
-  filterLoader
+  filter_loader
     .new(busted, {
       tags = cliArgs.tags,
       excludeTags = cliArgs['exclude-tags'],
@@ -225,8 +228,7 @@ local function main(options)
   -- Load test directories/files
   local rootFiles = cliArgs.ROOT
   local patterns = cliArgs.pattern
-  local testFileLoader = require('busted.test_file_loader')(busted)
-  testFileLoader(rootFiles, patterns, {
+  test_file_loader(busted, rootFiles, patterns, {
     excludes = cliArgs['exclude-pattern'],
     verbose = cliArgs.verbose,
     recursive = true,

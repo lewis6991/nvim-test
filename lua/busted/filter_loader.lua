@@ -46,6 +46,7 @@ end
 --- @param name? string
 --- @return string
 function M:_get_full_name(name)
+  --- @type busted.Element?
   local parent = self._busted.context:get()
   local names = { name }
 

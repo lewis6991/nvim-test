@@ -141,75 +141,70 @@ local function trim_c_frames(_filename, info)
 end
 
 --- @param busted busted.Busted
---- @return fun(rootFiles: string[], patterns: string[]?, options: test_file_loader.Options?): string[] load_test_files
---- @return test_file_loader.LoadTestFile load_test_file
---- @return fun(rootFiles: string[], patterns: string[]?, options: test_file_loader.Options?): string[] get_all_test_files
-return function(busted)
-  ---@param rootFiles string[]
-  ---@param patterns string[]?
-  ---@param options test_file_loader.Options?
-  ---@return string[]
-  local function get_all_test_files(rootFiles, patterns, options)
-    options = options or EMPTY_OPTIONS
-    patterns = patterns or EMPTY_PATTERNS
-    local fileList = {} ---@type string[]
-    for _, root in ipairs(rootFiles) do
-      local files = gather_root_files(busted, root, patterns, options)
-      table.sort(files)
-      vim.list_extend(fileList, files)
+--- @param rootFiles string[]
+--- @param patterns string[]?
+--- @param options test_file_loader.Options?
+--- @return string[]
+local function get_all_test_files(busted, rootFiles, patterns, options)
+  options = options or EMPTY_OPTIONS
+  patterns = patterns or EMPTY_PATTERNS
+  local fileList = {} ---@type string[]
+  for _, root in ipairs(rootFiles) do
+    local files = gather_root_files(busted, root, patterns, options)
+    table.sort(files)
+    vim.list_extend(fileList, files)
+  end
+  return fileList
+end
+
+--- @param busted_ctx busted.Busted
+--- @param filename string
+--- @return test_file_loader.LoadedFile?, test_file_loader.GetTrace?
+local function load_test_file(busted_ctx, filename)
+  if filename:sub(-4) == '.lua' then
+    local file, err = loadfile(filename)
+    if not file then
+      busted_ctx:publish(
+        { 'error', 'file' },
+        { descriptor = 'file', name = filename },
+        nil,
+        err,
+        {}
+      )
+      return nil, nil
     end
-    return fileList
+    return file, trim_c_frames
+  end
+end
+
+--- @param busted busted.Busted
+--- @param rootFiles string[]
+--- @param patterns string[]?
+--- @param options test_file_loader.Options?
+--- @return string[]
+return function(busted, rootFiles, patterns, options)
+  patterns = patterns or EMPTY_PATTERNS
+  options = options or EMPTY_OPTIONS
+  local fileList = get_all_test_files(busted, rootFiles, patterns, options)
+
+  for _, fileName in ipairs(fileList) do
+    local testFile, getTrace = load_test_file(busted, fileName)
+
+    if testFile then
+      --- @type busted.CallableValue
+      local file = setmetatable({
+        getTrace = getTrace,
+      }, {
+        __call = testFile,
+      })
+
+      busted.executors.file(fileName, file)
+    end
   end
 
-  ---@param busted_ctx busted.Busted
-  ---@param filename string
-  ---@return test_file_loader.LoadedFile?, test_file_loader.GetTrace?
-  local function load_test_file(busted_ctx, filename)
-    if filename:sub(-4) == '.lua' then
-      local file, err = loadfile(filename)
-      if not file then
-        busted_ctx:publish(
-          { 'error', 'file' },
-          { descriptor = 'file', name = filename },
-          nil,
-          err,
-          {}
-        )
-        return nil, nil
-      end
-      return file, trim_c_frames
-    end
-  end
-  ---@param rootFiles string[]
-  ---@param patterns string[]?
-  ---@param options test_file_loader.Options?
-  ---@return string[]
-  local function load_test_files(rootFiles, patterns, options)
-    patterns = patterns or EMPTY_PATTERNS
-    options = options or EMPTY_OPTIONS
-    local fileList = get_all_test_files(rootFiles, patterns, options)
-
-    for _, fileName in ipairs(fileList) do
-      local testFile, getTrace = load_test_file(busted, fileName)
-
-      if testFile then
-        --- @type busted.CallableValue
-        local file = setmetatable({
-          getTrace = getTrace,
-        }, {
-          __call = testFile,
-        })
-
-        busted.executors.file(fileName, file)
-      end
-    end
-
-    if #fileList == 0 then
-      publish_no_matches(busted, patterns)
-    end
-
-    return fileList
+  if #fileList == 0 then
+    publish_no_matches(busted, patterns)
   end
 
-  return load_test_files, load_test_file, get_all_test_files
+  return fileList
 end

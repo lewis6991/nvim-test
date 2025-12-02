@@ -1,3 +1,27 @@
+--- Block is the coordinator for busted lifecycle hooks inside the current
+--- context tree. It owns the root context captured at construction time,
+--- surfaces helper utilities for sorting runnable elements, and drives hook
+--- execution through `busted:safe`.
+---
+--- Responsibilities:
+--- - Sync descendant environments with the root before invoking hooks so that
+---   descriptors resolve to their canonical implementations.
+--- - Reject descriptors when a nested context tries to register lifecycle
+---   handlers that are already defined higher in the tree to prevent invalid
+---   nesting patterns.
+--- - Execute lifecycle entries in ancestor-first order, caching their success
+---   state to ensure each descriptor runs at most once per node.
+--- - Provide structured error surfacing by routing invocations through the
+---   busted executor, which wraps hooks with error handling.
+---
+--- Example:
+--- ```lua
+--- local block = Block.new(busted)
+--- block:execAllOnce('before_each', busted.context:get(), function(desc)
+---   print(('failed %s hook'):format(desc))
+--- end)
+--- ```
+
 --- @param elements busted.Element[]
 --- @return busted.Element[]
 local function sort(elements)

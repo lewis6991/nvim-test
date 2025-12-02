@@ -1,53 +1,86 @@
-local function get_status(status)
-  local smap = {
-    ['success'] = 'success',
-    ['pending'] = 'pending',
-    ['failure'] = 'failure',
-    ['error'] = 'error',
-    ['true'] = 'success',
-    ['false'] = 'failure',
-    ['nil'] = 'error',
-  }
-  return smap[tostring(status)] or 'error'
+--- @alias busted.StatusInput string|boolean|nil
+--- @alias busted.StatusValue 'success'|'pending'|'failure'|'error'
+--- @alias busted.StatusLike busted.StatusInput|busted.Status
+
+local STATUS_MAP = {
+  ['success'] = 'success',
+  ['pending'] = 'pending',
+  ['failure'] = 'failure',
+  ['error'] = 'error',
+  ['true'] = 'success',
+  ['false'] = 'failure',
+  ['nil'] = 'error',
+} ---@type table<string, busted.StatusValue>
+
+--- @param status busted.StatusLike
+--- @return busted.StatusValue
+local function normalize_status(status)
+  return STATUS_MAP[tostring(status)] or 'error'
 end
 
-return function(inital_status)
-  local objstat = get_status(inital_status)
-  local obj = {
-    success = function(_)
-      return (objstat == 'success')
-    end,
-    pending = function(_)
-      return (objstat == 'pending')
-    end,
-    failure = function(_)
-      return (objstat == 'failure')
-    end,
-    error = function(_)
-      return (objstat == 'error')
-    end,
+--- @class busted.Status
+--- @field private _status busted.StatusValue
+local M = {}
+M.__index = M
 
-    get = function(_)
-      return objstat
-    end,
+--- @private
+--- @return string
+function M:__tostring()
+  return self._status
+end
 
-    set = function(_, status)
-      objstat = get_status(status)
-    end,
-
-    update = function(_, status)
-      -- prefer current failure/error status over new status
-      status = get_status(status)
-      if objstat == 'success' or (objstat == 'pending' and status ~= 'success') then
-        objstat = status
-      end
-    end,
+--- @param initial_status? busted.StatusLike
+--- @return busted.Status
+function M.new(initial_status)
+  local instance = {
+    _status = normalize_status(initial_status),
   }
 
-  return setmetatable(obj, {
-    __index = {},
-    __tostring = function(_)
-      return objstat
-    end,
-  })
+  return setmetatable(instance, M)
 end
+
+--- @return boolean
+function M:success()
+  return self._status == 'success'
+end
+
+--- @return boolean
+function M:pending()
+  return self._status == 'pending'
+end
+
+--- @return boolean
+function M:failure()
+  return self._status == 'failure'
+end
+
+--- @return boolean
+function M:error()
+  return self._status == 'error'
+end
+
+--- @return busted.StatusValue
+function M:get()
+  return self._status
+end
+
+--- @param status busted.StatusLike
+function M:set(status)
+  self._status = normalize_status(status)
+end
+
+--- @param status busted.StatusLike
+function M:update(status)
+  local next_status = normalize_status(status)
+  if self._status == 'success' or (self._status == 'pending' and next_status ~= 'success') then
+    self._status = next_status
+  end
+end
+
+setmetatable(M, {
+  __call = function(_, initial_status)
+    return M.new(initial_status)
+  end,
+})
+
+return M

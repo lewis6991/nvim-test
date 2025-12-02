@@ -95,5 +95,4 @@ describe('busted.cli', function()
     assert(not ok)
     assert.matches('Cannot use %-%-tags and %-%-exclude%-tags', err)
   end)
-
 end)

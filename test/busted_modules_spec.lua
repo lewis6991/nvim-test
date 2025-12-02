@@ -1,7 +1,7 @@
 local uv = vim.uv
 local fs = vim.fs
 
-local test_file_loader_factory = require('busted.test_file_loader')
+local test_file_loader = require('busted.test_file_loader')
 local FilterLoader = require('busted.filter_loader')
 local fixtures = require('busted.fixtures')
 
@@ -76,7 +76,13 @@ describe('busted.modules.test_file_loader', function()
       end,
     }
 
-    loader = test_file_loader_factory(stub_busted, { 'lua' })
+    ---@param root_files string[]
+    ---@param patterns? string[]
+    ---@param options? test_file_loader.Options
+    ---@return string[]
+    loader = function(root_files, patterns, options)
+      return test_file_loader(stub_busted, root_files, patterns, options)
+    end
   end)
 
   after_each(function()

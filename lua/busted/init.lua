@@ -1,92 +1,131 @@
 local Block = require('busted.block')
 
+--- @param block busted.Block
 --- @param busted busted.Busted
---- @return busted.Busted
+--- @param element busted.BlockRuntimeElement
+local function file(block, busted, element)
+  busted:wrap(element.run)
+  if busted:safe_publish('file', { 'file', 'start' }, element) then
+    block:execute('file', element)
+  end
+  busted:safe_publish('file', { 'file', 'end' }, element)
+end
+
+--- @param block busted.Block
+--- @param busted busted.Busted
+--- @param element busted.BlockRuntimeElement
+local function describe(block, busted, element)
+  local parent = busted.context:parent(element) or busted.context:get()
+  if busted:safe_publish('describe', { 'describe', 'start' }, element, parent) then
+    block:execute('describe', element)
+  end
+  busted:safe_publish('describe', { 'describe', 'end' }, element, parent)
+end
+
+--- @param block busted.Block
+--- @param busted busted.Busted
+--- @param element busted.BlockRuntimeElement
+local function it(block, busted, element)
+  local parent = busted.context:parent(element) or busted.context:get()
+
+  if not block:lazySetup(parent) then
+    -- skip test if any setup failed
+    return
+  end
+
+  if not element.env then
+    element.env = {}
+  end
+
+  block:rejectAll(element)
+
+  --- @type busted.CallableValue? finally
+  local finally
+
+  --- @param fn busted.CallableValue
+  element.env.finally = function(fn)
+    finally = fn
+  end
+
+  --- @param ... any
+  element.env.pending = function(...)
+    return busted:pending(...)
+  end
+
+  local pass, ancestor = block:execAll('before_each', parent, true)
+
+  if pass then
+    local status = busted.status.new('success')
+    if busted:safe_publish('test', { 'test', 'start' }, element, parent) then
+      local run = element.run
+      if not run then
+        error('Attempt to execute spec without a body')
+      end
+      status:update(busted:safe('it', run, element))
+      if finally then
+        block:reject('pending', element)
+        status:update(busted:safe('finally', finally, element))
+      end
+    else
+      status = busted.status('error')
+    end
+    busted:safe_publish('test', { 'test', 'end' }, element, parent, tostring(status))
+  end
+
+  block:dexecAll('after_each', ancestor, true)
+end
+
+--- @param busted busted.Busted
+--- @param element busted.Element
+local function pending(busted, element)
+  local parent = busted.context:parent(element)
+  local status = 'pending'
+  if not busted:safe_publish('it', { 'test', 'start' }, element, parent) then
+    status = 'error'
+  end
+  busted:safe_publish('it', { 'test', 'end' }, element, parent, status)
+end
+
+--- @param busted busted.Busted
 local function init(busted)
   local block = Block.new(busted)
 
-  local file = function(file)
-    busted:wrap(file.run)
-    if busted:safe_publish('file', { 'file', 'start' }, file) then
-      block:execute('file', file)
+  busted:register(
+    'file',
+    --- @param element busted.Element
+    function(element)
+      return file(block, busted, element)
+    end,
+    { envmode = 'insulate' }
+  )
+
+  busted:register(
+    'describe',
+    --- @param element busted.Element
+    function(element)
+      return describe(block, busted, element)
     end
-    busted:safe_publish('file', { 'file', 'end' }, file)
-  end
+  )
 
-  local describe = function(describe)
-    local parent = busted.context:parent(describe)
-    if not parent then
-      parent = busted.context:get()
-    end
-    --- @cast parent busted.Element
-    if busted:safe_publish('describe', { 'describe', 'start' }, describe, parent) then
-      block:execute('describe', describe)
-    end
-    busted:safe_publish('describe', { 'describe', 'end' }, describe, parent)
-  end
-
-  local it = function(element)
-    local parent = busted.context:parent(element)
-    if not parent then
-      parent = busted.context:get()
-    end
-    --- @cast parent busted.Element
-    local finally
-
-    if not block:lazySetup(parent) then
-      -- skip test if any setup failed
-      return
-    end
-
-    if not element.env then
-      element.env = {}
-    end
-
-    block:rejectAll(element)
-    element.env.finally = function(fn)
-      finally = fn
-    end
-    element.env.pending = function(...)
-      return busted:pending(...)
-    end
-
-    local pass, ancestor = block:execAll('before_each', parent, true)
-
-    if pass then
-      local status = busted.status('success')
-      if busted:safe_publish('test', { 'test', 'start' }, element, parent) then
-        status:update(busted:safe('it', element.run, element))
-        if finally then
-          block:reject('pending', element)
-          status:update(busted:safe('finally', finally, element))
-        end
-      else
-        status = busted.status('error')
-      end
-      busted:safe_publish('test', { 'test', 'end' }, element, parent, tostring(status))
-    end
-
-    block:dexecAll('after_each', ancestor, true)
-  end
-
-  local pending = function(element)
-    local parent = busted.context:parent(element)
-    local status = 'pending'
-    if not busted:safe_publish('it', { 'test', 'start' }, element, parent) then
-      status = 'error'
-    end
-    busted:safe_publish('it', { 'test', 'end' }, element, parent, status)
-  end
-
-  busted:register('file', file, { envmode = 'insulate' })
-
-  busted:register('describe', describe)
   busted:register('insulate', 'describe', { envmode = 'insulate' })
   busted:register('expose', 'describe', { envmode = 'expose' })
 
-  busted:register('it', it)
+  busted:register(
+    'it',
+    --- @param element busted.Element
+    function(element)
+      return it(block, busted, element)
+    end
+  )
 
-  busted:register('pending', pending, { default_fn = function() end })
+  busted:register(
+    'pending',
+    --- @param element busted.Element
+    function(element)
+      return pending(busted, element)
+    end,
+    { default_fn = function() end }
+  )
 
   busted:register('before_each', { envmode = 'unwrap' })
   busted:register('after_each', { envmode = 'unwrap' })
@@ -114,9 +153,11 @@ local function init(busted)
   busted:exportApi('publish', function(...)
     return busted:publish(...)
   end)
+
   busted:exportApi('subscribe', function(...)
     return busted:subscribe(...)
   end)
+
   busted:exportApi('unsubscribe', function(...)
     return busted:unsubscribe(...)
   end)
@@ -124,9 +165,11 @@ local function init(busted)
   busted:exportApi('bindfenv', function(...)
     return busted:bindfenv(...)
   end)
+
   busted:exportApi('fail', function(...)
     return busted:fail(...)
   end)
+
   busted:exportApi('parent', busted.context.parent)
   busted:exportApi('children', busted.context.children)
   busted:exportApi('version', busted.version)
@@ -134,11 +177,10 @@ local function init(busted)
   busted:bindfenv(assert, 'error', function(...)
     return busted:fail(...)
   end)
-
-  return busted
 end
 
 return setmetatable({}, {
+  --- @param busted busted.Busted
   __call = function(self, busted)
     init(busted)
 

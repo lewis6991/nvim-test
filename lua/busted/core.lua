@@ -192,15 +192,6 @@ local function pretty_write(value)
   return vim.inspect(value)
 end
 
---- @class busted.Status
---- @field success fun(self): boolean
---- @field pending fun(self): boolean
---- @field failure fun(self): boolean
---- @field error fun(self): boolean
---- @field get fun(self): string
---- @field set fun(self, status: string)
---- @field update fun(self, status: string)
-
 --- @class busted.ExecutorAttributes
 --- @field default_fn fun()?
 --- @field envmode? 'insulate'|'unwrap'|'expose'
@@ -525,7 +516,7 @@ end
 --- @param key string
 --- @param value any
 function M:export(key, value)
-  self:exportApi(key, value)
+  self.api[key] = value
   self._environment:set(key, value)
 end
 
