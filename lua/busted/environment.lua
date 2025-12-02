@@ -1,5 +1,8 @@
 local setfenv = _G.setfenv
 
+---@class busted.ElementWithEnv: busted.Element
+---@field env? table<string, unknown>
+
 --- @class busted.Environment
 --- @field context busted.Context
 --- @field _env table<string, any>
@@ -20,6 +23,10 @@ function M.new(context)
 
   local function env_newindex(_, key, value)
     local node = self.context:get()
+    if not node then
+      error('no active busted context node')
+    end
+    ---@cast node busted.ElementWithEnv
     node.env = node.env or {}
     node.env[key] = value
   end
@@ -29,6 +36,9 @@ function M.new(context)
   return self
 end
 
+---@param node? busted.ElementWithEnv
+---@param key string
+---@return any
 function M:_getEnvValue(node, key)
   if not node then
     return

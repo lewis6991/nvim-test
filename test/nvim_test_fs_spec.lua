@@ -31,11 +31,16 @@ describe('nvim-test.util.fs', function()
   local tmpdir
 
   local function tmpfile(name)
-    return fs.joinpath(tmpdir, name)
+    local dir = tmpdir
+    if not dir then
+      error('tmpdir not initialized')
+    end
+    return fs.joinpath(dir, name)
   end
 
   before_each(function()
-    local template = fs.joinpath(uv.os_tmpdir(), 'nvim-test-fs-XXXXXX')
+    local os_tmp = assert(uv.os_tmpdir(), 'uv.os_tmpdir() unavailable')
+    local template = fs.joinpath(os_tmp, 'nvim-test-fs-XXXXXX')
     tmpdir = assert(uv.fs_mkdtemp(template))
   end)
 

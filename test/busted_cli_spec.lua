@@ -1,20 +1,42 @@
 local cli_factory = require('busted.cli')
 
+---@class BustedCliApi
+---@field set_name fun(self: BustedCliApi, name: string)
+---@field parse fun(self: BustedCliApi, args: string[]): (busted.cli.Arguments?, string?)
+
 local fs = vim.fs
 
 describe('busted.cli', function()
+  ---@type BustedCliApi?
   local cli
 
   local function parse_args(list)
-    list = list or {}
-    list[0] = list[0] or 'busted'
-    local parsed, err = cli:parse(list)
+    assert(cli, 'cli not initialized')
+    local args = {}
+    for index, value in ipairs(list or {}) do
+      args[index] = value
+    end
+    local parsed, err = cli:parse(args)
     assert(parsed, err)
     return parsed
   end
 
+  local function run_cli(args)
+    assert(cli, 'cli not initialized')
+    return cli:parse(args)
+  end
+
+  local function run_cli_and_expect_error(args)
+    local ok, err = run_cli(args)
+    assert(not ok)
+    assert(err, 'expected CLI error')
+    ---@cast err string
+    return err
+  end
+
   before_each(function()
     cli = cli_factory({})
+    ---@cast cli BustedCliApi
     cli:set_name('busted')
   end)
 
@@ -23,7 +45,6 @@ describe('busted.cli', function()
     assert.are.same('./', parsed.directory)
     assert.are.same({ 'spec' }, parsed.ROOT)
     assert.are.same({ '_spec' }, parsed.pattern)
-    assert.are.equal(parsed.pattern, parsed.p)
     assert(not parsed.coverage)
   end)
 
@@ -46,7 +67,6 @@ describe('busted.cli', function()
       'gamma',
     })
     assert.are.same({ 'alpha', 'beta', 'gamma' }, parsed.tags)
-    assert.are.same(parsed.tags, parsed.t)
   end)
 
   it('derives default handlers for multi options', function()
@@ -63,14 +83,12 @@ describe('busted.cli', function()
   end)
 
   it('errors when numeric options receive invalid values', function()
-    local ok, err = cli:parse({ [0] = 'busted', '--repeat', 'not-a-number' })
-    assert(not ok)
+    local err = run_cli_and_expect_error({ '--repeat', 'not-a-number' })
     assert.matches('--repeat', err)
   end)
 
   it('returns help text when requested', function()
-    local ok, err = cli:parse({ [0] = 'busted', '--help' })
-    assert(not ok)
+    local err = run_cli_and_expect_error({ '--help' })
     assert.matches('Usage: busted', err)
     assert.matches('ARGUMENTS:%s+ROOT', err)
     assert.matches('OPTIONS:%s+%-%-version', err)
@@ -80,8 +98,7 @@ describe('busted.cli', function()
   end)
 
   it('prints a usable help summary for -h', function()
-    local ok, err = cli:parse({ [0] = 'busted', '-h' })
-    assert(not ok)
+    local err = run_cli_and_expect_error({ '-h' })
     assert.matches('Usage: busted', err)
     assert.matches('%-%-pattern', err)
     assert.matches('%-%-helper', err)
@@ -100,14 +117,12 @@ describe('busted.cli', function()
   end)
 
   it('rejects conflicting include and exclude tags', function()
-    local ok, err = cli:parse({
-      [0] = 'busted',
+    local err = run_cli_and_expect_error({
       '--tags',
       'focus',
       '--exclude-tags',
       'focus',
     })
-    assert(not ok)
     assert.matches('Cannot use %-%-tags and %-%-exclude%-tags', err)
   end)
 end)

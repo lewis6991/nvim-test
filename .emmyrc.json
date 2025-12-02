@@ -22,7 +22,8 @@
   },
   "workspace": {
     "library": [
-      "$VIMRUNTIME"
+      "$VIMRUNTIME",
+      "./meta"
     ],
     "ignoreDir": [
       ".luarocks"

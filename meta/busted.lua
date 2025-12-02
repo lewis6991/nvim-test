@@ -165,3 +165,63 @@ function teardown(block) end
 --- ```
 --- @param block fun()
 function finally(block) end
+
+---@class busted.assert
+assert = {
+  are = {},
+  are_not = {},
+}
+
+---@generic T
+---@param expected T
+---@param actual T
+---@param message? string
+function assert.are.equal(expected, actual, message) end
+
+---@generic T
+---@param expected T
+---@param actual T
+---@param message? string
+function assert.are.same(expected, actual, message) end
+
+---@generic T
+---@param expected T
+---@param actual T
+---@param message? string
+function assert.are_not.equal(expected, actual, message) end
+
+---@generic T
+---@param expected T
+---@param actual T
+---@param message? string
+function assert.are_not.same(expected, actual, message) end
+
+---@param pattern string
+---@param actual string
+---@param message? string
+function assert.matches(pattern, actual, message) end
+
+---@param pattern string
+---@param actual string
+---@param message? string
+function assert.not_matches(pattern, actual, message) end
+
+---@param cb fun()
+---@param message? string
+function assert.has_error(cb, message) end
+
+---@param value any
+---@param message? string
+function assert.is_true(value, message) end
+
+---@param value any
+---@param message? string
+function assert.is_false(value, message) end
+
+---@param value any
+---@param message? string
+function assert.is_nil(value, message) end
+
+---@param value any
+---@param message? string
+function assert.is_not_nil(value, message) end

@@ -74,7 +74,10 @@ local function run_cli(args, env)
   end
 
   local command = table.concat(parts, ' ')
-  local pipe = assert(io.popen(command .. ' 2>&1', 'r'))
+  local pipe = io.popen(command .. ' 2>&1', 'r')
+  if not pipe then
+    error('failed to execute nvim-test CLI')
+  end
   local output = pipe:read('*a')
   local ok, _, code = pipe:close()
   local exit_code = ok and 0 or code

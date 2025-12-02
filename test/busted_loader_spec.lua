@@ -40,7 +40,8 @@ describe('busted output handler loader', function()
 
   it('loads output handlers from explicit Lua paths', function()
     local loader = output_loader_factory()
-    local tmp = vim.fs.joinpath(vim.uv.os_tmpdir(), 'output-handler-' .. vim.uv.now() .. '.lua')
+    local tmpdir = assert(vim.uv.os_tmpdir(), 'vim.uv.os_tmpdir() unavailable')
+    local tmp = vim.fs.joinpath(tmpdir, 'output-handler-' .. vim.uv.now() .. '.lua')
     local fd = assert(vim.uv.fs_open(tmp, 'w', 420))
     assert(vim.uv.fs_write(fd, 'return function() return { subscribe = function() end } end'))
     vim.uv.fs_close(fd)
@@ -55,6 +56,7 @@ describe('busted helper loader', function()
   it('invokes helper modules that return functions', function()
     local loader = helper_loader_factory()
     local helper_name = 'test.helper.module'
+    ---@type { helper: string, options: table }?
     local called_with
     package.preload[helper_name] = function()
       return function(_, helper, options)
@@ -67,6 +69,8 @@ describe('busted helper loader', function()
     local ok, err = loader({}, helper_name, options)
     assert(ok)
     assert(err == nil)
+    assert(called_with ~= nil, 'helper callback did not run')
+    ---@cast called_with { helper: string, options: table }
     assert.are.same(helper_name, called_with.helper)
     reset_module(helper_name)
   end)
@@ -82,6 +86,8 @@ describe('busted helper loader', function()
 
     local ok, err = loader({}, helper_name, { arguments = {} })
     assert.is_nil(ok)
+    assert(err, 'expected helper error')
+    ---@cast err string
     assert.matches('boom', err)
     reset_module(helper_name)
   end)

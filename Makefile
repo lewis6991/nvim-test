@@ -22,18 +22,18 @@ $(STYLUA_ZIP):
 stylua: $(STYLUA_ZIP)
 	unzip $<
 
-LUA_FILES = $(shell find lua -name '*.lua')
-LUA_TEST_FILES = $(shell find test -name '*.lua')
-LUA_FORMAT_FILES = $(LUA_FILES) $(LUA_TEST_FILES)
+LUA_FILES = \
+    $(shell find lua -name '*.lua') \
+    $(shell find test -name '*.lua')
 
 .PHONY: format-check
 format-check: stylua
-	@./stylua --check $(LUA_FORMAT_FILES)
+	@./stylua --check $(LUA_FILES)
 
 .PHONY: format
 format: stylua
-	@./stylua $(LUA_FORMAT_FILES)
-	@perl -0pi -e 's/^---@/--- @/gm' $(LUA_FORMAT_FILES)
+	@./stylua $(LUA_FILES)
+	@perl -0pi -e 's/^---@/--- @/gm' $(LUA_FILES)
 
 .PHONY: test
 test:
@@ -45,4 +45,4 @@ NVIM_TEST_RUNTIME=$(XDG_DATA_HOME)/nvim-test/nvim-test-nightly/share/nvim/runtim
 .PHONY: emmylua-check
 emmylua-check:
 	VIMRUNTIME=$(NVIM_TEST_RUNTIME) \
-		emmylua_check lua --config .emmyrc.json
+		emmylua_check lua test --config .emmyrc.json

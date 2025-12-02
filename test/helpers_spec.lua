@@ -42,12 +42,15 @@ describe('nvim-test.helpers', function()
     it('scrubs stack traces when pcall returns an error', function()
       local ok, err = helpers.pcall(explode)
       assert.is_false(ok)
+      assert(err, 'expected sanitized error message')
+      ---@cast err string
       assert.matches('%.%.%./foo%.lua:0: something bad happened', err)
       assert.not_matches('99', err)
     end)
 
     it('pcall_err returns the sanitized error and enforces failures', function()
       local err = helpers.pcall_err(explode)
+      ---@cast err string
       assert.matches('%.%.%./foo%.lua:0: something bad happened', err)
 
       assert.has_error(function()
