@@ -46,7 +46,9 @@ local function init(busted)
     element.env.finally = function(fn)
       finally = fn
     end
-    element.env.pending = busted.pending
+    element.env.pending = function(...)
+      return busted:pending(...)
+    end
 
     local pass, ancestor = block:execAll('before_each', parent, true)
 
@@ -109,17 +111,29 @@ local function init(busted)
 
   busted:export('assert', assert)
 
-  busted:exportApi('publish', busted.publish)
-  busted:exportApi('subscribe', busted.subscribe)
-  busted:exportApi('unsubscribe', busted.unsubscribe)
+  busted:exportApi('publish', function(...)
+    return busted:publish(...)
+  end)
+  busted:exportApi('subscribe', function(...)
+    return busted:subscribe(...)
+  end)
+  busted:exportApi('unsubscribe', function(...)
+    return busted:unsubscribe(...)
+  end)
 
-  busted:exportApi('bindfenv', busted.bindfenv)
-  busted:exportApi('fail', busted.fail)
+  busted:exportApi('bindfenv', function(...)
+    return busted:bindfenv(...)
+  end)
+  busted:exportApi('fail', function(...)
+    return busted:fail(...)
+  end)
   busted:exportApi('parent', busted.context.parent)
   busted:exportApi('children', busted.context.children)
   busted:exportApi('version', busted.version)
 
-  busted:bindfenv(assert, 'error', busted.fail)
+  busted:bindfenv(assert, 'error', function(...)
+    return busted:fail(...)
+  end)
 
   return busted
 end

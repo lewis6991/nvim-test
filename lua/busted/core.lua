@@ -192,26 +192,6 @@ local function pretty_write(value)
   return vim.inspect(value)
 end
 
-local PUBLIC_METHODS = {
-  'getTrace',
-  'rewriteMessage',
-  'publish',
-  'subscribe',
-  'unsubscribe',
-  'getFile',
-  'fail',
-  'pending',
-  'bindfenv',
-  'wrap',
-  'safe',
-  'safe_publish',
-  'exportApi',
-  'export',
-  'hide',
-  'register',
-  'execute',
-}
-
 --- @class busted.Status
 --- @field success fun(self): boolean
 --- @field pending fun(self): boolean
@@ -227,18 +207,6 @@ local PUBLIC_METHODS = {
 
 --- @alias busted.Executor fun(plugin: table)
 --- @alias busted.CallableValue (fun(...: any): any)|{ __call: fun(...: any): any }
-
---- @param instance table
---- @param method fun(self: table, ...: any): any
---- @return fun(...: any): any
-local function bind_method(instance, method)
-  return function(arg1, ...)
-    if arg1 == instance then
-      return method(instance, ...)
-    end
-    return method(instance, arg1, ...)
-  end
-end
 
 --- @class (partial) busted.Busted
 --- @field private _executor_impl table<string, busted.Executor?>
@@ -267,12 +235,6 @@ function M.new()
   }
 
   setmetatable(instance, { __index = M })
-
-  -- bind public methods
-  for _, name in ipairs(PUBLIC_METHODS) do
-    local method = M[name] or error('missing method implementation for ' .. name)
-    instance[name] = bind_method(instance, method)
-  end
 
   return instance
 end
