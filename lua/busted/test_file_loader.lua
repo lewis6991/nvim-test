@@ -31,30 +31,16 @@ end
 --- @return string[]
 local function collect_files(directory, recursive)
   local files = {} ---@type string[]
-
-  ---@param dir string
-  local function walk(dir)
-    local iter = vim.uv.fs_scandir(dir)
-    if not iter then
-      return
-    end
-    while true do
-      local name, type = vim.uv.fs_scandir_next(iter)
-      if not name then
-        break
-      end
-      if name:sub(1, 1) ~= '.' then
-        local full = vim.fs.joinpath(dir, name)
-        if type == 'file' then
-          files[#files + 1] = full
-        elseif type == 'directory' and recursive then
-          walk(full)
-        end
-      end
+  for name, type in
+    vim.fs.dir(directory, {
+      depth = recursive and 100 or 1,
+    })
+  do
+    local full = vim.fs.joinpath(directory, name)
+    if type == 'file' then
+      files[#files + 1] = full
     end
   end
-
-  walk(directory)
   return files
 end
 
