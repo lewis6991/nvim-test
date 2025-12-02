@@ -47,10 +47,7 @@ local function it(block, busted, element)
     finally = fn
   end
 
-  --- @param ... any
-  element.env.pending = function(...)
-    return busted:pending(...)
-  end
+  element.env.pending = busted.pending
 
   local pass, ancestor = block:execAll('before_each', parent, true)
 
@@ -150,33 +147,15 @@ local function init(busted)
 
   busted:export('assert', assert)
 
-  busted:exportApi('publish', function(...)
-    return busted:publish(...)
-  end)
-
-  busted:exportApi('subscribe', function(...)
-    return busted:subscribe(...)
-  end)
-
-  busted:exportApi('unsubscribe', function(...)
-    return busted:unsubscribe(...)
-  end)
-
-  busted:exportApi('bindfenv', function(...)
-    return busted:bindfenv(...)
-  end)
-
-  busted:exportApi('fail', function(...)
-    return busted:fail(...)
-  end)
-
+  busted:exportApiMethod('publish', busted.publish)
+  busted:exportApiMethod('subscribe', busted.subscribe)
+  busted:exportApiMethod('unsubscribe', busted.unsubscribe)
+  busted:exportApi('bindfenv', busted.bindfenv)
+  busted:exportApi('fail', busted.fail)
   busted:exportApi('parent', busted.context.parent)
   busted:exportApi('children', busted.context.children)
   busted:exportApi('version', busted.version)
-
-  busted:bindfenv(assert, 'error', function(...)
-    return busted:fail(...)
-  end)
+  busted.bindfenv(assert, 'error', busted.fail)
 end
 
 return setmetatable({}, {

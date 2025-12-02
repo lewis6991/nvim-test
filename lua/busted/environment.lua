@@ -31,7 +31,7 @@ end
 
 function M:_getEnvValue(node, key)
   if not node then
-    return nil
+    return
   end
 
   local value = node.env and node.env[key]
@@ -42,8 +42,9 @@ function M:_getEnvValue(node, key)
   return self:_getEnvValue(self.context:parent(node), key)
 end
 
+--- @param fn function
 function M:wrap(fn)
-  return setfenv(fn, self._env)
+  setfenv(fn, self._env)
 end
 
 function M:set(key, value)

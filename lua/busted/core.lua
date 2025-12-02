@@ -67,7 +67,7 @@ local function hasToString(obj)
 end
 
 --- @param obj any
---- @return boolean
+--- @return TypeGuard<function>
 local function isCallable(obj)
   return type(obj) == 'function' or (debug.getmetatable(obj) or {}).__call
 end
@@ -196,7 +196,7 @@ end
 --- @field default_fn fun()?
 --- @field envmode? 'insulate'|'unwrap'|'expose'
 
---- @alias busted.Executor fun(plugin: table)
+--- @alias busted.Executor fun(plugin: busted.Element)
 --- @alias busted.CallableValue (fun(...: any): any)|{ __call: fun(...: any): any }
 
 --- @class (partial) busted.Busted
@@ -215,7 +215,7 @@ function M.new()
     context = context,
     --- @type table<string, any>
     api = {},
-    --- @type table<string, fun(name: string|busted.CallableValue|nil, fn?: busted.CallableValue)>
+    --- @type table<string, fun(name: string|busted.CallableValue?, fn?: busted.CallableValue)>
     executors = {},
     status = require('busted.status'),
     skipAll = false,
@@ -328,10 +328,8 @@ function M:subscribe(channelNamespace, fn, options)
 end
 
 --- @param id integer
---- @param channelNamespace busted.EventChannelPath
 --- @return busted.EventSubscriber?
-function M:unsubscribe(id, channelNamespace)
-  local _ = channelNamespace
+function M:unsubscribe(id)
   local node = self._channel_root
   local owner, index = find_subscription_owner(node, id)
   if not owner or not index then
@@ -390,8 +388,7 @@ end
 
 --- @param msg string
 --- @param level? integer
-function M:fail(msg, level)
-  local _ = self
+function M.fail(msg, level)
   local rawlevel = (type(level) ~= 'number' or level <= 0) and level
   level = level or 1
   local _, emsg = pcall(error, msg, rawlevel or level + 2)
@@ -401,8 +398,7 @@ function M:fail(msg, level)
 end
 
 --- @param msg string
-function M:pending(msg)
-  local _ = self
+function M.pending(msg)
   local p = { message = msg }
   setmetatable(p, pendingMt)
   error(p)
@@ -411,8 +407,7 @@ end
 --- @param callable busted.CallableValue
 --- @param var string
 --- @param value any
-function M:bindfenv(callable, var, value)
-  local _ = self
+function M.bindfenv(callable, var, value)
   local env = {}
   local f = (debug.getmetatable(callable) or {}).__call or callable
   setmetatable(env, { __index = getfenv(f) })
@@ -422,10 +417,9 @@ end
 
 --- @param callable any
 function M:wrap(callable)
-  if isCallable(callable) then
-    -- prioritize __call if it exists, like in files
-    self._environment:wrap((debug.getmetatable(callable) or {}).__call or callable)
-  end
+  assert(isCallable(callable))
+  -- prioritize __call if it exists, like in files
+  self._environment:wrap((debug.getmetatable(callable) or {}).__call or callable)
 end
 
 --- @param descriptor string
@@ -515,6 +509,14 @@ end
 
 --- @param key string
 --- @param value any
+function M:exportApiMethod(key, value)
+  self:exportApi(key, function(...)
+    return value(self, ...)
+  end)
+end
+
+--- @param key string
+--- @param value any
 function M:export(key, value)
   self.api[key] = value
   self._environment:set(key, value)
@@ -531,10 +533,8 @@ end
 --- @param executor? busted.Executor|string|busted.ExecutorAttributes
 --- @param attributes? busted.ExecutorAttributes
 function M:register(descriptor, executor, attributes)
-  local alias
-  --- @type table<string, busted.Executor?>
+  local alias --- @type string?
   local executors = self._executor_impl
-  --- @type table<string, busted.ExecutorAttributes?>
   local eattributes = self._executor_attributes
 
   if type(executor) == 'string' then
@@ -544,21 +544,17 @@ function M:register(descriptor, executor, attributes)
     attributes = attributes or eattributes[descriptor]
     executors[alias] = executor
     eattributes[alias] = attributes
+  elseif executor ~= nil and not isCallable(executor) then
+    executors[descriptor] = nil
+    eattributes[descriptor] = executor
   else
-    --- @cast executor busted.Executor|busted.ExecutorAttributes|nil
-    if executor ~= nil and not isCallable(executor) then
-      --- @cast executor busted.ExecutorAttributes
-      attributes = executor
-      executor = nil
-    end
-    --- @cast executor busted.Executor?
     executors[descriptor] = executor
     eattributes[descriptor] = attributes
   end
 
   --- @param name? string|busted.CallableValue
   --- @param fn? busted.CallableValue
-  --- @return fun(f: busted.CallableValue)|nil
+  --- @return fun(f: busted.CallableValue)?
   local function publisher(name, fn)
     if not fn and type(name) == 'function' then
       fn = name
@@ -592,6 +588,7 @@ function M:register(descriptor, executor, attributes)
 
   self:subscribe({ 'register', descriptor }, function(name, fn, trace, attr)
     local ctx = self.context:get()
+    --- @type busted.Element
     local plugin = {
       descriptor = descriptor,
       attributes = attr or {},
@@ -607,7 +604,7 @@ function M:register(descriptor, executor, attributes)
 
     self.context:attach(plugin)
 
-    ctx[descriptor] = ctx[descriptor] or { plugin }
+    ctx[descriptor] = ctx[descriptor] or {}
     ctx[descriptor][#ctx[descriptor] + 1] = plugin
   end)
 end

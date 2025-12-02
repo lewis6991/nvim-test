@@ -13,17 +13,15 @@
 ---   test_file_loader.GetTrace?
 --- )
 
-local fs = vim.fs
-local uv = vim.uv
 local EMPTY_OPTIONS = {} ---@type test_file_loader.Options
 local EMPTY_PATTERNS = {} ---@type string[]
 
 --- @param target string
 --- @return string?
 local function get_path_type(target)
-  local stat = uv.fs_stat(target)
+  local stat = vim.uv.fs_stat(target)
   if not stat then
-    return nil
+    return
   end
   return stat.type
 end
@@ -36,17 +34,17 @@ local function collect_files(directory, recursive)
 
   ---@param dir string
   local function walk(dir)
-    local iter = uv.fs_scandir(dir)
+    local iter = vim.uv.fs_scandir(dir)
     if not iter then
       return
     end
     while true do
-      local name, type = uv.fs_scandir_next(iter)
+      local name, type = vim.uv.fs_scandir_next(iter)
       if not name then
         break
       end
       if name:sub(1, 1) ~= '.' then
-        local full = fs.joinpath(dir, name)
+        local full = vim.fs.joinpath(dir, name)
         if type == 'file' then
           files[#files + 1] = full
         elseif type == 'directory' and recursive then
@@ -65,7 +63,7 @@ end
 --- @param excludes string[]
 --- @return boolean
 local function should_include_file(filename, patterns, excludes)
-  local basename = fs.basename(filename)
+  local basename = vim.fs.basename(filename)
 
   for _, patt in ipairs(excludes) do
     if patt ~= '' and basename:find(patt) then
