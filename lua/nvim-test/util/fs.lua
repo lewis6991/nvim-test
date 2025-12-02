@@ -1,4 +1,4 @@
-local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
+local uv = vim.uv
 
 --- @class nvim_test.util.fs
 local M = {}

@@ -1,5 +1,5 @@
 local assert = require('luassert')
-local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
+local uv = vim.uv
 local Session = require('nvim-test.client.session')
 local ProcessStream = require('nvim-test.client.uv_stream')
 local MsgpackRpcStream = require('nvim-test.client.msgpack_rpc_stream')

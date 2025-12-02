@@ -1,4 +1,4 @@
-local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
+local uv = vim.uv
 local coroutine_any = coroutine ---@type table<string, any>
 local co_yield = coroutine_any.yield
 

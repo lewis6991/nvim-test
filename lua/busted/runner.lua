@@ -1,6 +1,6 @@
 -- Busted command-line runner
 
-local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
+local uv = vim.uv
 local fs = vim.fs
 local exit = require('busted.exit')
 local load_chunk = _G.loadstring or load
@@ -32,25 +32,16 @@ local function load_luacov(config)
   return luacov
 end
 
---- @param custom_options? {standalone?: boolean, output?: string, [string]: unknown}
+--- @param options? {output?: string}
 --- @return fun()?
-local function main(custom_options)
-  local provided_options = custom_options or { standalone = false }
+local function main(options)
   if loaded then
     return function() end
-  else
-    loaded = true
   end
 
-  local defaultOptions = {
-    standalone = true,
-  }
-  if provided_options then
-    for k, v in pairs(provided_options) do
-      defaultOptions[k] = v
-    end
-  end
-  local options = defaultOptions
+  loaded = true
+
+  options = options or {}
   options.output = options.output or 'busted.outputHandlers.output_handler'
   local busted = require('busted.core').new()
 
@@ -229,21 +220,15 @@ local function main(custom_options)
     suppressPending = cliArgs['suppress-pending'],
   })
 
-  if cliArgs.ROOT then
-    -- Load test directories/files
-    local rootFiles = cliArgs.ROOT
-    local patterns = cliArgs.pattern
-    local testFileLoader = require('busted.modules.test_file_loader')(busted)
-    testFileLoader(rootFiles, patterns, {
-      excludes = cliArgs['exclude-pattern'],
-      verbose = cliArgs.verbose,
-      recursive = true,
-    })
-  else
-    -- Running standalone, use standalone loader
-    local testFileLoader = require('busted.modules.standalone_loader')(busted)
-    testFileLoader(info, { verbose = cliArgs.verbose })
-  end
+  -- Load test directories/files
+  local rootFiles = cliArgs.ROOT
+  local patterns = cliArgs.pattern
+  local testFileLoader = require('busted.modules.test_file_loader')(busted)
+  testFileLoader(rootFiles, patterns, {
+    excludes = cliArgs['exclude-pattern'],
+    verbose = cliArgs.verbose,
+    recursive = true,
+  })
   local runs = cliArgs['repeat']
   local execute = require('busted.execute')(busted)
   execute(runs, { sort = true })
@@ -254,9 +239,9 @@ local function main(custom_options)
     luacov.shutdown()
   end
 
-  if options.standalone or failures > 0 or errors > 0 then
+  if failures > 0 or errors > 0 then
     exit(failures + errors, forceExit)
   end
 end
 
-main({ standalone = false })
+main()

@@ -1,9 +1,5 @@
 local M = {}
 
---- @class busted.cli.Options
---- @field standalone? boolean
---- @field output? string
-
 --- @class busted.cli.State
 --- @field args table<string, any>
 --- @field overrides table<string, any>

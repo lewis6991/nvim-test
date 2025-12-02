@@ -1,4 +1,4 @@
-local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
+local uv = vim.uv
 
 local function mkdir_p(path)
   local absolute = path
@@ -85,7 +85,8 @@ describe('nvim-test CLI', function()
   it('prints help output for -h', function()
     with_tmpdir(function(tmpdir)
       local runner_version = 'spec-runner'
-      local runner_bin = table.concat({ tmpdir, 'nvim-test', 'nvim-runner-' .. runner_version, 'bin' }, '/')
+      local runner_bin =
+        table.concat({ tmpdir, 'nvim-test', 'nvim-runner-' .. runner_version, 'bin' }, '/')
       mkdir_p(runner_bin)
       write_runner_shim(runner_bin .. '/nvim')
 

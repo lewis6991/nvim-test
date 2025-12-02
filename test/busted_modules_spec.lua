@@ -1,4 +1,4 @@
-local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
+local uv = vim.uv
 local fs = vim.fs
 
 local test_file_loader_factory = require('busted.modules.test_file_loader')
@@ -232,7 +232,11 @@ describe('busted.modules.filter_loader', function()
     assert.are.same('setup block', published[1].descriptor_name)
     assert.are_not.equal(original_fn, published[1].fn)
 
-    test_end_sub.handler({ trace = { what = 'Lua', short_src = 'spec.lua', currentline = 42 } }, nil, 'success')
+    test_end_sub.handler(
+      { trace = { what = 'Lua', short_src = 'spec.lua', currentline = 42 } },
+      nil,
+      'success'
+    )
     assert.are.same({ 'spec.lua:42: suite example' }, printed)
   end)
 end)

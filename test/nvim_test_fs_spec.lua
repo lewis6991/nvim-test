@@ -2,7 +2,7 @@ local helpers = require('nvim-test.helpers')
 local eq = helpers.eq
 
 local fs_util = require('nvim-test.util.fs')
-local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
+local uv = vim.uv
 local fs = vim.fs
 
 local function rm_rf(path)

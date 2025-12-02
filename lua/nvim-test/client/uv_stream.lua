@@ -1,4 +1,4 @@
-local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
+local uv = vim.uv
 
 --- @class test.ProcessStream
 --- @field private _proc uv.uv_process_t

@@ -23,15 +23,17 @@ stylua: $(STYLUA_ZIP)
 	unzip $<
 
 LUA_FILES = $(shell find lua -name '*.lua')
+LUA_TEST_FILES = $(shell find test -name '*.lua')
+LUA_FORMAT_FILES = $(LUA_FILES) $(LUA_TEST_FILES)
 
 .PHONY: format-check
 format-check: stylua
-	@./stylua --check $(LUA_FILES)
+	@./stylua --check $(LUA_FORMAT_FILES)
 
 .PHONY: format
 format: stylua
-	@./stylua $(LUA_FILES)
-	@perl -0pi -e 's/^---@/--- @/gm' $(LUA_FILES)
+	@./stylua $(LUA_FORMAT_FILES)
+	@perl -0pi -e 's/^---@/--- @/gm' $(LUA_FORMAT_FILES)
 
 .PHONY: test
 test:

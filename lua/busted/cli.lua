@@ -1,9 +1,12 @@
 local utils = require('busted.utils')
 local argparse = require('argparse')
 
-local uv = (vim and vim.uv) or error('nvim-test requires vim.uv')
+local uv = vim.uv
 local fs = vim.fs
 local is_windows = uv.os_uname().sysname:match('Windows')
+
+--- @class busted.cli.Options
+--- @field output? string
 
 --- @param pathname string?
 --- @return string?
