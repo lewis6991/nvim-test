@@ -1,5 +1,5 @@
-local output_loader_factory = require('busted.modules.output_handler_loader')
-local helper_loader_factory = require('busted.modules.helper_loader')
+local output_loader_factory = require('busted.output_handler_loader')
+local helper_loader_factory = require('busted.helper_loader')
 
 local function reset_module(name)
   package.loaded[name] = nil

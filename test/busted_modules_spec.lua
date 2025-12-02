@@ -1,8 +1,8 @@
 local uv = vim.uv
 local fs = vim.fs
 
-local test_file_loader_factory = require('busted.modules.test_file_loader')
-local FilterLoader = require('busted.modules.filter_loader')
+local test_file_loader_factory = require('busted.test_file_loader')
+local FilterLoader = require('busted.filter_loader')
 local fixtures = require('busted.fixtures')
 
 local function mktempdir()
@@ -142,7 +142,7 @@ describe('busted.modules.filter_loader', function()
   local original_print
 
   local function apply_filter(options)
-    FilterLoader.apply(stub_busted, options or {})
+    FilterLoader.new(stub_busted, options or {}):run()
   end
 
   before_each(function()

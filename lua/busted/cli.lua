@@ -1,9 +1,7 @@
 local utils = require('busted.utils')
 local argparse = require('argparse')
 
-local uv = vim.uv
-local fs = vim.fs
-local is_windows = uv.os_uname().sysname:match('Windows')
+local is_windows = vim.uv.os_uname().sysname:match('Windows')
 
 --- @class busted.cli.Options
 --- @field output? string
@@ -14,7 +12,7 @@ local function normalize(pathname)
   if not pathname or pathname == '' then
     return pathname
   end
-  return fs.normalize(pathname)
+  return vim.fs.normalize(pathname)
 end
 
 --- @param base string?
@@ -27,7 +25,7 @@ local function join(base, relative)
   if not relative or relative == '' then
     return normalize(base)
   end
-  return normalize(fs.joinpath(base, relative))
+  return normalize(vim.fs.joinpath(base, relative))
 end
 
 --- @param pathname string?
@@ -36,7 +34,7 @@ local function isfile(pathname)
   if not pathname or pathname == '' then
     return false
   end
-  local stat = uv.fs_stat(pathname)
+  local stat = vim.uv.fs_stat(pathname)
   return stat ~= nil and stat.type == 'file'
 end
 
@@ -170,7 +168,7 @@ local function processDir(state, key, value, altkey)
 end
 
 local function merge_tables(base, overrides)
-  return vim.deep_extend('force', base or {}, overrides or {})
+  return vim.deep_extend('force', base, overrides or {})
 end
 
 local function config_loader(config_file, config, defaults)

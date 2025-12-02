@@ -245,7 +245,6 @@ function M:_load_exclude_names()
   for line_name in io.lines(exclude_file) do
     table.insert(self._exclude_names, line_name)
   end
-  return
 end
 
 function M:run()
@@ -254,13 +253,6 @@ function M:run()
   end
   self:_apply_error_filters()
   self:_apply_name_filters()
-  return
-end
-
---- @param busted busted.Busted
---- @param options busted.FilterLoaderOptions
-function M.apply(busted, options)
-  M.new(busted, options):run()
 end
 
 return M

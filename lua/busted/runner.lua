@@ -46,9 +46,9 @@ local function main(options)
   local busted = require('busted.core').new()
 
   local cli = require('busted.cli')(options)
-  local filterLoader = require('busted.modules.filter_loader')
-  local helperLoader = require('busted.modules.helper_loader')()
-  local outputHandlerLoader = require('busted.modules.output_handler_loader')()
+  local filterLoader = require('busted.filter_loader')
+  local helperLoader = require('busted.helper_loader')()
+  local outputHandlerLoader = require('busted.output_handler_loader')()
 
   require('busted')(busted)
 
@@ -209,21 +209,23 @@ local function main(options)
   end
 
   -- Load tag and test filters
-  filterLoader.apply(busted, {
-    tags = cliArgs.tags,
-    excludeTags = cliArgs['exclude-tags'],
-    filter = cliArgs.filter,
-    filterOut = cliArgs['filter-out'],
-    excludeNamesFile = cliArgs['exclude-names-file'],
-    list = cliArgs.list,
-    nokeepgoing = cliArgs['quit-on-error'],
-    suppressPending = cliArgs['suppress-pending'],
-  })
+  filterLoader
+    .new(busted, {
+      tags = cliArgs.tags,
+      excludeTags = cliArgs['exclude-tags'],
+      filter = cliArgs.filter,
+      filterOut = cliArgs['filter-out'],
+      excludeNamesFile = cliArgs['exclude-names-file'],
+      list = cliArgs.list,
+      nokeepgoing = cliArgs['quit-on-error'],
+      suppressPending = cliArgs['suppress-pending'],
+    })
+    :run()
 
   -- Load test directories/files
   local rootFiles = cliArgs.ROOT
   local patterns = cliArgs.pattern
-  local testFileLoader = require('busted.modules.test_file_loader')(busted)
+  local testFileLoader = require('busted.test_file_loader')(busted)
   testFileLoader(rootFiles, patterns, {
     excludes = cliArgs['exclude-pattern'],
     verbose = cliArgs.verbose,
