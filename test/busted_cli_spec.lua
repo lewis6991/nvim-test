@@ -14,7 +14,7 @@ describe('busted.cli', function()
   end
 
   before_each(function()
-    cli = cli_factory({ standalone = false })
+    cli = cli_factory({})
     cli:set_name('busted')
   end)
 
@@ -96,11 +96,4 @@ describe('busted.cli', function()
     assert.matches('Cannot use %-%-tags and %-%-exclude%-tags', err)
   end)
 
-  it('rejects positional roots when running standalone', function()
-    local standalone = cli_factory({ standalone = true })
-    standalone:set_name('busted')
-    local ok, err = standalone:parse({ [0] = 'busted', 'spec/foo_spec.lua' })
-    assert(not ok)
-    assert.matches('Unexpected positional argument', err)
-  end)
 end)

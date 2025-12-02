@@ -206,19 +206,15 @@ end
 return function(options)
   local appName = ''
   options = options or {}
-  local allow_roots = not options.standalone
   local defaultOutput = options.output or 'busted.outputHandlers.output_handler'
   local parser = argparse.new_parser({
     state_factory = function()
       return {
-        args = { ROOT = options.standalone and {} or { 'spec' } },
+        args = { ROOT = { 'spec' } },
         overrides = {},
       }
     end,
     positional_handler = function(state, argument)
-      if not allow_roots then
-        return false, 'Unexpected positional argument ' .. argument
-      end
       local list = state.overrides['ROOT']
       if not list then
         list = {}
@@ -230,31 +226,27 @@ return function(options)
     app_name = appName,
   })
 
-  if allow_roots then
-    parser:add_argument_help(
-      'ROOT',
-      'Test script file or directory. Directories are traversed for files matching --pattern.'
-    )
-  end
+  parser:add_argument_help(
+    'ROOT',
+    'Test script file or directory. Directories are traversed for files matching --pattern.'
+  )
 
   parser:add_argument({ '--version' }, {
     help = 'Print the program version and exit.',
     default = false,
   })
-  if allow_roots then
-    parser:add_argument({ '-p', '--pattern' }, {
-      metavar = 'PATTERN',
-      multi = true,
-      help = 'Only run test files matching the Lua pattern.',
-      default = { '_spec' },
-    })
-    parser:add_argument({ '--exclude-pattern' }, {
-      metavar = 'PATTERN',
-      multi = true,
-      help = 'Do not run files matching the Lua pattern; takes precedence over --pattern.',
-      default = {},
-    })
-  end
+  parser:add_argument({ '-p', '--pattern' }, {
+    metavar = 'PATTERN',
+    multi = true,
+    help = 'Only run test files matching the Lua pattern.',
+    default = { '_spec' },
+  })
+  parser:add_argument({ '--exclude-pattern' }, {
+    metavar = 'PATTERN',
+    multi = true,
+    help = 'Do not run files matching the Lua pattern; takes precedence over --pattern.',
+    default = {},
+  })
   parser:add_argument({ '-e', '--exec' }, {
     metavar = 'STATEMENT',
     multi = true,
