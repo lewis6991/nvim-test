@@ -10,7 +10,7 @@ Adapted directly from https://github.com/neovim/neovim/tree/master/test
 
 - [Luarocks]
 - [Lua5.1]
-- MacOS or Linux
+- macOS, Linux, or MSYS2/Windows
 
 ## Usage
 
@@ -48,7 +48,7 @@ nvim-test:
 .PHONY: test
 test: nvim-test
 	nvim-test/bin/nvim-test test \
-		--lpath=$(PWD)/lua/?.lua
+		--lpath "$(CURDIR)/lua/?.lua"
 ```
 
 Add a test file `test/mytest_spec.lua` with the format:
@@ -82,7 +82,7 @@ make test
 
 ```
 nvim-test/bin/nvim-test test \
-        --lpath=.../nvim-test/example/lua/?.lua
+        --lpath .../nvim-test/example/lua/?.lua
 -------- Global test environment setup.
 -------- Running tests from test/mytest_spec.lua
 RUN       my tests run a test: 1.14 ms OK

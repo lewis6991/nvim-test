@@ -74,6 +74,29 @@ function parse_args() {
 
 parse_args "$@"
 
+function is_windows() {
+  case $(uname -s) in
+    MSYS_*|MINGW*|CYGWIN*|*_NT-*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+function native_path() {
+  local path=$1
+  if is_windows; then
+    cygpath --mixed "$path"
+  else
+    echo "$path"
+  fi
+}
+
+NVIM_BIN=nvim
+if is_windows; then
+  NVIM_BIN=nvim.exe
+fi
+
 function version {
   echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'
 }
@@ -84,7 +107,9 @@ function version_cmp {
 
 function get_platform() {
   local ver=$1
-  if [[ $(uname -s) == Darwin ]]; then
+  if is_windows; then
+    echo "windows"
+  elif [[ $(uname -s) == Darwin ]]; then
     if [[ $ver == 'nightly' ]] || version_cmp "$ver" 0.10; then
       echo "macos-$(uname -m)"
     else
@@ -99,7 +124,6 @@ function get_platform() {
     fi
   fi
 }
-
 
 NVIM_URL=https://github.com/neovim/neovim/releases/download
 NVIM_RELEASES_URL=https://github.com/neovim/neovim-releases/releases/download
@@ -117,20 +141,35 @@ function fetch_nvim() {
   local ver=$1
   local dst=$2
   local platform; platform=$(get_platform "$ver")
-  local asset; asset="nvim-$platform"
+  local asset ext
 
+  if [[ $platform == windows ]]; then
+    asset="nvim-win64"
+    ext=zip
+  else
+    asset="nvim-$platform"
+    ext=tar.gz
+  fi
+
+  local archive; archive="$asset.$ext"
   local url
   if use_nvim_releases "$ver" "$platform"; then
-    url="$NVIM_RELEASES_URL/$ver/$asset.tar.gz"
+    url="$NVIM_RELEASES_URL/$ver/$archive"
   else
-    url="$NVIM_URL/$ver/$asset.tar.gz"
+    url="$NVIM_URL/$ver/$archive"
   fi
 
   rm -rf "$dst"
-  rm -rf "$asset.tar.gz"
+  rm -rf "$archive"
   wget "$url"
-  tar -xf "$asset.tar.gz"
-  rm -rf "$asset.tar.gz"
+
+  if [[ $ext == zip ]]; then
+    unzip -q "$archive"
+  else
+    tar -xf "$archive"
+  fi
+
+  rm -rf "$archive"
   mv "$asset" "$dst"
 }
 
@@ -142,6 +181,10 @@ function is_dir_older_than_24h() {
   local dir_mtime=$(stat -c %Y "$dir")
   local now=$(date +%s)
   [ $((now - dir_mtime)) -gt 86400 ]
+}
+
+function has_rock() {
+  $LUAROCKS show "$1" >/dev/null 2>&1
 }
 
 if [ "$NVIM_TEST_VERSION" = "nightly" ] \
@@ -168,13 +211,13 @@ fi
 
 LUAROCKS="luarocks --lua-version=5.1 --tree $DATA/luarocks"
 
-if [ ! -f "$DATA/luarocks/bin/busted" ]; then
+if ! has_rock busted; then
   echo "Installing Busted"
   $LUAROCKS install busted
 fi
 
 if [ $LUACOV_ENABLED ]; then
-  if [ ! -f "$DATA/luarocks/bin/luacov" ]; then
+  if ! has_rock luacov; then
     echo "Installing LuaCov"
     $LUAROCKS install luacov
     # Add some more reporters
@@ -189,15 +232,19 @@ if [ $INIT_ONLY ]; then
   exit
 fi
 
-eval "$($LUAROCKS path)"
+# `luarocks path` emits shell-specific commands. On MSYS2/Windows that output
+# uses `SET ...`, which is not valid in bash, so export the Lua paths directly.
+# `;;` preserves Lua's built-in search paths after the LuaRocks tree entries.
+export LUA_PATH="$($LUAROCKS path --lr-path);;"
+export LUA_CPATH="$($LUAROCKS path --lr-cpath);;"
 
-export NVIM_PRG=$NVIM_TEST/bin/nvim
+export NVIM_PRG="$NVIM_TEST/bin/$NVIM_BIN"
 export NVIM_TEST_HOME
 
-exec "$NVIM_RUNNER"/bin/nvim -ll \
-  "$NVIM_TEST_HOME/lua/nvim-test/busted/runner.lua" \
-  --helper="$NVIM_TEST_HOME/lua/nvim-test/preload.lua" \
-  --lpath="$NVIM_TEST_HOME/lua/?.lua" \
+# `-ll` is handled by nvim itself, so the runner path must be normalized here.
+exec "$NVIM_RUNNER/bin/$NVIM_BIN" -ll \
+  "$(native_path "$NVIM_TEST_HOME/lua/nvim-test/busted/runner.lua")" \
+  --helper "$NVIM_TEST_HOME/lua/nvim-test/preload.lua" \
+  --lpath "$NVIM_TEST_HOME/lua/?.lua" \
   --output nvim-test.busted.output_handler \
   "${ARGS[@]}"
-
