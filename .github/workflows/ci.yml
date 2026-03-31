@@ -1,0 +1,75 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stylua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check formatting
+        run: make stylua-check
+
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: test / linux
+            os: ubuntu-latest
+            platform: unix
+          - name: test / macos
+            os: macos-latest
+            platform: unix
+          - name: test / windows
+            os: windows-latest
+            platform: windows
+            msystem: UCRT64
+            msys2_packages: >-
+              make
+              unzip
+              wget
+              mingw-w64-ucrt-x86_64-gcc
+              mingw-w64-ucrt-x86_64-lua-luarocks
+              mingw-w64-ucrt-x86_64-lua51
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - if: matrix.platform == 'unix'
+        uses: lewis6991/gh-actions-lua@master
+        with:
+          luaVersion: '5.1.5'
+
+      - if: matrix.platform == 'unix'
+        uses: leafo/gh-actions-luarocks@v4
+
+      - if: matrix.platform == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          install: ${{ matrix.msys2_packages }}
+
+      - name: Run example suite
+        if: matrix.platform == 'unix'
+        working-directory: example
+        run: make test LOCAL=1
+
+      - name: Run example suite
+        if: matrix.platform == 'windows'
+        shell: msys2 {0}
+        working-directory: example
+        run: make test LOCAL=1 COVERAGE=false

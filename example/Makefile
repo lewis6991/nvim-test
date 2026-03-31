@@ -1,5 +1,7 @@
 
 LOCAL :=
+COVERAGE ?= true
+COVERAGE_FLAG := $(if $(filter true,$(COVERAGE)),--coverage)
 
 .DEFAULT_GOAL := test
 
@@ -16,6 +18,5 @@ nvim-test:
 .PHONY: test
 test: $(NVIM_TEST_HOME)
 	$(NVIM_TEST_HOME)/bin/nvim-test test \
-		--lpath=$(PWD)/lua/?.lua \
-		--verbose \
-		--coverage
+		--lpath "$(CURDIR)/lua/?.lua" \
+		--verbose $(COVERAGE_FLAG)

@@ -13,6 +13,19 @@ M.sleep = uv.sleep
 M.eq = assert.are.same
 M.neq = assert.are_not.same
 
+local function normalize_windows_path(path)
+  if not path or package.config:sub(1, 1) ~= '\\' then
+    return path
+  end
+
+  local drive, tail = path:match('^/([A-Za-z])/(.*)$')
+  if not drive then
+    return path
+  end
+
+  return string.format('%s:/%s', drive:upper(), tail)
+end
+
 local function epicfail(state, arguments, _)
   --- @diagnostic disable-next-line
   state.failure_message = arguments[1]
@@ -313,11 +326,14 @@ local exec_lua = M.exec_lua
 function M.clear(init_lua_path)
   check_close()
 
+  -- These env-backed paths are consumed after the shell wrapper returns, so
+  -- normalize any MSYS-style values at the point of use.
+  local nvim_test_home = normalize_windows_path(os.getenv('NVIM_TEST_HOME'))
   local nvim_cmd = {
-    os.getenv('NVIM_PRG') or 'nvim',
+    normalize_windows_path(os.getenv('NVIM_PRG')) or 'nvim',
     '--clean',
     '-u',
-    init_lua_path or 'NONE',
+    normalize_windows_path(init_lua_path) or 'NONE',
     '-i',
     'NONE',
     '--cmd',
@@ -351,15 +367,15 @@ function M.clear(init_lua_path)
   --- @type integer
   local channel = M.api.nvim_get_api_info()[1]
 
-  exec_lua(function(chan)
-    vim.opt.rtp:append(vim.env.NVIM_TEST_HOME)
+  exec_lua(function(chan, nvim_test_home)
+    vim.opt.rtp:append(nvim_test_home)
 
     local orig_print = _G.print
     function _G.print(...)
       vim.rpcnotify(chan, 'nvim_print_event', ...)
       return orig_print(...)
     end
-  end, channel)
+  end, channel, nvim_test_home)
 
   --- @type table?
   local enable_cov = package.loaded['luacov.runner']
