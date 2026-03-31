@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/lewis6991/nvim-test/compare/v1.3.0...v1.4.0) (2026-03-31)
+
+
+### Features
+
+* add ci coverage for windows support ([4af4566](https://github.com/lewis6991/nvim-test/commit/4af4566b3e1eef9ae6df8d10a430ea08a7a13e97))
+
+
+### Bug Fixes
+
+* remove block from pending() meta ([2518409](https://github.com/lewis6991/nvim-test/commit/25184091d60e093cf534448d23018acfc4cb46ba))
+
 ## [1.3.0](https://github.com/lewis6991/nvim-test/compare/v1.2.0...v1.3.0) (2025-11-27)
 
 
