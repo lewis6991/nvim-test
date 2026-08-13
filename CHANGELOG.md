@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/lewis6991/nvim-test/compare/v1.4.0...v1.4.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **preload:** fix runner error when coxpcall installed ([07c1617](https://github.com/lewis6991/nvim-test/commit/07c1617cfb48c9ed6e237a72d2c889f0a1368c41))
+
 ## [1.4.0](https://github.com/lewis6991/nvim-test/compare/v1.3.0...v1.4.0) (2026-03-31)
 
 
